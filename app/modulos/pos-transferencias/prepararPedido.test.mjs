@@ -205,6 +205,50 @@ test("EL RECORRIDO: va completo, corregir a menos, a 0, bultos con sueltas, agre
   assert.deepEqual(A.navegacion.at(-1), ["push", "/modulos/pos-transferencias"]);
 });
 
+test("enviar y el depósito ya lo había cancelado: el aviso y de vuelta a Pedidos de locales", async () => {
+  // La respuesta que dio `enviar` al perder la carrera contra cancelar
+  // (sección 15d), y nunca "El local cambió…".
+  assert.deepEqual(dep.depositoEnviarPerdioContraCancelar, { status: 409, cuerpo: { ok: false, error: "Este pedido se canceló." } });
+  const { pedidos } = await montarPreparar({ enviar: [dep.depositoEnviarPerdioContraCancelar] });
+  // Las mismas escrituras que EL RECORRIDO, hasta tener todo revisado.
+  await A.tocar(A.boton("✓ Va completo", linea("ACEITE")));
+  await corregir("YERBA", [0]);
+  await corregir("ARROZ", [1]);
+  await corregir("AGUA X6", [1, 3]);
+  await elegir("Con cambios");
+  await corregir("AGUA X6", [2, 0]);
+  await A.tocar(A.boton("+ Agregar producto que no pidió"));
+  await A.teclear(A.modal().querySelector("input"), "AZUC");
+  await A.asentar();
+  await A.tocar([...A.modal().querySelectorAll("button")].find((b) => /AZUCAR/.test(b.textContent)));
+  await elegir("Pendientes");
+  await A.tocar(A.boton("✓ Va completo", linea("FIDEOS")));
+  assert.ok(!enviarBoton().disabled, "Enviar sigue apagado con todo revisado");
+
+  const lecturas = A.llamadas(pedidos, "/api/pos-transferencias/detalle").length;
+  await A.tocar(enviarBoton());
+  assert.equal(A.llamadas(pedidos, "/api/pos-transferencias/enviar").length, 1);
+  assert.match(A.texto(), /Este pedido se canceló\./);
+  assert.doesNotMatch(A.texto(), /El local cambió/);
+  assert.deepEqual(A.navegacion.at(-1), ["push", "/modulos/pos-transferencias"]);
+  assert.equal(A.llamadas(pedidos, "/api/pos-transferencias/detalle").length, lecturas, "volvió a leer un pedido cancelado");
+});
+
+test("la hoja de corregir dice lo pedido con el mismo texto que la tarjeta", async () => {
+  for (const n of ["ACEITE", "AGUA X6"]) {
+    await A.desmontarTodo();
+    await montarPreparar();
+    const enLaTarjeta = [...linea(n).querySelectorAll("p")].find((p) => p.firstElementChild?.textContent === "Pidió").children[1].textContent.trim();
+    await A.tocar(A.boton("Corregir", linea(n)));
+    const hoja = A.modal();
+    assert.ok(hoja, `no se abrió la hoja de ${n}`);
+    assert.ok(hoja.textContent.includes(`Pidió ${enLaTarjeta}`), `${n}: la hoja no dice "Pidió ${enLaTarjeta}": ${hoja.textContent}`);
+    assert.doesNotMatch(hoja.textContent, /BULTO de/);
+    // El renglón por bulto, con su número.
+    if (n === "AGUA X6") assert.ok(hoja.textContent.includes("Pidió 2 PACK x6"));
+  }
+});
+
 test("escanear un código deja solo ese producto, aunque ya esté preparado", async () => {
   await montarPreparar({ detalle: dep.depositoDetalleTrabajando });
   const fideos = dep.depositoDetalleTrabajando.cuerpo.item.detalles.find((d) => d.productoNombre === "FIDEOS");

@@ -8,7 +8,7 @@ import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conve
 import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
-import { sinCancelados } from "@/lib/pedidos/estados";
+import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 import { cantidadQueViaja } from "@/lib/pedidos/revisionDeLinea";
 import {
@@ -54,6 +54,9 @@ function snapshotDeEnvioManual(item) {
     pesoPiezaKg: d.presentacion === PRESENTACION.PIEZA ? d.pesoPiezaKg : null,
   };
 }
+
+/** Lo que lee el que envía cuando el depósito canceló el pedido antes que él. */
+const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
 
 /** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
 function firmaDeLineas(lineas) {
@@ -103,6 +106,18 @@ export async function POST(req) {
     });
 
     if (!pos) {
+      // Cancelado antes de llegar acá: lo mismo que si se cancelaba durante el
+      // bloqueo de abajo, y no un "no encontrada" que no dice qué pasó. Con el
+      // mismo alcance de abajo: a quien no es del origen ni del destino no se
+      // le dice nada de un pedido ajeno.
+      const cancelado = await prisma.posTransferencia.findFirst({
+        where: { id: posId, estado: ESTADO_PEDIDO.CANCELADO },
+        select: { origenId: true, destinoId: true },
+      });
+      const local = Number(session.localId);
+      if (cancelado && (session.esAdmin || local === cancelado.origenId || local === cancelado.destinoId)) {
+        return NextResponse.json({ ok: false, error: MENSAJE_SE_CANCELO }, { status: 409 });
+      }
       return NextResponse.json(
         { ok: false, error: "POS no encontrada" },
         { status: 404 }
@@ -291,7 +306,15 @@ export async function POST(req) {
       // vieja y lo que sumó quedaría en el pedido sin viajar. Entonces no se
       // despacha y se dice. Ver `lib/pedidos/bloqueoDelPedido.js`.
       await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
-      await bloquearFilaDelPedido(tx, pos.id);
+      const fila = await bloquearFilaDelPedido(tx, pos.id);
+      // ── SI LO CANCELARON MIENTRAS ESPERABA, ES ESO LO QUE SE DICE ─────────
+      // El depósito puede cancelar el pedido (2026-10-23). Si la cancelación
+      // tomó el bloqueo primero, las líneas de abajo ya no se leen —el pedido
+      // está cancelado— y la firma no coincide: se decía "El local cambió el
+      // pedido", que es falso. Se pregunta primero por el estado de la fila.
+      if (fila?.estado === ESTADO_PEDIDO.CANCELADO) {
+        throw new Error("PEDIDO_CANCELADO");
+      }
       const ahora = await tx.posTransferenciaDetalle.findMany({
         where: { posTransferenciaId: pos.id, pos: sinCancelados() },
         select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true },
@@ -357,6 +380,9 @@ export async function POST(req) {
       error: null,
     });
   } catch (err) {
+    if (err.message === "PEDIDO_CANCELADO") {
+      return NextResponse.json({ ok: false, error: MENSAJE_SE_CANCELO }, { status: 409 });
+    }
     if (err.message === "PEDIDO_CAMBIO") {
       return NextResponse.json(
         { ok: false, error: "El local cambió el pedido mientras lo enviabas. Volvé a abrirlo y enviá de nuevo." },

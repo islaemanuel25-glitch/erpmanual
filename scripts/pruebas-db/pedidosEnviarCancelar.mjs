@@ -1452,23 +1452,32 @@ try {
       // otra encuentra el pedido ya decidido. Nunca las dos: cancelado Y con
       // transferencia. Y si ganó la cancelación, el stock no se movió.
       const VUELTAS = 20;
-      const carrera = { vueltas: VUELTAS, cancelo: 0, envio: 0, ambas: 0, ninguna: 0, stockMovidoAlCancelar: 0, respuestas: {} };
+      const carrera = { vueltas: VUELTAS, cancelo: 0, envio: 0, ambas: 0, ninguna: 0, stockMovidoAlCancelar: 0, enviarDijoCancelado: 0, enviarDijoElLocalCambio: 0, respuestas: {} };
       for (let i = 0; i < VUELTAS; i++) {
         const p = await pedirC([["ACEITE", 1]]);
         await empezar(p);
         const antes = await stock();
-        // El envío arranca primero y la cancelación sale con una demora que va
-        // de 0 a 38 ms: `enviar` valida el stock ANTES de tomar el bloqueo, y
-        // largadas juntas la cancelación ganaba las 20 (una carrera que cae
-        // siempre del mismo lado no ejerce nada).
+        // El envío arranca primero. `enviar` valida el stock ANTES de tomar el
+        // bloqueo, así que largadas juntas gana casi siempre la cancelación, y
+        // con una demora de unos milisegundos gana casi siempre el envío. Las
+        // vueltas pares salen juntas y las impares con demora (de 2 a 38 ms): la
+        // carrera cae de los dos lados, y el mensaje del envío que perdió se mide
+        // más de una vez (con todas demoradas, 1 de 20).
         const envia = enviarC(lucas.s, p);
-        await new Promise((r) => setTimeout(r, i * 2));
+        await new Promise((r) => setTimeout(r, i % 2 === 0 ? 0 : i * 2));
         const [rc, re] = await Promise.all([cancelarC(marta.s, p), envia]);
         const e = await pedidoDe(p);
         const t = await transferenciasDe(p);
         // Con el mensaje: lo que lee el que perdió.
         const clave = `cancelar ${rc.status}${rc.cuerpo.error ? ` "${rc.cuerpo.error}"` : ""} / enviar ${re.status}${re.cuerpo.error ? ` "${re.cuerpo.error}"` : ""}`;
         carrera.respuestas[clave] = (carrera.respuestas[clave] || 0) + 1;
+        // El envío que perdió: qué le dijo la ruta (2026-10-23, "Este pedido
+        // se canceló." y nunca "El local cambió…", que es falso).
+        if (!re.cuerpo.ok) {
+          if (re.status === 409 && re.cuerpo.error === "Este pedido se canceló.") carrera.enviarDijoCancelado++;
+          if (/El local cambió/.test(re.cuerpo.error || "")) carrera.enviarDijoElLocalCambio++;
+          if (!lectura.depositoEnviarPerdioContraCancelar) guardar("depositoEnviarPerdioContraCancelar", re);
+        }
         if (e.estado === "Cancelado" && t > 0) carrera.ambas++;
         else if (e.estado === "Cancelado") {
           carrera.cancelo++;
@@ -1481,6 +1490,18 @@ try {
       ok("15d: nunca quedan las dos cosas (cancelado y con transferencia)", carrera.ambas === 0, json(carrera));
       ok("15d: cada vuelta terminó en una de las dos", carrera.cancelo + carrera.envio === VUELTAS && carrera.ninguna === 0, json(carrera));
       ok("15d: ninguna cancelación movió stock", carrera.stockMovidoAlCancelar === 0, json(carrera));
+      ok("15d: el envío que perdió dice \"Este pedido se canceló.\", cada vez", carrera.cancelo > 0 && carrera.enviarDijoCancelado === carrera.cancelo, json(carrera));
+      ok("15d: y nunca \"El local cambió…\"", carrera.enviarDijoElLocalCambio === 0, json(carrera));
+
+      // ── e. Enviar uno que ya estaba cancelado: lo mismo, no un 404 mudo ───
+      const pe = await pedirC([["ACEITE", 1]]);
+      await empezar(pe);
+      await cancelarC(marta.s, pe);
+      const ee = await enviarC(lucas.s, pe);
+      guardar("depositoEnviarYaCancelado", ee);
+      ok("15e: enviar uno ya cancelado da 409 \"Este pedido se canceló.\"", ee.status === 409 && ee.cuerpo.error === "Este pedido se canceló.", json(ee));
+      const eeAjeno = await enviarC(otroDepo.s, pe);
+      ok("15e: a otro depósito no se le dice que se canceló", eeAjeno.status === 404, json(eeAjeno));
       guardar("depositoCancelarIds", { pa, pb, pcc, local: C.local.nombre, deposito: C.deposito.nombre });
     }
   }

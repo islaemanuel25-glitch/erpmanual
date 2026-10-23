@@ -46,7 +46,7 @@ import SunmiBarraDeAvance from "@/components/sunmi/SunmiBarraDeAvance";
 import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
-import { showSuccess } from "@/components/sunmi/SunmiToast";
+import { showSuccess, showWarning } from "@/components/sunmi/SunmiToast";
 import { TITULO_MAS_ACCIONES } from "@/components/transferencias/RecepcionMovil";
 import {
   CajaDeCantidad,
@@ -85,6 +85,8 @@ export const TEXTO_CANCELAR_PEDIDO = "Cancelar pedido";
 export const TEXTO_LO_PREPARADO_NO_SE_ENVIA = "Lo preparado no se envía.";
 
 const ENTRADA = "/modulos/pos-transferencias";
+/** El 409 de `enviar` cuando el pedido se canceló antes que el envío. */
+const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
 
 // ── LA HOJA DE CORRECCIÓN ─────────────────────────────────────────────────
 //
@@ -368,6 +370,13 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
       }
       // El 409 de "el local cambió el pedido mientras lo enviabas": el aviso
       // arriba y el pedido como está ahora.
+      // Lo canceló el depósito mientras se enviaba: no hay nada que releer,
+      // el aviso y de vuelta a la lista, donde ya no está.
+      if (res.status === 409 && json.error === MENSAJE_SE_CANCELO) {
+        showWarning(json.error);
+        router.push(ENTRADA);
+        return;
+      }
       if (res.status === 409) {
         setAviso({ tono: "warning", texto: json.error });
         await leer();

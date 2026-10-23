@@ -63,6 +63,27 @@ test("LA CARRERA: 20 vueltas cancelando mientras otro envía, nunca las dos cosa
   assert.equal(m.stockMovidoAlCancelar, 0, "una cancelación movió stock");
 });
 
+test("el envío que perdió contra la cancelación dice que se canceló, nunca que el local cambió algo", () => {
+  const m = dep.depositoCarreraCancelarEnviar;
+  assert.ok(m.cancelo > 1, "la cancelación ganó una vez o ninguna: el mensaje casi no se midió");
+  assert.equal(m.enviarDijoCancelado, m.cancelo);
+  assert.equal(m.enviarDijoElLocalCambio, 0);
+  const SE_CANCELO = { status: 409, cuerpo: { ok: false, error: "Este pedido se canceló." } };
+  assert.deepEqual(dep.depositoEnviarPerdioContraCancelar, SE_CANCELO);
+  // Y enviar uno que ya estaba cancelado, lo mismo (no un 404 mudo).
+  assert.deepEqual(dep.depositoEnviarYaCancelado, SE_CANCELO);
+});
+
+test("la forma de enviar: el cancelado se pregunta adentro del bloqueo, antes de comparar las líneas", () => {
+  const enviar = sinComentarios("app/api/pos-transferencias/enviar/route.js");
+  const tx = enviar.indexOf("prisma.$transaction(async (tx) =>");
+  const fila = enviar.indexOf("const fila = await bloquearFilaDelPedido(tx, pos.id);");
+  const cancelado = enviar.indexOf('if (fila?.estado === ESTADO_PEDIDO.CANCELADO) {');
+  const firma = enviar.indexOf("firmaDeLineas(ahora) !== firmaDeLineas(pos.detalles)");
+  assert.ok(tx > -1 && fila > tx && cancelado > fila && firma > cancelado, "el orden no es transacción → fila → cancelado → líneas");
+  assert.match(enviar, /const MENSAJE_SE_CANCELO = "Este pedido se canceló\.";/);
+});
+
 test("la forma: el depósito ORIGEN, con el permiso de enviar, adentro del mismo bloqueo", () => {
   assert.match(ruta, /const PERMISO_DEL_DEPOSITO = "pos_transferencias\.enviar";/);
   assert.match(ruta, /checkPerm\(session, PERMISO_DEL_DEPOSITO\)\.ok/);
