@@ -172,6 +172,19 @@ export const PATRONES = [
     re: /^\s*UPDATE\s+/im,
     motivo: "reescribe filas existentes; hay que mirar si la versión vieja las lee mientras tanto",
   },
+  // ── UN BLOQUE `DO` FRENA SOLO (2026-10-24) ─────────────────────────────
+  //
+  // Adentro de un `DO $$ … $$` el código puede escribir, borrar o armar la
+  // sentencia en un texto (`EXECUTE`), y los patrones de arriba no lo ven: la
+  // migración de los sumados de antes —un INSERT de datos dentro de un DO— dio
+  // CERO. No se intenta leerlo por dentro: cualquier `DO` se marca, y quien
+  // despliega lo mira.
+  {
+    nombre: "bloque DO",
+    re: /\bDO\s*(\$[A-Za-z0-9_]*\$|LANGUAGE\b|')/i,
+    motivo:
+      "un bloque DO ejecuta código que este clasificador no lee por dentro: puede escribir o borrar datos sin que ningún patrón lo vea",
+  },
 ];
 
 /**

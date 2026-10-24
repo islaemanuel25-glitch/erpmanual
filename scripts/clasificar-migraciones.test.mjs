@@ -166,8 +166,36 @@ test("la fixture aditiva menciona DROP COLUMN en un comentario y aun así pasa",
 // Inventario: sumar un patrón tiene que ser deliberado
 // ---------------------------------------------------------------------------
 
-test("los patrones son los 13 esperados, cada uno con su motivo", () => {
-  assert.equal(PATRONES.length, 13);
+test("UN BLOQUE DO FRENA SOLO, AUNQUE ADENTRO HAYA UN INSERT QUE NINGÚN PATRÓN VE", () => {
+  // La migración real que dio 0: un INSERT de datos adentro de un DO.
+  const real = fs.readFileSync(
+    path.join(ROOT, "prisma/migrations/20261024193235_lista_sumados_de_antes/migration.sql"),
+    "utf8"
+  );
+  const h = clasificarSql(real);
+  assert.ok(h.some((x) => x.patron === "bloque DO"), "la migración con DO no se marcó");
+  // Las otras formas de abrir el bloque.
+  for (const sql of [
+    `DO $$ BEGIN PERFORM 1; END $$;`,
+    `do $x$ begin null; end $x$;`,
+    `DO LANGUAGE plpgsql $$ BEGIN NULL; END $$;`,
+    `DO 'BEGIN NULL; END';`,
+  ]) {
+    assert.ok(clasificarSql(sql).some((x) => x.patron === "bloque DO"), sql);
+  }
+  // Y no se confunde con palabras que contienen "do" ni con un DO en un comentario.
+  for (const sql of [
+    `CREATE TABLE "Documento" ("id" SERIAL NOT NULL, "todo" TEXT);`,
+    `ALTER TABLE "F" ADD COLUMN "redondeo" BOOLEAN NOT NULL DEFAULT false;`,
+    `-- acá no hay un DO $$ de verdad\nCREATE INDEX "i" ON "F"("a");`,
+    `ALTER TABLE "F" ADD CONSTRAINT "f_fk" FOREIGN KEY ("a") REFERENCES "G"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  ]) {
+    assert.ok(!clasificarSql(sql).some((x) => x.patron === "bloque DO"), sql);
+  }
+});
+
+test("los patrones son los 14 esperados, cada uno con su motivo", () => {
+  assert.equal(PATRONES.length, 14);
   for (const p of PATRONES) {
     assert.ok(p.nombre, "un patrón sin nombre");
     assert.ok(p.motivo && p.motivo.length > 20, `el patrón ${p.nombre} no explica por qué rompe`);
