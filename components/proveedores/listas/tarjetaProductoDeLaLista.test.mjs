@@ -434,6 +434,70 @@ test("GRANIX CON LA PIEZA DE 2 KG: LA CUENTA EN KILOS CONTRA $ 6.405 EL KILO, Y 
   assert.equal(conEspacios(cuentaDe(soloPieza)), "$ 22.105,73 ÷ 2 kg = $ 11.052,87 el kilo · hoy $ 6.405,00 el kilo");
 });
 
+// ── LOS NOMBRES VAN ENTEROS, NUNCA CON "…" (Emanuel, 2026-10-24) ─────────
+//
+// SOL PAMPEANO MOSTACHOL: dos renglones "SOL PAMPEANO FIDEO MOSTACHOL…" que se
+// leían iguales; lo que los distingue —gramaje, variedad— va al final.
+const LARGO = "SOL PAMPEANO FIDEO MOSTACHOL RAYADO SEMOLA DE TRIGO CANDEAL 500G X 12 PAQUETES";
+const NOMBRE_LARGO = "Sol Pampeano fideo mostachol rayado sémola de trigo candeal 500 g, paquete por doce";
+
+test("UN RENGLÓN CON NOMBRE LARGO SE DIBUJA ENTERO, SIN «…», EN «EN LA LISTA:» Y EN «¿ES …?»", () => {
+  // Vinculado: el renglón debajo del nombre.
+  const f = fila({ descripcionProveedor: LARGO, codigoCrudo: "6962" });
+  const vinculado = tusProductosDeLaLista({
+    productos: [{ id: 7, nombre: NOMBRE_LARGO, precio_costo: 1300, filas: [f] }],
+    rango: RANGO,
+  }).items[0];
+  const html = dibujar({ item: vinculado, abierta: true });
+  assert.ok(html.includes(`6962 · ${LARGO}`), "el renglón no salió entero");
+  assert.ok(html.includes(NOMBRE_LARGO), "el nombre del producto no salió entero");
+  // Sin vincular, con la sugerencia "¿Es …?".
+  const s = sugerenciaDeRenglon({
+    filas: [renglonLibre({ codigoCrudo: "5228", descripcionProveedor: LARGO })],
+    nombreDelProducto: NOMBRE_LARGO,
+    productoBaseId: 7,
+  });
+  assert.ok(s, "el caso no ejerce la sugerencia");
+  const sinVincular = tusProductosDeLaLista({
+    productos: [{ id: 7, nombre: NOMBRE_LARGO, precio_costo: 1300, filas: [] }],
+    rango: RANGO,
+    sugerencias: new Map([[7, s]]),
+  }).items[0];
+  const h2 = dibujar({ item: sinVincular, abierta: true });
+  assert.ok(h2.includes(`¿Es 5228 · ${LARGO}?`), "la sugerencia no salió entera");
+  // Ningún "…" y ninguna clase que corte, en ninguna de las dos.
+  for (const h of [html, h2]) {
+    assert.ok(!h.includes("…"), "apareció un «…»");
+    assert.ok(!/\b(truncate|line-clamp-\d|text-ellipsis)\b/.test(h), "una clase corta el texto");
+  }
+});
+
+test("NINGUNA PIEZA DE LA REVISIÓN DE UNA LISTA CORTA UN NOMBRE", () => {
+  // La hoja de vincular trae sus renglones de la ruta al montarse y no se puede
+  // dibujar sin servidor: se lee su fuente, sin comentarios.
+  const sinComentarios = (rel) =>
+    readFileSync(new URL(`../../../${rel}`, import.meta.url), "utf8")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+  for (const rel of [
+    "app/modulos/proveedores/listas/[id]/page.jsx",
+    "components/proveedores/listas/TarjetaProductoDeLaLista.jsx",
+    "components/proveedores/listas/HojaVincularConLaLista.jsx",
+    "components/proveedores/listas/HojaRevisarPrecio.jsx",
+    "components/proveedores/listas/PreguntaQueFalta.jsx",
+    "components/proveedores/listas/PiezasPantallas.jsx",
+  ]) {
+    const c = sinComentarios(rel);
+    // `whitespace-nowrap` no entra: lo lleva el importe ("$ 19.100,00"), que
+    // no tiene que partir, y no pone "…".
+    assert.ok(!/\b(truncate|line-clamp-\d+|text-ellipsis)\b/.test(c), `${rel} corta un texto`);
+  }
+  // El renglón de la hoja de vincular, entero y partiendo línea.
+  const hoja = sinComentarios("components/proveedores/listas/HojaVincularConLaLista.jsx");
+  assert.match(hoja, /break-words">\s*\{c\.codigo\} · \{c\.descripcion\}/);
+});
+
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {
   const html = dibujar({ item: itemDe({ filas: [fila()] }), abierta: true, error: "No se pudo. No se guardó nada." });
   assert.match(html, /sunmi-text-danger[^>]*>No se pudo\. No se guardó nada\.</);

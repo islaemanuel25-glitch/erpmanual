@@ -826,7 +826,9 @@ export default function ResultadoDeListaPage() {
   // una ubicación sin los costos), es la barra él solo.
   const avisoHecho = hecho ? (
     <div className="flex items-center justify-between gap-3" role="status" aria-live="polite">
-      <span className="min-w-0 text-sm2 sunmi-text-strong truncate">
+      {/* El nombre entero, en las líneas que haga falta (2026-10-24): con "…"
+          dos productos parecidos se leen iguales. */}
+      <span className="min-w-0 text-sm2 sunmi-text-strong break-words">
         {TEXTO_HECHO} {hecho.nombre}
         {hecho.deshacer ? " ·" : ""}
       </span>
@@ -994,7 +996,7 @@ export default function ResultadoDeListaPage() {
           <div className="mt-2 divide-y sunmi-divide">
             {(omitidas.propuestaDiferente ?? []).slice(0, 5).map((o) => (
               <div key={o.filaId} className="py-2">
-                <div className="text-sm2 sunmi-text-strong truncate" title={o.nombre ?? ""}>
+                <div className="text-sm2 sunmi-text-strong break-words">
                   {o.nombre ?? `Fila ${o.filaExcel ?? o.filaId}`}
                 </div>
                 <div className="text-sm2 sunmi-text-muted tabular-nums">
@@ -1086,7 +1088,7 @@ export default function ResultadoDeListaPage() {
                 Como "Transferencia #464": el nombre en negrita y el chip del
                 estado al lado. */}
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-semibold sunmi-text-strong truncate">{nombreProveedor}</span>
+              <span className="min-w-0 font-semibold sunmi-text-strong break-words">{nombreProveedor}</span>
               <ChipDeEstado cabecera={cabecera} />
             </div>
             {/* NO HAY FECHA DE LA LISTA: la base guarda cuándo se subió y
@@ -1094,7 +1096,7 @@ export default function ResultadoDeListaPage() {
                 va el archivo, que es lo que la identifica. Controlando se dice
                 además que no cambia nada, que es la primera pregunta de quien
                 abre un control. */}
-            <p className="text-sm2 sunmi-text-muted truncate">
+            <p className="text-sm2 sunmi-text-muted break-words">
               {cabecera.archivoNombre} · subida {fechaHora(cabecera.subidaEn ?? cabecera.leidaEn)}
               {controlando ? " · control: no cambia ningún precio" : ""}
             </p>
