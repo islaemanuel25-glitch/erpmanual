@@ -450,8 +450,9 @@ async function sembrar(db) {
       activo: true,
       es_combo: false,
       // `proveedor_id`, en snake, y no `proveedorId`: es el escalar del modelo.
-      // Es además el campo que mira `productoDelProveedorWhere` —junto con
-      // `proveedor2_id`— para decidir qué productos son de este proveedor.
+      // Es además uno de los tres campos que mira `productoDelProveedorWhere`
+      // —con `proveedor2_id` y `proveedor3_id`— para decidir qué productos son
+      // de este proveedor.
       proveedor_id: prov.id,
     };
     const base = ya

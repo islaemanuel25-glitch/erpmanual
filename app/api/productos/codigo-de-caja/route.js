@@ -63,8 +63,6 @@ export async function GET(req) {
         nombre: true,
         codigo_barra: true,
         codigo_barra_secundario: true,
-        proveedor_id: true,
-        proveedor2_id: true,
       },
     });
     if (!base) {

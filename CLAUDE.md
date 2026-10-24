@@ -12,8 +12,9 @@ firma, se cambia — con sus candados corriendo. **Nunca escribir una parecida a
 lado.**
 
 *Por qué:* dos funciones que hacen lo mismo no se rompen el día que se escriben,
-se rompen el día que una cambia. `productoDelProveedorWhere` mira `proveedor_id`
-y `proveedor2_id` y no los vínculos de código, por una razón que está escrita al
+se rompen el día que una cambia. `productoDelProveedorWhere` mira los tres lugares
+—`proveedor_id`, `proveedor2_id` y `proveedor3_id`— y no los vínculos de código,
+por una razón que está escrita al
 lado: un vínculo viejo metía productos ajenos en la conciliación. Una búsqueda
 "parecida" en otra pantalla habría sugerido productos que el motor no considera
 del proveedor, y nadie se habría enterado hasta ver un costo mal aplicado.

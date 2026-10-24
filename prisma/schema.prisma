@@ -5447,6 +5447,10 @@ model RenglonQueNoEsElProducto {
 ///
 /// `lugarDelProveedor` es "proveedor_id", "proveedor2_id" o "proveedor3_id", o
 /// null si el proveedor ya estaba: entonces «Deshacer» no le saca ninguno.
+///
+/// `sumadoPorUsuarioId` NULL es una marca RECONSTRUIDA: los «✓ Sí» de antes de
+/// esta tabla, por `20261024193235_lista_sumados_de_antes`. La aplicación
+/// siempre anota quién, y la reposición de esa migración se apoya en eso.
 model ProductoSumadoALaLista {
   id                Int     @id @default(autoincrement())
   grupoId           Int

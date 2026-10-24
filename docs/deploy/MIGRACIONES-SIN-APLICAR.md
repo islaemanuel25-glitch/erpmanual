@@ -16,34 +16,39 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261024190123_lista_producto_sumado` — **Aditiva, sin datos.** Una tabla
-  nueva, vacía, `ProductoSumadoALaLista`: los productos del resto del catálogo
-  aceptados en una lista con «✓ Sí» u «Otro» en "Pueden ser de…", con el lugar
-  de proveedor que llenó cada uno (para que «Deshacer» lo vacíe sin tocar el
-  que tenía antes). No toca ninguna fila existente ni `ProductoBase`. Va ANTES
-  de levantar la imagen nueva: el resultado de una lista la lee para la
-  etiqueta "Sumado a", y sin ella abrir una lista da error. La imagen vieja con
-  esto puesto sigue andando: no la conoce.
+- `20261024193235_lista_sumados_de_antes` — **De datos, aditiva e
+  idempotente, solo `INSERT`.** Reconstruye en `ProductoSumadoALaLista` la
+  marca de los «✓ Sí» hechos entre los despliegues de `77c4646f` y `f0c8abc0`,
+  que dejaron el vínculo y el proveedor sumado pero no la marca. Los reconoce
+  por la huella de esa transacción (el producto tocado hasta 5 s después del
+  vínculo, sin aplicar, sin códigos de ese proveedor anteriores, y vinculado
+  después de que terminó la migración de `77c4646f`); el criterio está escrito
+  en el archivo. `ON CONFLICT DO NOTHING`: correrla dos veces no agrega nada.
+  No toca `ProductoBase`, renglones ni códigos. **Reposición:**
+  `DELETE FROM "ProductoSumadoALaLista" WHERE "sumadoPorUsuarioId" IS NULL;`
+  (la aplicación siempre anota quién; la migración deja NULL). **El
+  clasificador la frena** por ser de datos; confirmarla es de Emanuel. Puede ir
+  antes o después de la imagen: sin ella, esos productos solo siguen sin
+  etiqueta. Ejercida contra `erpazul_al`: marcó el «✓ Sí» de antes con su lugar
+  y no marcó un vínculo hecho desde la revisión; la segunda corrida no agregó
+  nada.
 
-Producción está en **86 migraciones**, la última
-`20261024164309_lista_renglon_que_no_es_el_producto`.
+Producción está en **87 migraciones**, la última
+`20261024190123_lista_producto_sumado`.
 
-**De dónde sale el 86.** Emanuel informó el 2026-10-24 que el despliegue de
-`77c4646f` aplicó `20261024164309_lista_renglon_que_no_es_el_producto`, la
-última del árbol. `prisma migrate deploy` aplica en orden y no saltea, así que
-con ésa aplicada están aplicadas las 14 que esta lista todavía nombraba —desde
-`20261019180000_usuario_sesion_invalidada_en` hasta
-`20261024135738_lista_kilos_por_pieza`—, que nadie había borrado al
-desplegarlas. *Inferido, sin verificar desde esta sesión*, que es de nube y no
-ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy`
-(mismo usuario y base que el backup del skill):
+**De dónde sale el 87.** Emanuel informó el 2026-10-24 que el despliegue de
+`f0c8abc0` aplicó `20261024190123_lista_producto_sumado`; antes, el de
+`77c4646f` había dejado producción en 86. Las migraciones se aplican en orden y
+sin saltear. *Sin verificar desde esta sesión*, que es de nube y no ve el VPS.
+Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy` (mismo usuario
+y base que el backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `86|20261024164309_lista_renglon_que_no_es_el_producto`.
-Si dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir.
-La descripción de las que salieron está en el `git log` de este archivo.
+que tiene que decir `87|20261024190123_lista_producto_sumado`. Si dice otra
+cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
+descripción de las que salieron está en el `git log` de este archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261024164309_lista_renglon_que_no_es_el_producto`— salieron de acá: la historia de cuándo
+`20261024190123_lista_producto_sumado`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los

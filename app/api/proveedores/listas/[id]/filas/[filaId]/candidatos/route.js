@@ -27,7 +27,8 @@
 //
 // Sale de `cargarDatosDeConciliacion`, la misma función que usa el motor. No se
 // arma un "where" parecido al lado: `productoDelProveedorWhere` tiene su propia
-// historia —mira proveedor_id y proveedor2_id, no los vínculos de código, porque
+// historia —mira los tres lugares de proveedor (proveedor_id, proveedor2_id y
+// proveedor3_id), no los vínculos de código, porque
 // un vínculo viejo metía productos ajenos en la conciliación— y duplicar ese
 // criterio garantiza que algún día diverjan y la pantalla sugiera productos que
 // el motor no considera del proveedor.

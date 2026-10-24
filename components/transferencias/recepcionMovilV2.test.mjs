@@ -646,7 +646,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // proveedor. No toca transferencias.
   // Sube a 87 el 2026-10-24: `20261024190123_lista_producto_sumado`, una tabla
   // nueva para los aceptados de "Pueden ser de…". No toca transferencias.
-  assert.equal(migraciones.length, 87, "aparecio una migracion que nadie declaro aca");
+  // Sube a 88 el 2026-10-24: `20261024193235_lista_sumados_de_antes`, de datos:
+  // reconstruye la marca de los «✓ Sí» de antes en las listas de proveedor. No
+  // toca transferencias.
+  assert.equal(migraciones.length, 88, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
