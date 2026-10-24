@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-23 14:16
+**Última actualización:** 2026-10-24 00:33
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,8 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: refactor(listas): borrar las tres rutas que quedaron sin pantalla
+- 2026-10-24: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
 - 2026-10-23: fix(proveedores/listas): el recargo vacío vale 0 y no frena la lectura
 - 2026-10-18: fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios
 - 2026-10-18: fix: el dueño de un local crea y edita sus propios proveedores

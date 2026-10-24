@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-24] - Actualización: proveedores, transferencias
+
+### Modificado
+- **proveedores**: refactor(listas): borrar las tres rutas que quedaron sin pantalla
+- **proveedores**: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
+- **transferencias**: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
+
+
 ## [2026-10-23] - Actualización: pos-transferencias, transferencias, stock, auditoria, productos
 
 ### Modificado
