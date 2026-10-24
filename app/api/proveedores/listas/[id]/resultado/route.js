@@ -64,7 +64,8 @@ import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
-  lecturaQueMuestraLaTarjeta,
+  lecturaDelPropuesto,
+  lecturaElegida,
   lecturasDeLaFila,
 } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
@@ -320,6 +321,8 @@ export async function GET(req, context) {
       }),
       abierta: esImportacionAbierta(cab.estado),
       puedeCambiarCostos,
+      // Para el cartel: "Dab suele aumentar entre 0 % y 12 %".
+      proveedor: cab.proveedor?.nombre ?? null,
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
@@ -640,7 +643,7 @@ function numero(v) {
  * Una lista de control no confirma nada desde la tarjeta, y una cerrada
  * tampoco: ahí no se lee nada y la tarjeta muestra lo guardado.
  *
- * @returns Map filaId → `{ lectura, confirmable }`
+ * @returns Map filaId → `{ lectura, delPropuesto, confirmable }`
  */
 async function lecturasDeTusFilas({ importacionId, productos, cab, rango, operandoEnLocalId, depositoLocalId }) {
   const porFila = new Map();
@@ -661,7 +664,13 @@ async function lecturasDeTusFilas({ importacionId, productos, cab, rango, operan
       operandoEnLocalId,
       depositoLocalId,
     });
-    porFila.set(fila.id, { lectura: lecturaQueMuestraLaTarjeta({ lecturas, fila }), confirmable });
+    // Dos: la que se ELIGE para revisar —«Usar» la acepta— y la del costo que la
+    // fila ya propone, que es la cuenta de las que no se revisan.
+    porFila.set(fila.id, {
+      lectura: lecturaElegida({ lecturas, fila }),
+      delPropuesto: lecturaDelPropuesto({ lecturas, fila }),
+      confirmable,
+    });
   }
   return porFila;
 }

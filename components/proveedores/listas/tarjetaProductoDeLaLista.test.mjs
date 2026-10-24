@@ -27,6 +27,7 @@ import TarjetaProductoDeLaLista, {
 import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
 import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
+import { lecturaElegida, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { ESTADO_VARIACION } from "@/lib/proveedores/listas/rangoAumento";
 
@@ -69,6 +70,9 @@ function itemDe({ filas = [], lecturaPorFila = null, abierta = true } = {}) {
   }).items[0];
 }
 
+/** `Intl` separa el "$" con un espacio duro; el texto esperado se escribe con uno común. */
+const conEspacios = (t) => String(t).replace(/ /g, " ");
+
 const dibujar = (props) => renderToStaticMarkup(React.createElement(TarjetaProductoDeLaLista, props));
 
 /** Los botones que dibuja, con su texto y su clase. */
@@ -105,7 +109,8 @@ test("PARA REVISAR CON LECTURA: «✓ Usar» arriba y «Corregir» abajo, el ren
   const html = dibujar({ item, abierta: true });
   assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
   assert.ok(html.includes("1612 · SOLITAS ANIMACION 400G"), "no está el renglón de la lista");
-  assert.match(cuentaDe(item), /× 10 · hoy /);
+  // La multiplicación hecha, no solo "× 10" (2026-10-24).
+  assert.equal(conEspacios(cuentaDe(item)), "$ 146,98 × 10 = $ 1.469,75 · hoy $ 1.300,00");
   // El porcentaje, verde porque está adentro del rango.
   assert.match(html, /sunmi-text-success[^>]*>\+13,1 %</);
 });
@@ -165,6 +170,36 @@ test("UNA VINCULADA DICE QUE EL VÍNCULO ESTÁ HECHO, Y NUNCA QUEDA SIN ACCIÓN"
   // La aplicada no: su costo ya está escrito.
   const aplicada = itemDe({ filas: [fila({ aplicada: true })] });
   assert.deepEqual(botones(dibujar({ item: aplicada, abierta: true })).map((x) => x.texto), []);
+});
+
+test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en ámbar, y «✓ Usar» además de «Corregir»", () => {
+  // Las lecturas salen de `lecturasDeLaFila` con los números del renglón 281 de
+  // Dab; no se escriben a mano.
+  const f = fila({
+    id: 281, estado: ESTADO_LINEA.FACTOR_DUDOSO, seleccionada: false, costoAnterior: 19200,
+    costoMaestroPropuesto: null, diferenciaPct: null, codigoCrudo: "281",
+    descripcionProveedor: "9 DE ORO AGRIDULCE 200G", precioConIva: 955, unidadesPorBulto: null,
+    codigoNormalizado: "281", unidadProveedor: "UN", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12,
+  });
+  const producto = {
+    id: 7, nombre: "9 DE ORO AGRIDULCE", precio_costo: 19200, factor_pack: 20, unidad_medida: "pack",
+    modoCompraProveedor: null, pesoReferenciaKg: null, creadoEnLocalId: null, es_combo: false,
+  };
+  const cab = { estado: "CONCILIADA", recargoPct: 0, impuestoAdicionalPct: null, proveedor: { id: 1, nombre: "Dab", parserListaId: null } };
+  const rango = { minPct: 0, maxPct: 12 };
+  const { lecturas, confirmable } = lecturasDeLaFila({ fila: f, producto, cab, rango });
+  const item = tusProductosDeLaLista({
+    productos: [{ id: 7, nombre: "9 DE ORO AGRIDULCE", precio_costo: 19200, filas: [f] }],
+    rango,
+    lecturaPorFila: new Map([[f.id, { lectura: lecturaElegida({ lecturas, fila: f }), delPropuesto: null, confirmable }]]),
+    proveedor: "Dab",
+  }).items[0];
+  assert.equal(conEspacios(cuentaDe(item)), "$ 955,00 × 20 = $ 19.100,00 · hoy $ 19.200,00");
+  const html = dibujar({ item, abierta: true });
+  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+  assert.match(html, /sunmi-text-warning[^>]*>-0,5 %</);
+  assert.ok(html.includes("Bajó 0,5 %. Dab suele aumentar entre 0 % y 12 %."));
+  assert.ok(!html.includes(">—<"), "volvió el costo nuevo en raya");
 });
 
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {

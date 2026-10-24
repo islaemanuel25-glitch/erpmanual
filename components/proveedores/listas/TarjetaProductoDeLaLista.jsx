@@ -182,13 +182,27 @@ export default function TarjetaProductoDeLaLista({
 }
 
 /**
- * La cuenta, en gris: "$ 955,00 × 20 · hoy $ 19.200,00". Sin renglón, lo que
- * cuesta hoy. El "× N" solo cuando se sabe por cuánto se multiplica.
+ * La cuenta, en gris, con la multiplicación hecha: "$ 955,00 × 20 = $ 19.100,00
+ * · hoy $ 19.200,00" (Emanuel, 2026-10-24). Sin renglón, lo que cuesta hoy.
+ *
+ * El precio de la izquierda se saca del costo nuevo dividido el multiplicador y
+ * no del renglón crudo: con recargo o impuesto, "$ 955 × 20" no daría el número
+ * de la derecha, y una cuenta que no cierra es peor que ninguna. Sin recargo es
+ * el mismo $ 955 del papel.
+ *
+ * Sin lectura que la explique —sin multiplicador o sin costo nuevo— se dicen el
+ * renglón y el costo de hoy, sin inventar la cuenta.
  */
 export function cuentaDe(item) {
   if (!item.renglon || item.renglon.precio === null || item.renglon.precio === undefined) {
     return `Hoy cuesta ${money(item.costoHoy)}`;
   }
-  const por = item.multiplicador > 1 ? ` × ${item.multiplicador}` : "";
-  return `${money(item.renglon.precio)}${por} · hoy ${money(item.costoHoy)}`;
+  const hoy = ` · hoy ${money(item.costoHoy)}`;
+  const nuevo = item.costoNuevo;
+  const mult = Number(item.multiplicador);
+  if (nuevo === null || nuevo === undefined || !Number.isFinite(mult) || mult < 1) {
+    return `${money(item.renglon.precio)}${hoy}`;
+  }
+  if (mult === 1) return `${money(nuevo)}${hoy}`;
+  return `${money(nuevo / mult)} × ${mult} = ${money(nuevo)}${hoy}`;
 }

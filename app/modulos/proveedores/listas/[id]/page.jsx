@@ -66,7 +66,6 @@ import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincular
 import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
   ACCION_USAR,
-  FILTRO,
   ORDEN_FILTROS,
   TEXTO_FILTRO,
   cantidadDelFiltro,
@@ -700,7 +699,9 @@ export default function ResultadoDeListaPage() {
   const tusProductos = datos.tusProductos ?? { items: [], conteo: { total: 0, traeLaLista: 0, porEstado: {} } };
   const nombreProveedor = cabecera.proveedor?.nombre ?? "este proveedor";
   const sinVincular = tusProductos.conteo.porEstado?.SIN_VINCULAR ?? 0;
-  const filtroActivo = filtro ?? FILTRO.TODOS;
+  // Sin «Todos»: si todavía no se eligió, el mismo con el que arranca. Y con
+  // texto en el buscador, `seVe` busca en todos sin mirar el chip.
+  const filtroActivo = filtro ?? filtroInicial(tusProductos.conteo);
   const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar, fijados }));
 
   // Los avisos que existen hoy, en el lugar de los caminos de excepción: entre
