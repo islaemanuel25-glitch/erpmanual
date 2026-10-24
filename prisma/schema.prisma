@@ -5008,6 +5008,12 @@ model ImportacionListaFila {
   /// demuestre que cotiza por unidad suelta y el producto agrupe varias. NUNCA
   /// sale de UxBU, que es un nivel logístico del proveedor.
   multiplicadorConfirmado Int?
+  /// Entre cuántos kilos se dividió el precio informado, cuando el producto
+  /// guarda el costo POR KILO (2026-10-24, GRANIX de Dab): la pieza, o las
+  /// piezas del bulto por los kilos de la pieza. Null en todo producto que no
+  /// es por peso. Decimal porque una pieza puede traer 2,5 kg; no cabe en
+  /// `multiplicadorConfirmado`, que multiplica y es entero.
+  kilosConfirmados       Decimal? @db.Decimal(10, 3)
   /// Cuántas unidades trae el envase. Es un DATO de la presentación: no
   /// multiplica el precio y NO reescribe ProductoBase.factor_pack, que se
   /// corrige por su propio flujo.
@@ -5433,6 +5439,12 @@ model LecturaProductoProveedor {
   /// dato de la decisión, no del producto: NUNCA se escribe en
   /// `ProductoBase.factor_pack`.
   cantidad Int?
+
+  /// Cuántos kilos trae la pieza que vende este proveedor, para un producto que
+  /// guarda el costo por kilo. Lo contesta una persona en la tarjeta ("¿Cuántos
+  /// kilos trae la pieza?"). Es un dato de este proveedor, no del producto:
+  /// NUNCA se escribe en `ProductoBase.pesoReferenciaKg`.
+  kilosPorPieza Decimal? @db.Decimal(10, 3)
 
   confirmadaPorUsuarioId Int?
   confirmadaEn           DateTime @default(now())

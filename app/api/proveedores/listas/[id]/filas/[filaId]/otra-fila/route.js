@@ -460,6 +460,7 @@ function desvinculada() {
     // otra cantidad, otro precio. Se borra entera, con su rango congelado.
     baseConfirmada: null,
     multiplicadorConfirmado: null,
+    kilosConfirmados: null,
     cantidadPresentacion: null,
     confirmadoEn: null,
     confirmadoPorUsuarioId: null,

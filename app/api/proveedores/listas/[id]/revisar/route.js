@@ -34,7 +34,7 @@ import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/v
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision, MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
 import { CAMPOS_PRODUCTO_PARA_LEER, lecturaElegida, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
-import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { ordenDeLaCola, posicionActual } from "@/lib/proveedores/listas/colaDeRevision";
 import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
 
@@ -210,9 +210,9 @@ export async function GET(req, context) {
       proveedorId: cab.proveedor?.id,
       productoBaseIds: [fila.productoBaseId],
     });
-    const { lecturas, confirmable, porQueNo } = lecturasDeLaFila({
+    const { lecturas, confirmable, porQueNo, porKilo } = lecturasDeLaFila({
       fila,
-      producto: conLaCajaRecordada(fila.productoBase, cajas.get(fila.productoBaseId)),
+      producto: conLoRecordado(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
       rango,
       operandoEnLocalId: Number(scope.localId),
@@ -237,6 +237,9 @@ export async function GET(req, context) {
       nombreEnElArchivo: fila.descripcionProveedor,
       codigo: fila.codigoCrudo,
       factorPack,
+      // Si guarda el costo por kilo (GRANIX, 2026-10-24): la hoja dice "lo
+      // tenés cargado por kilo" y no "por caja de 1".
+      porKilo,
       costoAnterior: costoDeHoy,
       precioLista: numero(fila.precioConIva),
       motivo: motivoDeRevision(fila, rango),

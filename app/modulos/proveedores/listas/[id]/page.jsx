@@ -385,20 +385,25 @@ export default function ResultadoDeListaPage() {
   };
 
   /**
-   * «LISTO» CON CUÁNTAS TRAE LA CAJA: se guarda como lectura recordada de este
-   * producto con este proveedor —no en la ficha— y la tarjeta se relee con su
-   * cuenta. Deshacer vuelve a poner la recordada que había antes.
+   * «LISTO» CON CUÁNTAS TRAE LA CAJA, O CON CUÁNTOS KILOS TRAE LA PIEZA: se
+   * guarda como lectura recordada de este producto con este proveedor —no en
+   * la ficha— y la tarjeta se relee con su cuenta. Deshacer vuelve a poner la
+   * recordada que había antes. Las dos van a la misma ruta.
    */
+  const guardarLoQueFalta = (item, cuerpo, textoSiFalla) => {
+    const url = `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/lectura-recordada`;
+    return pedirDesdeLaTarjeta(item, url, cuerpo, textoSiFalla, (r) => ({
+      url,
+      cuerpo: { restaurar: r?.anterior ?? null },
+    }));
+  };
   const caja = (item, cantidad) =>
-    pedirDesdeLaTarjeta(
+    guardarLoQueFalta(item, { cantidad }, "El servidor no pudo guardar cuántas trae la caja y no dijo por qué.");
+  const kilos = (item, kilosDeLaPieza) =>
+    guardarLoQueFalta(
       item,
-      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/caja`,
-      { cantidad },
-      "El servidor no pudo guardar cuántas trae la caja y no dijo por qué.",
-      (r) => ({
-        url: `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/caja`,
-        cuerpo: { restaurar: r?.anterior ?? null },
-      })
+      { kilos: kilosDeLaPieza },
+      "El servidor no pudo guardar cuántos kilos trae la pieza y no dijo por qué."
     );
 
   /** El mismo criterio que el resto de la pantalla (`costos.puedeCambiar`). */
@@ -1162,6 +1167,7 @@ export default function ResultadoDeListaPage() {
                 onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
                 onSi={si}
                 onCaja={caja}
+                onKilos={kilos}
               />
             ))}
             {visibles.length === 0 && (

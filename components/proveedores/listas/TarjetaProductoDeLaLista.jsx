@@ -43,6 +43,10 @@
 //
 //   Para revisar sin ninguna lectura porque no se sabe cuántas trae la caja
 //   (`item.preguntarCaja`): "¿Cuántas trae la caja?", un número y «Listo».
+//
+//   Para revisar sin ninguna lectura porque el producto guarda el costo por
+//   kilo y no se sabe cuántos kilos trae la pieza (`item.preguntarKilos`,
+//   GRANIX): "¿Cuántos kilos trae la pieza?", con decimales, y «Listo».
 
 import { useState } from "react";
 
@@ -63,6 +67,8 @@ import {
 /** El borde ámbar de una tarjeta fuera de rango. Solo el borde: el fondo no cambia. */
 export const CLASE_TARJETA_FUERA_DE_RANGO = "border-1.5 sunmi-border-warning";
 import { ACCION_USAR, ESTADO_TU_PRODUCTO } from "@/lib/proveedores/listas/tusProductos";
+import { cuentaPorKilo } from "@/lib/proveedores/listas/explicarLectura";
+import { kilosValidos } from "@/lib/proveedores/listas/cajaRecordada";
 
 export const TEXTO_USAR = "✓ Usar";
 export const TEXTO_VINCULAR = "Vincular";
@@ -74,6 +80,13 @@ export const MARCA_VINCULADO = "✓";
 export const TEXTO_SI = "✓ Sí";
 export const TEXTO_OTRO = "Otro";
 export const TEXTO_PREGUNTA_CAJA = "¿Cuántas trae la caja?";
+export const TEXTO_PREGUNTA_KILOS = "¿Cuántos kilos trae la pieza?";
+
+/** Lo que se escribió en la pregunta, como número: "2,5" y "2.5" son lo mismo. */
+export function numeroDeLaRespuesta(texto) {
+  const t = String(texto ?? "").trim().replace(",", ".");
+  return t === "" ? NaN : Number(t);
+}
 export const TEXTO_LISTO = "Listo";
 
 /** "¿Es 101 · BIZCOCHITOS CAMPEON 300G?" */
@@ -104,6 +117,8 @@ export default function TarjetaProductoDeLaLista({
   // «✓ Sí» sobre el renglón sugerido, y «Listo» con cuántas trae la caja.
   onSi,
   onCaja,
+  // «Listo» con los kilos de la pieza, para un producto por kilo.
+  onKilos,
 }) {
   const { estado } = item;
   const sinRenglon = estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR || estado === ESTADO_TU_PRODUCTO.NO_VIENE;
@@ -111,7 +126,10 @@ export default function TarjetaProductoDeLaLista({
   const cambia = estado === ESTADO_TU_PRODUCTO.CAMBIA;
   const sugerencia = abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR ? item.sugerencia ?? null : null;
   const preguntarCaja = abierta && !controlando && puedeCambiarCostos && item.preguntarCaja === true;
-  const [cantidadCaja, setCantidadCaja] = useState("");
+  const preguntarKilos = abierta && !controlando && puedeCambiarCostos && item.preguntarKilos === true;
+  const [respuesta, setRespuesta] = useState("");
+  const n = numeroDeLaRespuesta(respuesta);
+  const respuestaValida = preguntarKilos ? kilosValidos(n) : Number.isInteger(n) && n >= 2;
 
   // ── DEBAJO DEL NOMBRE: QUÉ RENGLÓN LE TOCÓ, Y LA CUENTA ──────────────────
   const debajo = (
@@ -227,30 +245,32 @@ export default function TarjetaProductoDeLaLista({
   const avisos = (
     <>
       {revisar && item.motivoTexto && <p className="text-sm2 sunmi-text-warning">{item.motivoTexto}</p>}
-      {preguntarCaja && (
+      {(preguntarCaja || preguntarKilos) && (
         <form
           className="flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            const n = Number(cantidadCaja);
-            if (Number.isInteger(n) && n >= 2) onCaja?.(item, n);
+            const n = numeroDeLaRespuesta(respuesta);
+            if (preguntarKilos && kilosValidos(n)) onKilos?.(item, n);
+            else if (preguntarCaja && Number.isInteger(n) && n >= 2) onCaja?.(item, n);
           }}
         >
-          <label className="text-sm2 sunmi-text-strong flex-1" htmlFor={`caja-${item.productoBaseId}`}>
-            {TEXTO_PREGUNTA_CAJA}
+          <label className="text-sm2 sunmi-text-strong flex-1" htmlFor={`pregunta-${item.productoBaseId}`}>
+            {preguntarKilos ? TEXTO_PREGUNTA_KILOS : TEXTO_PREGUNTA_CAJA}
           </label>
+          {/* Los kilos admiten decimales —una pieza de 2,5 kg—, la caja no. */}
           <SunmiInput
-            id={`caja-${item.productoBaseId}`}
+            id={`pregunta-${item.productoBaseId}`}
             type="number"
-            inputMode="numeric"
-            min={2}
-            step={1}
-            value={cantidadCaja}
-            onChange={(e) => setCantidadCaja(e.target.value)}
+            inputMode={preguntarKilos ? "decimal" : "numeric"}
+            min={preguntarKilos ? 0.001 : 2}
+            step={preguntarKilos ? 0.001 : 1}
+            value={respuesta}
+            onChange={(e) => setRespuesta(e.target.value)}
             disabled={trabajando}
             className="w-20 text-right tabular-nums"
           />
-          <SunmiButton type="submit" disabled={trabajando || !(Number(cantidadCaja) >= 2)} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+          <SunmiButton type="submit" disabled={trabajando || !respuestaValida} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
             {TEXTO_LISTO}
           </SunmiButton>
         </form>
@@ -291,11 +311,27 @@ export default function TarjetaProductoDeLaLista({
  * renglón y el costo de hoy, sin inventar la cuenta.
  */
 export function cuentaDe(item) {
+  // Un producto que guarda el costo por kilo dice "el kilo" en los dos lados
+  // (GRANIX, 2026-10-24): "$ 22.105,73 ÷ 2 kg = $ 11.052,87 el kilo · hoy $
+  // 6.405,00 el kilo". La cuenta es la misma de la hoja (`cuentaPorKilo`).
+  const elKilo = item.porKilo ? " el kilo" : "";
   if (!item.renglon || item.renglon.precio === null || item.renglon.precio === undefined) {
-    return `Hoy cuesta ${money(item.costoHoy)}`;
+    return `Hoy cuesta ${money(item.costoHoy)}${elKilo}`;
   }
-  const hoy = ` · hoy ${money(item.costoHoy)}`;
+  const hoy = ` · hoy ${money(item.costoHoy)}${elKilo}`;
   const nuevo = item.costoNuevo;
+  if (item.porKilo) {
+    if (nuevo === null || nuevo === undefined || item.divisorKg === null || item.divisorKg === undefined) {
+      return `${money(item.renglon.precio)} la pieza${hoy}`;
+    }
+    return `${cuentaPorKilo({
+      precio: item.precioBase ?? item.renglon.precio,
+      kilosPorPieza: item.kilosPorPieza ?? item.divisorKg,
+      piezas: item.piezas,
+      costoNuevo: nuevo,
+      money,
+    })}${hoy}`;
+  }
   const mult = Number(item.multiplicador);
   if (nuevo === null || nuevo === undefined || !Number.isFinite(mult) || mult < 1) {
     return `${money(item.renglon.precio)}${hoy}`;

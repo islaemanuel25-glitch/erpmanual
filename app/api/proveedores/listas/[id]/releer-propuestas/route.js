@@ -64,7 +64,7 @@ import {
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import { modoDeImportacion, MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
-import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 
 const numeroONull = (v) => {
   if (v === null || v === undefined) return null;
@@ -164,7 +164,7 @@ export async function POST(req, context) {
       proveedorId: importacion.proveedorId,
       productoBaseIds: baseIds,
     });
-    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
+    const porId = new Map(productos.map((p) => [p.id, conLoRecordado(p, cajas.get(p.id))]));
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const revision = revisarAntesDeAplicar({

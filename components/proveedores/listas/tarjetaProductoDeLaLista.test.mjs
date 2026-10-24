@@ -25,6 +25,8 @@ import TarjetaProductoDeLaLista, {
   TEXTO_NO_VIENE,
   TEXTO_OTRO,
   TEXTO_PREGUNTA_CAJA,
+  TEXTO_PREGUNTA_KILOS,
+  numeroDeLaRespuesta,
   TEXTO_SI,
   TEXTO_USAR,
   TEXTO_VINCULAR,
@@ -33,7 +35,7 @@ import TarjetaProductoDeLaLista, {
 } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 import { TEXTO_FUERA_DE_RANGO, tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
 import { sugerenciaDeRenglon } from "@/lib/proveedores/listas/vincularConUnaFila";
-import { conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
 import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
@@ -323,7 +325,7 @@ function pimenton({ cajaRecordada = null, puedeCambiarCostos = true } = {}) {
     // Vacío: el lector genérico no trae unidad comercial (`importacionGenerica.js`).
     codigoNormalizado: "4233", unidadProveedor: "", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12,
   });
-  const producto = conLaCajaRecordada(
+  const producto = conLoRecordado(
     {
       id: 9, nombre: "ALICANTE PIMENTÓN 25G", precio_costo: 19680, factor_pack: null, unidad_medida: "unidad",
       modoCompraProveedor: null, pesoReferenciaKg: null, creadoEnLocalId: null, es_combo: false,
@@ -361,6 +363,66 @@ test("CON LA CAJA DE 24 RECORDADA, LA CUENTA SE ARMA Y LA PREGUNTA SE VA", () =>
   const html = dibujar({ item, abierta: true });
   assert.ok(!html.includes(TEXTO_PREGUNTA_CAJA));
   assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+});
+
+// ── «¿CUÁNTOS KILOS TRAE LA PIEZA?» (GRANIX BOCADITO 2KG, 2026-10-24) ───
+//
+// Producto por kilo a $ 6.405, renglón 5808 de Dab a $ 22.105,73 la pieza, en
+// bulto de 2. Los `item` salen de `lecturasDeLaFila` y `tusProductosDeLaLista`.
+function granix({ kilos = null } = {}) {
+  const f = fila({
+    id: 5808, estado: ESTADO_LINEA.FACTOR_DUDOSO, motivo: "SIN_LECTURAS", seleccionada: false, costoAnterior: 6405,
+    costoMaestroPropuesto: null, diferenciaPct: null, codigoCrudo: "5808", codigoNormalizado: "5808",
+    descripcionProveedor: "GRANIX BOCADITOS CHOC BLANCO 2 K", precioConIva: 22105.73, unidadesPorBulto: 2,
+    unidadProveedor: "", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12, kilosConfirmados: null,
+  });
+  const producto = conLoRecordado(
+    {
+      id: 31, nombre: "GRANIX BOCADITO CHOC. BLANCO 2KG", precio_costo: 6405, factor_pack: 1, unidad_medida: "kg",
+      modoCompraProveedor: "BULTO", pesoReferenciaKg: null, creadoEnLocalId: null, es_combo: false,
+    },
+    kilos === null ? null : { clave: "KILOS_POR_PIEZA", multiplicador: 1, cantidad: null, kilosPorPieza: String(kilos) }
+  );
+  const cab = { estado: "CONCILIADA", recargoPct: 0, impuestoAdicionalPct: null, proveedor: { id: 1, nombre: "Dab", parserListaId: null } };
+  const rango = { minPct: 0, maxPct: 12 };
+  const leida = lecturasDeLaFila({ fila: f, producto, cab, rango });
+  return tusProductosDeLaLista({
+    productos: [{ id: 31, nombre: "GRANIX BOCADITO CHOC. BLANCO 2KG", precio_costo: 6405, filas: [f] }],
+    rango,
+    lecturaPorFila: new Map([[f.id, { ...leida, lectura: lecturaElegida({ lecturas: leida.lecturas, fila: f }), delPropuesto: null }]]),
+    proveedor: "Dab",
+  }).items[0];
+}
+
+test("GRANIX SIN KILOS: LA TARJETA PREGUNTA «¿CUÁNTOS KILOS TRAE LA PIEZA?», CON DECIMALES Y «LISTO»", () => {
+  const item = granix();
+  const html = dibujar({ item, abierta: true });
+  assert.ok(html.includes(TEXTO_PREGUNTA_KILOS));
+  assert.ok(!html.includes(TEXTO_PREGUNTA_CAJA), "a un producto por kilo se le preguntó la caja");
+  assert.match(html, /<input[^>]*inputMode="decimal"/);
+  assert.match(html, /<input[^>]*step="0\.001"/);
+  assert.ok(botones(html).some((b) => b.texto === TEXTO_LISTO));
+  // La cuenta de hoy, en kilos.
+  assert.equal(conEspacios(cuentaDe(item)), "$ 22.105,73 la pieza · hoy $ 6.405,00 el kilo");
+  // "2,5" y "2.5" son la misma respuesta.
+  assert.equal(numeroDeLaRespuesta("2,5"), 2.5);
+  assert.equal(numeroDeLaRespuesta("2.5"), 2.5);
+  assert.ok(Number.isNaN(numeroDeLaRespuesta("")));
+});
+
+test("GRANIX CON LA PIEZA DE 2 KG: LA CUENTA EN KILOS CONTRA $ 6.405 EL KILO, Y «✓ USAR»", () => {
+  const item = granix({ kilos: 2 });
+  assert.equal(item.preguntarKilos, false);
+  // Se eligió el bulto, que es el más cercano al costo de hoy (−13,7 %).
+  assert.equal(conEspacios(cuentaDe(item)), "$ 22.105,73 ÷ (2 piezas × 2 kg) = $ 5.526,43 el kilo · hoy $ 6.405,00 el kilo");
+  const html = dibujar({ item, abierta: true });
+  assert.ok(!html.includes(TEXTO_PREGUNTA_KILOS));
+  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+  // Una baja va en rojo, y fuera del 0 a 12 lo dice la etiqueta aparte.
+  assert.match(html, /sunmi-text-danger[^>]*>-13,7 %</);
+  // La pieza sola, con la cuenta del pedido de Emanuel.
+  const soloPieza = { ...item, divisorKg: 2, kilosPorPieza: 2, piezas: null, costoNuevo: 11052.87, precioBase: 22105.73 };
+  assert.equal(conEspacios(cuentaDe(soloPieza)), "$ 22.105,73 ÷ 2 kg = $ 11.052,87 el kilo · hoy $ 6.405,00 el kilo");
 });
 
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {

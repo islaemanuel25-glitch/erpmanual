@@ -42,6 +42,7 @@ import {
 // EL RANGO DICHO EN PALABRAS, y vacío cuando no hay ninguno. Vive con el modo
 // porque lo que decide es qué significa un 0 a 0.
 import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
+import { TEXTO_FALTAN_LOS_KILOS } from "@/lib/proveedores/listas/tusProductos";
 
 /**
  * Qué acción rechazó el servidor, cuando no fue una lectura.
@@ -308,7 +309,11 @@ export function DecisionDeLectura({
             <p className="text-sm2 sunmi-text-muted leading-snug">
               {proveedor}
               {fila.codigo ? ` · código ${fila.codigo}` : ""}
-              {fila.factorPack ? ` · lo tenés cargado por caja de ${fila.factorPack}` : ""}
+              {fila.porKilo
+                ? " · lo tenés cargado por kilo"
+                : fila.factorPack
+                  ? ` · lo tenés cargado por caja de ${fila.factorPack}`
+                  : ""}
             </p>
             {/* El aviso va debajo del nombre y no al lado del costo: lo que pone
                 en duda es el costo de hoy, que es contra lo que se calculan TODOS
@@ -404,8 +409,9 @@ export function DecisionDeLectura({
 
           {fila.lecturas.length === 0 && (
             <Aviso tono="warning">
-              La lista no dice si este precio es de una unidad o de la caja, así que no sé por
-              cuánto multiplicarlo. Dejalo como está y miralo en el papel del proveedor.
+              {fila.porKilo
+                ? TEXTO_FALTAN_LOS_KILOS
+                : "La lista no dice si este precio es de una unidad o de la caja, así que no sé por cuánto multiplicarlo. Dejalo como está y miralo en el papel del proveedor."}
             </Aviso>
           )}
 

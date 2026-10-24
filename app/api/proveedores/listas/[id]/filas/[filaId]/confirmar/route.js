@@ -45,7 +45,7 @@ import {
   CANTIDAD_MAX,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { porQueNoSeConfirma, TEXTO_COMBO, TEXTO_SIN_PROPIEDAD_DEL_COSTO } from "@/lib/proveedores/listas/porQueNoSeConfirma";
-import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 
 /**
  * El rango con el que se evalúa esta importación.
@@ -126,7 +126,10 @@ export async function POST(req, context) {
     const reg = resolverParserDeProveedor(importacion.proveedor);
     const lecturasPosibles = reg.ok ? reg.config?.lecturasPosibles ?? null : null;
 
-    const permitido = puedeConfirmarse(fila, importacion, { lecturasPropias: Boolean(lecturasPosibles) });
+    const permitido = puedeConfirmarse(fila, importacion, {
+      lecturasPropias: Boolean(lecturasPosibles),
+      admiteKilos: reg.ok && reg.config?.admiteKilosRecordados === true,
+    });
     if (!permitido.ok) {
       return NextResponse.json(
         // El texto de ESTE renglón, no el de los cuatro casos posibles juntos.
@@ -154,7 +157,7 @@ export async function POST(req, context) {
       proveedorId: importacion.proveedor?.id,
       productoBaseIds: [productoVivo.id],
     });
-    const base = conLaCajaRecordada(productoVivo, cajas.get(productoVivo.id));
+    const base = conLoRecordado(productoVivo, cajas.get(productoVivo.id));
     if (esComboBase(base)) {
       return NextResponse.json(
         { ok: false, error: TEXTO_COMBO },
@@ -246,6 +249,9 @@ export async function POST(req, context) {
         where: { id: filaIdNum },
         data: {
           multiplicadorConfirmado: r.multiplicador,
+          // Entre cuántos kilos se dividió el precio (GRANIX, 2026-10-24); null
+          // si la lectura no es por kilo. Con él `aplicar` recalcula lo mismo.
+          kilosConfirmados: r.kilos,
           cantidadPresentacion: r.cantidadPresentacion,
           // El rango se congela con la fila: cambiarlo después no puede
           // reescribir con qué criterio se decidió esto.
@@ -315,6 +321,9 @@ export async function POST(req, context) {
             clave: r.clave,
             multiplicador: r.multiplicador,
             cantidad: r.cantidadPresentacion ?? null,
+            // Los kilos de la pieza que dijo una persona, si los hay. En el
+            // `update` no se tocan: elegir una lectura no borra la respuesta.
+            kilosPorPieza: base.kilosPorPieza ?? null,
             confirmadaPorUsuarioId: Number(session?.id ?? session?.userId) || null,
             confirmadaEn: ahora,
           },

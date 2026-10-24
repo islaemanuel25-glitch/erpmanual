@@ -62,7 +62,7 @@ import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
-import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { sugerenciasDeRenglones } from "@/lib/proveedores/listas/vincularConUnaFila";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
@@ -672,9 +672,9 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
   });
   for (const fila of filas) {
     if (!fila.productoBase) continue;
-    const { lecturas, confirmable, admiteCaja } = lecturasDeLaFila({
+    const { lecturas, confirmable, admiteCaja, admiteKilos, porKilo } = lecturasDeLaFila({
       fila,
-      producto: conLaCajaRecordada(fila.productoBase, cajas.get(fila.productoBaseId)),
+      producto: conLoRecordado(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
       rango,
       operandoEnLocalId,
@@ -683,11 +683,14 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
     // Dos: la que se ELIGE para revisar —«Usar» la acepta— y la del costo que la
     // fila ya propone, que es la cuenta de las que no se revisan. Y si este
     // lector puede preguntar cuántas trae la caja, para cuando no hay ninguna.
+    // Y lo mismo con los kilos de la pieza, si el producto guarda por kilo.
     porFila.set(fila.id, {
       lectura: lecturaElegida({ lecturas, fila }),
       delPropuesto: lecturaDelPropuesto({ lecturas, fila }),
       confirmable,
       admiteCaja,
+      admiteKilos,
+      porKilo,
     });
   }
   return porFila;
@@ -786,7 +789,7 @@ async function loQueElRecalculoVaAOmitir({ importacionId, grupoId, localId, cab 
       proveedorId: cab.proveedor?.id,
       productoBaseIds: baseIds,
     });
-    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
+    const porId = new Map(productos.map((p) => [p.id, conLoRecordado(p, cajas.get(p.id))]));
 
     const revision = revisarAntesDeAplicar({
       filas,

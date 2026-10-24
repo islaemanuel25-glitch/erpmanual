@@ -67,7 +67,7 @@ import {
 import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Una de control no escribe costos.
 import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
-import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 /** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
@@ -209,7 +209,7 @@ export async function GET(req, context) {
       proveedorId: importacion.proveedorId,
       productoBaseIds: baseIds,
     });
-    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
+    const porId = new Map(productos.map((p) => [p.id, conLoRecordado(p, cajas.get(p.id))]));
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     // La CABECERA viaja en el contexto porque de ahí sale el rango con el que se
@@ -423,7 +423,7 @@ export async function POST(req, context) {
         proveedorId: importacion.proveedorId,
         productoBaseIds: baseIds,
       });
-      const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
+      const porId = new Map(productos.map((p) => [p.id, conLoRecordado(p, cajas.get(p.id))]));
 
       const overrides = await tx.productoLocal.findMany({
         where: { baseId: { in: baseIds } },

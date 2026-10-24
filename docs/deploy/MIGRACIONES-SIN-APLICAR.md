@@ -128,6 +128,15 @@ Si la lista está vacía, el despliegue es solo de código.
   imagen nueva exige ese permiso para "Turnos y cierres" y "(anterior)", así
   que sin la migración el dueño deja de verlas hasta tildarlo en Roles (el
   Admin sí, por "*").
+- `20261024135738_lista_kilos_por_pieza` — **Aditiva, sin datos.** Dos
+  columnas nulas DECIMAL(10,3): `LecturaProductoProveedor.kilosPorPieza` (los
+  kilos de la pieza que contesta una persona en la tarjeta, para un producto
+  que guarda el costo por kilo, GRANIX de Dab) e
+  `ImportacionListaFila.kilosConfirmados` (entre cuántos kilos se dividió el
+  precio en la lectura que se usó). No toca ninguna fila ni `ProductoBase`. Va
+  ANTES de levantar la imagen nueva: el resultado de una lista, revisar,
+  confirmar y aplicar las leen o escriben, y sin ellas abrir una lista da
+  error. La imagen vieja con esto puesto sigue andando: no las conoce.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.
