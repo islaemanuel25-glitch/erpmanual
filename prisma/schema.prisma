@@ -674,6 +674,7 @@ model ProductoBase {
   noSeCambiaDeProveedor ProductoQueNoSeCambia[]
   noVieneEnListas       ProductoQueNoVieneEnLaLista[]
   renglonesQueNoSon     RenglonQueNoEsElProducto[]
+  sumadoEnListas        ProductoSumadoALaLista[]
 
   filasImportacionLista ImportacionListaFila[]
 
@@ -4869,6 +4870,7 @@ model ImportacionListaProveedor {
   usuario   Usuario                @relation(fields: [usuarioId], references: [id])
   filas     ImportacionListaFila[]
   noVienen  ProductoQueNoVieneEnLaLista[]
+  sumados   ProductoSumadoALaLista[]
 
   /// IDEMPOTENCIA REAL, a nivel base. Dos pedidos simultáneos con el mismo
   /// archivo no pueden crear dos importaciones: el segundo choca contra este
@@ -5430,6 +5432,36 @@ model RenglonQueNoEsElProducto {
   /// Una por pareja: decir «No» dos veces no suma nada.
   @@unique([grupoId, proveedorId, productoBaseId, codigoInterno], name: "renglon_no_es_unico", map: "renglon_no_es_unico")
   @@index([grupoId, proveedorId])
+  @@index([productoBaseId])
+}
+
+/// "SUMADO A DAB": UN PRODUCTO DEL RESTO DEL CATÁLOGO QUE SE ACEPTÓ EN ESTA LISTA.
+///
+/// Desde «Buscar en el resto de mis productos» (2026-10-24): «✓ Sí» u «Otro»
+/// vinculan el producto con un renglón y le suman el proveedor de la lista en un
+/// lugar libre. Esta fila es ese hecho, de ESTA lista: arma la pestaña
+/// «Aceptados» de la hoja y la etiqueta "Sumado a Dab" de la revisión, y guarda
+/// QUÉ LUGAR llenó, que es lo único que hace falta para que «Deshacer» le quite
+/// este proveedor sin tocar el que tenía antes. El vínculo en sí —el código y el
+/// renglón— vive donde vive siempre; acá no se repite.
+///
+/// `lugarDelProveedor` es "proveedor_id", "proveedor2_id" o "proveedor3_id", o
+/// null si el proveedor ya estaba: entonces «Deshacer» no le saca ninguno.
+model ProductoSumadoALaLista {
+  id                Int     @id @default(autoincrement())
+  grupoId           Int
+  importacionId     Int
+  productoBaseId    Int
+  lugarDelProveedor String?
+
+  sumadoPorUsuarioId Int?
+  sumadoEn           DateTime @default(now())
+
+  importacion  ImportacionListaProveedor @relation(fields: [importacionId], references: [id], onDelete: Cascade)
+  productoBase ProductoBase              @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+
+  @@unique([importacionId, productoBaseId], name: "sumado_unico_por_lista_y_producto", map: "sumado_unico_por_lista_y_producto")
+  @@index([grupoId])
   @@index([productoBaseId])
 }
 

@@ -406,6 +406,23 @@ export async function POST(req, context) {
           data: { [lugarDelProveedor]: cab.proveedorId },
         });
       }
+      // 5. Y queda anotado como sumado a ESTA lista, con el lugar que llenó:
+      //    la pestaña «Aceptados», la etiqueta de la revisión y el «Deshacer»
+      //    salen de acá (`ProductoSumadoALaLista`). Si ya estaba anotado —otro
+      //    renglón con «Otro»— el lugar que llenó la primera vez no se pisa.
+      if (body?.sumarProveedor === true) {
+        await tx.productoSumadoALaLista.upsert({
+          where: { sumado_unico_por_lista_y_producto: { importacionId, productoBaseId } },
+          create: {
+            grupoId,
+            importacionId,
+            productoBaseId,
+            lugarDelProveedor,
+            sumadoPorUsuarioId: Number(ctx.session?.id ?? ctx.session?.userId) || null,
+          },
+          update: lugarDelProveedor ? { lugarDelProveedor } : {},
+        });
+      }
 
       await recalcularContadores(tx, importacionId);
     }, OPCIONES_TX);

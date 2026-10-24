@@ -294,6 +294,11 @@ export async function GET(req, context) {
       where: { importacionId: id, grupoId },
       select: { productoBaseId: true },
     });
+    // Los sumados desde "Pueden ser de…": la etiqueta "Sumado a Dab".
+    const sumados = await prisma.productoSumadoALaLista.findMany({
+      where: { importacionId: id, grupoId },
+      select: { productoBaseId: true },
+    });
     // ── DESDE DÓNDE SE TRABAJA ESTA LISTA (Emanuel, 2026-10-24) ──────────
     //
     // La abrió desde un local, vinculó, eligió la lectura, tocó «Usar» y recién
@@ -332,6 +337,7 @@ export async function GET(req, context) {
         noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
         abierta: esImportacionAbierta(cab.estado),
       }),
+      sumados: new Set(sumados.map((s) => s.productoBaseId)),
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────

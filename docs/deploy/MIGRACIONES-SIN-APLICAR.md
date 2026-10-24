@@ -16,7 +16,14 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna.
+- `20261024190123_lista_producto_sumado` — **Aditiva, sin datos.** Una tabla
+  nueva, vacía, `ProductoSumadoALaLista`: los productos del resto del catálogo
+  aceptados en una lista con «✓ Sí» u «Otro» en "Pueden ser de…", con el lugar
+  de proveedor que llenó cada uno (para que «Deshacer» lo vacíe sin tocar el
+  que tenía antes). No toca ninguna fila existente ni `ProductoBase`. Va ANTES
+  de levantar la imagen nueva: el resultado de una lista la lee para la
+  etiqueta "Sumado a", y sin ella abrir una lista da error. La imagen vieja con
+  esto puesto sigue andando: no la conoce.
 
 Producción está en **86 migraciones**, la última
 `20261024164309_lista_renglon_que_no_es_el_producto`.

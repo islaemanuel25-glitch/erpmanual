@@ -48,9 +48,7 @@ import {
 } from "@/lib/proveedores/listas/conciliarLista";
 import { filaAPersistir, OPCIONES_TX, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
-import { clavesDeCodigo } from "@/lib/proveedores/listas/normalizarCodigo";
 import { modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
-import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 // ── LAS TRES PIEZAS QUE COMPARTE CON «BUSCARLO EN LA LISTA» ─────────────────
 //
 // Ordenar las candidatas, guardar el código de la fila elegida y darle al motor
@@ -66,6 +64,9 @@ import {
   ubicacionQueJuzgaElCosto,
   CAMPOS_PRODUCTO_PARA_EL_MOTOR,
   CAMPOS_CABECERA_PARA_EL_MOTOR,
+  // Mudadas el 2026-10-24: el «Deshacer» de "Pueden ser de…" también desvincula.
+  desvinculada,
+  desactivarCodigo,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 
 
@@ -426,68 +427,4 @@ export async function POST(req, context) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Los campos que dejan una fila SIN producto.
- *
- * En un solo lugar porque los escriben los dos caminos de este endpoint, y una
- * fila desvinculada a medias —sin producto pero con el costo propuesto de antes—
- * sería un costo huérfano esperando a que alguien lo aplique.
- */
-function desvinculada() {
-  return {
-    // ── LA RELACIÓN SE DESCONECTA, NO SE PONE EL ESCALAR EN NULL ──────────
-    //
-    // `productoBaseId` es el campo de una relación, así que Prisma NO lo acepta
-    // en un `update`: contesta `Unknown argument productoBaseId`. El build no lo
-    // ve —el proyecto es JavaScript y Next no mira los argumentos de Prisma— y
-    // ningún candado lo ve tampoco, porque son funciones puras que no tocan la
-    // base. Falla recién contra Postgres, que es donde apareció.
-    productoBase: { disconnect: true },
-    // `codigoProveedorId` SÍ va directo: es un escalar suelto, sin `@relation`
-    // en el modelo. Los dos campos terminan en "Id" y se parecen; lo que decide
-    // cuál se escribe de qué forma es si el modelo declara la relación.
-    codigoProveedorId: null,
-    estado: ESTADO_LINEA.NO_MACHEADO,
-    motivo: null,
-    costoAnterior: null,
-    costoMaestroPropuesto: null,
-    diferencia: null,
-    diferenciaPct: null,
-    variacionAlta: false,
-    // La interpretación confirmada era sobre el renglón equivocado: otra unidad,
-    // otra cantidad, otro precio. Se borra entera, con su rango congelado.
-    baseConfirmada: null,
-    multiplicadorConfirmado: null,
-    kilosConfirmados: null,
-    cantidadPresentacion: null,
-    confirmadoEn: null,
-    confirmadoPorUsuarioId: null,
-    vinculadoEn: null,
-    aumentoEsperadoMinPct: null,
-    aumentoEsperadoMaxPct: null,
-    fueraDeRangoAceptadaEn: null,
-    // Y deja de estar elegible y elegida: una fila sin producto no se aplica.
-    seleccionable: false,
-    seleccionada: false,
-    excluidaManual: false,
-  };
-}
-
-/**
- * Da de baja el vínculo de un código con un producto.
- *
- * SE DESACTIVA, NO SE BORRA: borrarlo perdería que alguna vez ese producto se
- * compró con ese código, y el histórico de importaciones lo sigue nombrando.
- * Desactivado deja de machear y deja de contarse como faltante, que es lo que
- * hace falta.
- */
-async function desactivarCodigo(tx, { grupoId, proveedorId, productoBaseId, codigo }) {
-  const { normalizado } = clavesDeCodigo(codigo);
-  if (!normalizado) return;
-  await tx.productoCodigoProveedor.updateMany({
-    where: { grupoId, proveedorId, productoBaseId, codigoInterno: normalizado },
-    data: { activo: false },
-  });
 }

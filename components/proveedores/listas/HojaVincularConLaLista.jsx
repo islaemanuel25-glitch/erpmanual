@@ -44,7 +44,11 @@ const ESPERA_BUSQUEDA_MS = 350;
  * @param nombre        el del producto, para el título y el buscador
  * @param proveedor     el nombre del proveedor
  * @param cuerpoNoViene lo que se manda con «No viene en esta lista», que cada
- *                      ruta llama distinto
+ *                      ruta llama distinto. Sin él, el botón no está: desde
+ *                      «Otro» en "Pueden ser de…" el producto no es del
+ *                      proveedor, así que "no viene" no es una respuesta
+ * @param cuerpoVincular lo que viaja además del renglón elegido: desde «Otro»,
+ *                      `{ sumarProveedor: true }`, lo mismo que manda «✓ Sí»
  * @param onListo       al guardar algo: `(respuesta)`; la pantalla recarga
  * @param onCerrar      al cerrar sin guardar
  * @param importacionId con `seguirConLaLectura`, la lista donde se decide la lectura
@@ -57,7 +61,8 @@ export default function HojaVincularConLaLista({
   endpoint,
   nombre,
   proveedor = "",
-  cuerpoNoViene,
+  cuerpoNoViene = null,
+  cuerpoVincular = null,
   onListo,
   onCerrar,
   importacionId = null,
@@ -181,20 +186,22 @@ export default function HojaVincularConLaLista({
             color="primary"
             type="button"
             disabled={trabajando || !elegida}
-            onClick={() => mandar({ filaElegidaId: elegida.id })}
+            onClick={() => mandar({ ...cuerpoVincular, filaElegidaId: elegida.id })}
             className="w-full min-h-toque justify-center text-base font-bold"
           >
             {trabajando ? "Guardando…" : elegida ? `Vincular con ${elegida.codigo}` : "Elegí un renglón de la lista"}
           </SunmiButton>
-          <SunmiButton
-            color="slate"
-            type="button"
-            disabled={trabajando}
-            onClick={() => mandar(cuerpoNoViene)}
-            className="w-full min-h-toque justify-center text-sm3"
-          >
-            No viene en esta lista
-          </SunmiButton>
+          {cuerpoNoViene && (
+            <SunmiButton
+              color="slate"
+              type="button"
+              disabled={trabajando}
+              onClick={() => mandar(cuerpoNoViene)}
+              className="w-full min-h-toque justify-center text-sm3"
+            >
+              No viene en esta lista
+            </SunmiButton>
+          )}
           {elegida && (
             <p className="text-sm2 sunmi-text-muted leading-snug">
               Guardo el código {elegida.codigo}

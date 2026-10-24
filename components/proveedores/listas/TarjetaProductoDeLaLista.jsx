@@ -49,6 +49,7 @@
 //   GRANIX): "¿Cuántos kilos trae la pieza?", con decimales, y «Listo».
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
 import {
   CLASE_ACCION_CORREGIR,
@@ -249,7 +250,17 @@ export default function TarjetaProductoDeLaLista({
 
   return (
     <TarjetaDeRevision
-      nombre={item.nombre}
+      // "Sumado a Dab", chica, junto al nombre: vino de «Buscar en el resto de
+      // mis productos». Sin etiqueta, el nombre va solo, como siempre.
+      nombre={
+        item.sumadoA ? (
+          <>
+            {item.nombre} <SunmiPill color="cyan">{item.sumadoA}</SunmiPill>
+          </>
+        ) : (
+          item.nombre
+        )
+      }
       // Fuera de rango, el borde de la tarjeta en ámbar: se ve barriendo la lista.
       tono={fueraDeRango ? CLASE_TARJETA_FUERA_DE_RANGO : ""}
       debajo={debajo}

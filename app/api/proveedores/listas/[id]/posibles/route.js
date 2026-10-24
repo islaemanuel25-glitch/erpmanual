@@ -21,9 +21,22 @@
 //
 // ── LO QUE ESTO NO HACE ───────────────────────────────────────────────────
 //
-// No vincula. «✓ Sí» va por la vinculación de siempre (`en-la-lista`, con
-// `sumarProveedor`), que es la que guarda el código y recalcula el renglón con
-// el motor de la lista. Acá solo se guarda el «No».
+// No vincula. «✓ Sí» y «Otro» van por la vinculación de siempre (`en-la-lista`,
+// con `sumarProveedor`), que es la que guarda el código, recalcula el renglón
+// con el motor de la lista y anota el producto como sumado a esta lista
+// (`ProductoSumadoALaLista`). Acá se guarda el «No» y se hace el «Deshacer».
+//
+// ── ACEPTADOS (2026-10-24) ────────────────────────────────────────────────
+//
+// El GET devuelve además los aceptados en esta lista, con el renglón al que
+// quedaron atados: la pestaña «Aceptados» de la hoja. Se leen de la base, así
+// que siguen ahí al cerrar y volver a abrir la hoja o la pantalla.
+//
+// «Deshacer» (`{ deshacer: true, productoBaseId }`) saca el vínculo con este
+// proveedor —el renglón queda sin producto y su código apagado, como «No está
+// en la lista» de `otra-fila`, con las mismas funciones— y, si el «✓ Sí» le
+// sumó el proveedor, vacía ESE lugar y nada más: el proveedor que tenía antes
+// queda. Todo en una transacción.
 
 import { NextResponse } from "next/server";
 
@@ -31,13 +44,18 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
-import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+import { esImportacionAbierta, OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
+import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { clavesDeCodigo } from "@/lib/proveedores/listas/normalizarCodigo";
 import {
+  LUGARES_DE_PROVEEDOR,
   claveDeRechazo,
+  desactivarCodigo,
+  desvinculada,
   posiblesDelProveedor,
+  renglonDeLaHoja,
   sugerenciasDeRenglones,
   textoDeProveedoresDeHoy,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
@@ -85,7 +103,7 @@ export async function GET(req, context) {
     const proveedorId = cab.proveedorId;
     const desde = Date.now();
 
-    const [libres, delProveedor, porCodigo, rechazos, conRenglon] = await Promise.all([
+    const [libres, delProveedor, porCodigo, rechazos, conRenglon, sumados] = await Promise.all([
       prisma.importacionListaFila.findMany({
         where: { importacionId, productoBaseId: null, aplicada: false },
         select: CAMPOS_RENGLON,
@@ -105,7 +123,13 @@ export async function GET(req, context) {
       }),
       prisma.importacionListaFila.findMany({
         where: { importacionId, productoBaseId: { not: null } },
-        select: { productoBaseId: true },
+        select: CAMPOS_RENGLON,
+        orderBy: { filaExcel: "asc" },
+      }),
+      prisma.productoSumadoALaLista.findMany({
+        where: { importacionId, grupoId },
+        select: { productoBaseId: true, productoBase: { select: { nombre: true } } },
+        orderBy: { sumadoEn: "asc" },
       }),
     ]);
 
@@ -146,6 +170,16 @@ export async function GET(req, context) {
         proveedoresDeHoy: textoDeProveedoresDeHoy([producto.proveedor?.nombre, producto.proveedor2?.nombre, producto.proveedor3?.nombre]),
         renglon,
       })),
+      // Los aceptados en esta lista, con el renglón al que están atados hoy
+      // (null si después alguien lo desató desde la revisión).
+      aceptados: sumados.map((s) => {
+        const fila = conRenglon.find((f) => f.productoBaseId === s.productoBaseId) ?? null;
+        return {
+          productoBaseId: s.productoBaseId,
+          nombre: s.productoBase?.nombre ?? "",
+          renglon: fila ? renglonDeLaHoja(fila) : null,
+        };
+      }),
       // Cuánto tardó, para poder medirlo en producción sin abrir la consola.
       ms: Date.now() - desde,
     });
@@ -170,6 +204,7 @@ export async function POST(req, context) {
 
     const body = await req.json().catch(() => ({}));
     const productoBaseId = Number(body?.productoBaseId);
+    if (body?.deshacer === true) return await deshacer({ grupoId, importacionId, cab, productoBaseId });
     const filaId = Number(body?.filaId);
     if (!Number.isInteger(productoBaseId) || !Number.isInteger(filaId)) {
       return NextResponse.json({ ok: false, error: "Falta el producto o el renglón." }, { status: 400 });
@@ -206,4 +241,89 @@ export async function POST(req, context) {
     console.error("[listas/posibles POST]", e);
     return NextResponse.json({ ok: false, error: "No se pudo guardar la respuesta. Probá de nuevo." }, { status: 500 });
   }
+}
+
+/**
+ * «Deshacer» un aceptado: vuelve a como estaba antes del «✓ Sí» o del «Otro».
+ *
+ *   1. Sus renglones de ESTA lista quedan sin producto, con el código apagado:
+ *      `desvinculada` y `desactivarCodigo`, las mismas de «No está en la
+ *      lista». Uno ya aplicado no se toca: su costo está escrito, y eso se
+ *      deshace deshaciendo la aplicación.
+ *   2. Si el «✓ Sí» le sumó el proveedor, ESE lugar se vacía, y solo si sigue
+ *      teniendo a este proveedor. Los otros dos no se miran: el proveedor que
+ *      tenía antes queda.
+ *   3. La anotación de sumado se borra: vuelve a «Por revisar».
+ */
+async function deshacer({ grupoId, importacionId, cab, productoBaseId }) {
+  if (!Number.isInteger(productoBaseId)) {
+    return NextResponse.json({ ok: false, error: "Falta el producto." }, { status: 400 });
+  }
+  const sumado = await prisma.productoSumadoALaLista.findFirst({
+    where: { importacionId, productoBaseId, grupoId },
+    select: { id: true, lugarDelProveedor: true, productoBase: { select: { nombre: true } } },
+  });
+  if (!sumado) {
+    return NextResponse.json(
+      { ok: false, error: "Ese producto no se sumó desde esta búsqueda, así que no hay nada que deshacer." },
+      { status: 404 }
+    );
+  }
+  const filas = await prisma.importacionListaFila.findMany({
+    where: { importacionId, productoBaseId },
+    select: { id: true, aplicada: true, codigoCrudo: true, codigoNormalizado: true },
+  });
+  if (filas.some((f) => f.aplicada === true)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Su costo ya se aplicó con esta lista. Para deshacerlo, primero deshacé la aplicación.",
+        codigo: "YA_APLICADA",
+      },
+      { status: 409 }
+    );
+  }
+  const lugar = LUGARES_DE_PROVEEDOR.includes(sumado.lugarDelProveedor) ? sumado.lugarDelProveedor : null;
+
+  await prisma.$transaction(async (tx) => {
+    for (const f of filas) {
+      await desactivarCodigo(tx, {
+        grupoId,
+        proveedorId: cab.proveedorId,
+        productoBaseId,
+        codigo: f.codigoNormalizado ?? f.codigoCrudo,
+      });
+      await tx.importacionListaFila.update({ where: { id: f.id }, data: desvinculada() });
+    }
+    if (lugar) {
+      await tx.productoBase.updateMany({
+        where: { id: productoBaseId, grupoId, [lugar]: cab.proveedorId },
+        data: { [lugar]: null },
+      });
+    }
+    await tx.productoSumadoALaLista.delete({ where: { id: sumado.id } });
+    await recalcularContadores(tx, importacionId);
+  }, OPCIONES_TX);
+
+  // Con qué proveedores quedó: la tarjeta vuelve a «Por revisar» diciéndolo.
+  const despues = await prisma.productoBase.findFirst({
+    where: { id: productoBaseId, grupoId },
+    select: {
+      proveedor: { select: { nombre: true } },
+      proveedor2: { select: { nombre: true } },
+      proveedor3: { select: { nombre: true } },
+    },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    accion: "DESHECHO",
+    productoBaseId,
+    proveedoresDeHoy: textoDeProveedoresDeHoy([
+      despues?.proveedor?.nombre,
+      despues?.proveedor2?.nombre,
+      despues?.proveedor3?.nombre,
+    ]),
+    mensaje: `${sumado.productoBase?.nombre ?? "El producto"} ya no es de ${cab.proveedor?.nombre ?? "este proveedor"} y vuelve a «Por revisar».`,
+  });
 }
