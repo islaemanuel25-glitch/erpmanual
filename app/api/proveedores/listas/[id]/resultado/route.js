@@ -29,7 +29,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { paginacion } from "@/lib/proveedores/listas/persistencia";
+import { esImportacionAbierta, paginacion } from "@/lib/proveedores/listas/persistencia";
 import {
   contarResultado,
   contarControl,
@@ -62,6 +62,11 @@ import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
+import {
+  CAMPOS_PRODUCTO_PARA_LEER,
+  lecturaQueMuestraLaTarjeta,
+  lecturasDeLaFila,
+} from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO, GRUPOS_PRECIO_VIEJO } from "@/lib/proveedores/listas/gruposProducto";
@@ -264,6 +269,9 @@ export async function GET(req, context) {
         id: true,
         nombre: true,
         precio_costo: true,
+        // Para el buscador, que busca tus productos por nombre o por código.
+        codigo_barra: true,
+        codigo_barra_secundario: true,
         filasImportacionLista: {
           where: { importacionId: id },
           orderBy: { filaExcel: "asc" },
@@ -286,6 +294,8 @@ export async function GET(req, context) {
       rango: rangoDelProveedor,
       omitidas: revision.ids,
       noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
+      lecturaPorFila: await lecturasDeTusFilas({ importacionId: id, grupoId, productos: productosDelProveedor, cab, rango: rangoDelProveedor }),
+      abierta: esImportacionAbierta(cab.estado),
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
@@ -334,6 +344,9 @@ export async function GET(req, context) {
         proveedor: cab.proveedor,
         archivoNombre: cab.archivoNombre,
         leidaEn: cab.conciliadaEn ?? cab.createdAt,
+        // Cuándo se SUBIÓ, que es lo que dice la tarjeta de arriba. No hay una
+        // columna con la fecha de la lista misma: el archivo no la trae aparte.
+        subidaEn: cab.createdAt,
         productosActualizados,
         tuyosQueNoAparecen,
         rango: {
@@ -578,6 +591,36 @@ function numero(v) {
   if (v === null || v === undefined) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * LA LECTURA QUE MUESTRA CADA TARJETA, que es la que «✓ Usar» acepta.
+ *
+ * Con la fila ENTERA y el producto con el `select` de `confirmar`: son las dos
+ * cosas que `analizarFila` mira, y con menos campos la lectura que se ofrece acá
+ * podría no ser la que `confirmar` reconoce. Solo las filas de TUS productos —
+ * las que dibujan una tarjeta—, no las 1.546 del archivo.
+ *
+ * Una lista de control no confirma nada desde la tarjeta, y una cerrada
+ * tampoco: ahí no se lee nada y la tarjeta muestra lo guardado.
+ *
+ * @returns Map filaId → `{ lectura, confirmable }`
+ */
+async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rango }) {
+  const porFila = new Map();
+  if (modoDeImportacion(cab) === MODO_LISTA.CONTROLAR || !esImportacionAbierta(cab.estado)) return porFila;
+  const ids = productos.flatMap((p) => p.filasImportacionLista.map((f) => f.id));
+  if (ids.length === 0) return porFila;
+  const filas = await prisma.importacionListaFila.findMany({
+    where: { id: { in: ids }, importacionId },
+    include: { productoBase: { select: CAMPOS_PRODUCTO_PARA_LEER } },
+  });
+  for (const fila of filas) {
+    if (!fila.productoBase) continue;
+    const { lecturas, confirmable } = lecturasDeLaFila({ fila, producto: fila.productoBase, cab, rango });
+    porFila.set(fila.id, { lectura: lecturaQueMuestraLaTarjeta({ lecturas, fila }), confirmable });
+  }
+  return porFila;
 }
 
 /**

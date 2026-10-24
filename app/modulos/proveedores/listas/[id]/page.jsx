@@ -1,23 +1,28 @@
 "use client";
 
-// 4 · RESULTADO DE LA LISTA — y 6 · CONFIRMAR APLICAR, que es su hoja inferior.
+// 4 · LA REVISIÓN DE UNA LISTA — y 6 · CONFIRMAR APLICAR, que es su hoja inferior.
 //
-// ── LA PANTALLA CONTESTA UNA PREGUNTA ───────────────────────────────────────
+// ── TIENE LA FORMA DE RECIBIR UNA TRANSFERENCIA (Emanuel, 2026-10-24) ──────
 //
-// "¿Qué va a pasar si aplico esto?". Todo lo demás es secundario: el número
-// grande de lo que está listo, entre qué porcentajes aumenta, tres ejemplos para
-// mirarlos, y cuántos quedan para revisar.
+// La versión del 2026-10-23 ya arrancaba de tus productos, pero no dejaba claro
+// qué era tu producto y qué era el renglón de la lista. Emanuel prefiere cómo se
+// ve y se usa la recepción de una transferencia, así que esta pantalla se arma
+// con las MISMAS piezas que `RecepcionMovil`, en el mismo orden:
 //
-// La versión anterior de esta pantalla era una tabla de novecientas filas con
-// filtros, selección múltiple y ocho paneles. Eso sigue existiendo y se llega
-// desde acá —"Ver los 850"—, pero dejó de ser lo primero: con novecientas filas
-// adelante, la pregunta de arriba no se contesta.
+//   · `SunmiPantallaDeTrabajo`: la tarjeta de dónde estoy, el buscador, los
+//     filtros, la lista y la barra fija de abajo.
+//   · `SunmiCampoBusquedaVoz`, con el micrófono.
+//   · `SunmiFiltroEstado`: los cuatro estados en grilla de 2 × 2.
+//   · `TarjetaDeRevision`, adentro de `TarjetaProductoDeLaLista`.
+//   · La barra de «Total / ✓ Confirmar», acá «Para aplicar / ✓ Aplicar».
+//
+// Lo que decide cada estado sigue en `tusProductos.js`, y qué hace el botón de
+// cada tarjeta lo manda el servidor en `item.usar`.
 //
 // ── UNA LISTA TERMINADA NO INVITA A TRABAJAR ────────────────────────────────
 //
 // Cuando ya se aplicó y se terminó, esta pantalla muestra lo que pasó y ofrece
-// SOLO lo que se puede hacer. Un botón "Aplicar los 0 precios" apagado, en una
-// lista cerrada, es una pantalla que pide algo que no existe.
+// SOLO lo que se puede hacer: sin botones en las tarjetas y sin barra de aplicar.
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -29,15 +34,21 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import {
   useAccionDePagina,
   useTituloDePagina,
 } from "@/app/context/AccionDePaginaContext";
-
-import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
+// El chip de estado de la cabecera es el de la transferencia, con sus clases:
+// el control de stock ya lo copió así, y no se escribe uno parecido al lado.
+import EstadoTransferenciaBadge, {
+  InsigniaEnCurso,
+  InsigniaTerminada,
+} from "@/components/transferencias/EstadoTransferenciaBadge";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
 import {
@@ -48,17 +59,11 @@ import {
   // el día que uno cambie de decimales.
   money,
 } from "@/components/proveedores/listas/PiezasPantallas";
-// ── LA REVISIÓN ARRANCA DE TUS PRODUCTOS (diseño de Emanuel, 2026-10-23) ──
-//
-// Las seis tarjetas de números y las tres pantallas sueltas —"Para revisar" de
-// a uno, "Vincular" recorriendo el archivo de a uno, "No cambian"— se fueron:
-// esta pantalla es la revisión entera, y su lista son tus productos del
-// proveedor, cada uno con lo que le pasa. Lo que decide cada estado vive en
-// `tusProductos.js`; vincular y revisar son hojas que no sacan de acá.
-import TarjetaDeTuProducto from "@/components/proveedores/listas/TarjetaDeTuProducto";
+import TarjetaProductoDeLaLista from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincularConLaLista";
-import HojaRevisarPrecio from "@/components/proveedores/listas/HojaRevisarPrecio";
+import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
+  ACCION_USAR,
   FILTRO,
   ORDEN_FILTROS,
   TEXTO_FILTRO,
@@ -86,8 +91,11 @@ import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
 // dos acciones del control.
-import { MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
+import { MODO_LISTA, textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+
+/** El texto del buscador, como el de la recepción pero sobre lo tuyo. */
+export const PLACEHOLDER_BUSCADOR_LISTA = "Buscar tu producto o código…";
 
 export default function ResultadoDeListaPage() {
   const router = useRouter();
@@ -134,34 +142,35 @@ export default function ResultadoDeListaPage() {
   const [eligiendoOtra, setEligiendoOtra] = useState(null);
   /** El producto que se está revisando: `{ filaId, productoBaseId }` o null. */
   const [revisando, setRevisando] = useState(null);
+  // ── LO QUE SE TOCA EN LA TARJETA MISMA ─────────────────────────────────
+  //
+  // «✓ Usar» y «No viene» no abren nada: guardan y la tarjeta cambia en el
+  // lugar. `tocando` es el producto con el pedido en vuelo; `errores`, el
+  // rechazo del servidor PEGADO a la tarjeta donde se tocó —arriba de todo
+  // quedaría fuera de la pantalla justo cuando el dedo está en el botón—.
+  const [tocando, setTocando] = useState(null);
+  const [errores, setErrores] = useState(() => new Map());
+  /** La tarjeta que pidió «✓ Usar» sobre una lectura fuera de rango. */
+  const [preguntaFuera, setPreguntaFuera] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
   // a mano. Una lista de otro local la frena el servidor.
   const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
-  // ── LA BARRA DE LA APP DICE DÓNDE ESTÁS ─────────────────────────────────
+  // ── LA BARRA DE LA APP DICE QUÉ ES ESTO, Y LA TARJETA DE QUIÉN ──────────
   //
-  // Decía "Listas de proveedores" en las seis pantallas del módulo, que es el
-  // nombre del ítem del menú. Adentro de una lista eso no informa nada: Emanuel
-  // ya sabe que está en listas, lo que necesita saber es DE CUÁL.
-  //
-  // El mecanismo ya existía y lo usan las pantallas de cobros y de medios de
-  // pago: `useTituloDePagina` registra un título que gana sobre el de la ruta.
-  // El nombre del proveedor es un dato que ninguna tabla de rutas puede
-  // contener, que es exactamente para lo que se hizo ese slot.
-  useTituloDePagina(datos?.cabecera?.proveedor?.nombre || "Lista de proveedor");
+  // Decía el nombre del proveedor. Ahora el nombre va en negrita en la tarjeta
+  // de arriba, como "Transferencia #464", y la barra dice qué pantalla es.
+  useTituloDePagina("Lista de precios");
 
   // ── Y EL VOLVER VA EN LA FILA DEL SHELL, NO ADENTRO DEL CONTENIDO ───────
   //
-  // Estaba dibujado como primer hijo del `<main>`, y `<main>` es el que
-  // scrollea: en el resultado, que es largo, el volver se iba de pantalla
-  // apenas se bajaba un poco. No es z-index ni sticky, es en qué caja está.
-  // La fila del shell vive AFUERA del scroll, así que ahí no se puede ir.
-  //
-  // Es la misma llamada que hacen las 32 pantallas que ya usan el slot.
+  // La fila del shell vive AFUERA del `<main>` que scrollea, así que ahí no se
+  // puede ir de pantalla. Es la misma llamada que hacen las pantallas que ya usan
+  // el slot.
   useAccionDePagina(
-    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" className="min-h-toque" />,
+    () => <SunmiBackButton href="/modulos/proveedores/listas" className="min-h-toque" />,
     []
   );
 
@@ -214,6 +223,82 @@ export default function ResultadoDeListaPage() {
     if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id]);
+
+  /**
+   * UN PEDIDO DESDE LA TARJETA, con el error pegado a ella.
+   *
+   * Si sale bien, la tarjeta queda fijada y la lista se relee sin el cargador:
+   * el estado nuevo lo dice el servidor, no esta pantalla.
+   */
+  const pedirDesdeLaTarjeta = async (item, url, cuerpo, textoSiFalla) => {
+    const pid = item.productoBaseId;
+    setTocando(pid);
+    setErrores((prev) => {
+      const m = new Map(prev);
+      m.delete(pid);
+      return m;
+    });
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setErrores((prev) => new Map(prev).set(pid, `${j?.error || textoSiFalla} No se guardó nada.`));
+        return;
+      }
+      await despuesDeTocar(pid);
+    } catch {
+      setErrores((prev) =>
+        new Map(prev).set(pid, "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.")
+      );
+    } finally {
+      setTocando(null);
+    }
+  };
+
+  /**
+   * «✓ USAR», QUE ES EL «✓ COINCIDE» DE LA RECEPCIÓN.
+   *
+   * Qué hace lo dice el servidor en `item.usar`, y cada acción es una ruta que ya
+   * existía: confirmar la lectura que la tarjeta muestra, o tildar y destildar.
+   * Una lectura fuera de rango NO se usa de un toque: se pregunta antes con la
+   * misma pregunta de la hoja de revisar.
+   */
+  const usar = (item, { aceptarFueraDeRango = false } = {}) => {
+    const u = item.usar;
+    if (!u) return;
+    if (u.accion === ACCION_USAR.CONFIRMAR) {
+      if (u.fueraDeRango && !aceptarFueraDeRango) {
+        setPreguntaFuera(item);
+        return;
+      }
+      return pedirDesdeLaTarjeta(
+        item,
+        `/api/proveedores/listas/${id}/filas/${item.filaId}/confirmar`,
+        { clave: u.clave, aceptarFueraDeRango },
+        "El servidor no pudo guardar este precio y no dijo por qué."
+      );
+    }
+    return pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/seleccion`,
+      { accion: u.accion, ids: [item.filaId] },
+      "El servidor no pudo cambiarlo y no dijo por qué."
+    );
+  };
+
+  /** «No viene»: lo mismo que el botón de la hoja de vincular, sin abrirla. */
+  const noViene = (item) =>
+    pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
+      { noViene: true },
+      "El servidor no pudo guardarlo y no dijo por qué."
+    );
 
   /**
    * Pasa este control a actualizar precios, con el rango que se acaba de pedir.
@@ -410,11 +495,10 @@ export default function ResultadoDeListaPage() {
    *
    * ── POR QUÉ UNA RUTA Y NO UN BLOB ARMADO ACÁ ────────────────────────────
    *
-   * Porque acá NO están los datos. La pantalla tiene `muestra`, que son TRES
-   * filas de ejemplo, y los contadores — no las novecientas líneas con su
-   * diferencia. Armar el archivo con lo que hay a mano habría bajado un CSV de
-   * tres renglones titulado "el control": un archivo que se abre, se ve
-   * perfecto, y miente por omisión sobre el 99 % de la lista.
+   * Porque acá NO están los datos: están tus productos, no las novecientas
+   * líneas del archivo con su diferencia. Armar el archivo con lo que hay a mano
+   * habría bajado un CSV titulado "el control" que se abre, se ve perfecto, y
+   * miente por omisión sobre casi toda la lista.
    *
    * Es una navegación y no un `fetch`: el navegador maneja la descarga y el
    * `Content-Disposition` de la ruta pone el nombre del archivo.
@@ -494,7 +578,7 @@ export default function ResultadoDeListaPage() {
             motivos.length > 0
               ? `No se actualizó ningún costo. ${textoDeMotivos(motivos)}`
               : "No se actualizó ningún costo, y el servidor no dijo por qué. " +
-                "Abrí «se actualizan» y fijate si las filas siguen tildadas.",
+                "Mirá en «Cambian» si siguen marcados con «Usar».",
         });
       }
       await cargar();
@@ -583,632 +667,596 @@ export default function ResultadoDeListaPage() {
   const filtroActivo = filtro ?? FILTRO.TODOS;
   const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar, fijados }));
 
-  return (
-    <Marco>
-      {/* El volver y el título ya no se dibujan acá: van al slot del shell, que
-          es una fila que vive AFUERA de `<main>`. Ver el comentario del registro,
-          arriba. */}
-      {/* ── EL NOMBRE DEL PROVEEDOR VA UNA SOLA VEZ, Y ESTÁ ARRIBA ──────────
-          Acá había un `<h1>` con el nombre del proveedor. Ahora la barra del
-          shell dice ese mismo nombre, dos centímetros más arriba: en la captura
-          a 360 se leía "M Y F SRL" y justo debajo "M Y F SRL" otra vez. Es el
-          mismo título duplicado que el listado ya tuvo, con el agravante de que
-          acá las dos copias quedan pegadas.
+  // Los avisos que existen hoy, en el lugar de los caminos de excepción: entre
+  // los filtros y la lista, como el "no figura" de la recepción. Se arman como
+  // lista para que, sin ninguno, la ranura llegue en `null` y no deje un hueco.
+  const avisos = [];
 
-          Lo que el shell NO puede decir es de qué archivo se trata, cuándo se
-          leyó y en qué estado está — y eso es lo que queda. */}
-      {/* ── CONTROLANDO, EL RENGLÓN DICE QUE NO SE CAMBIÓ NADA ─────────────
-          Y lo dice acá arriba, junto al nombre del archivo, no al pie: es la
-          primera pregunta que se hace alguien que abre esta pantalla —"¿esto ya
-          me tocó los costos?"— y la respuesta tiene que estar antes que los
-          números, no después de recorrerlos. */}
-      {/* Archivo · fecha y hora de lectura · qué pasó con los precios. El
-          nombre del proveedor lo dice la barra del shell, en grande, con
-          «← Listas» a la derecha. */}
-      <p className="text-sm2 sunmi-text-muted leading-snug">
-        {cabecera.archivoNombre} · {fechaHora(cabecera.leidaEn)} ·{" "}
-        {controlando ? "no se cambió ningún precio" : estadoEnCastellano(cabecera)}
-      </p>
+  // EL AVISO DEL 0 A 0. Se deduce de lo guardado, así que sigue estando la
+  // semana que viene: quien puso 0 % tiene que poder entender por qué esta
+  // lista terminó siendo un control, y no descubrirlo por descarte.
+  if (cabecera.avisoDeModo) {
+    avisos.push(<Aviso key="modo" tono="warning">{cabecera.avisoDeModo}</Aviso>);
+  }
 
-      {/* EL AVISO DEL 0 A 0. Se deduce de lo guardado, así que sigue estando la
-          semana que viene: quien puso 0 % tiene que poder entender por qué esta
-          lista terminó siendo un control, y no descubrirlo por descarte. */}
-      {cabecera.avisoDeModo && <Aviso tono="warning">{cabecera.avisoDeModo}</Aviso>}
-
-      {/* ── LA QUE QUEDÓ ATRAPADA EN EL DEFECTO VIEJO ──────────────────────
-          Una lista leída antes de esta tanda con el rango en 0 a 0: el motor no
-          pudo elegir la columna de precio y dejó todo para revisar. No se
-          arregla sola, así que se avisa al abrirla y se ofrecen las dos
-          salidas. Sin esto, la pantalla se ve como una lista normal que
-          simplemente no pudo con nada, y no hay forma de saber por qué. */}
-      {cabecera.quedoAtrapada && (
-        <Aviso tono="warning">
-          <p className="leading-snug">{cabecera.avisoAtrapada}</p>
-          <div className="mt-2 space-y-2">
-            <SunmiButton
-              color="cyan"
-              onClick={pasarAControlar}
-              disabled={pasando}
-              className="w-full min-h-toque text-sm3"
-            >
-              {pasando ? "Pasando…" : "Pasarla a control"}
-            </SunmiButton>
-            <SunmiButton
-              color="slate"
-              onClick={() => setCancelando(true)}
-              disabled={pasando}
-              className="w-full min-h-toque text-sm3"
-            >
-              Cancelar esta lista
-            </SunmiButton>
-          </div>
-        </Aviso>
-      )}
-
-      {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
-
-      {/* ── FILAS QUE QUEDARON AFUERA POR UNA BAJA POSTERIOR ───────────────
-          El archivo trae N renglones y la pantalla muestra menos. Sin este
-          cartel la diferencia no se explica y parece que se perdieron filas:
-          lo que pasó es que su producto se dio de baja DESPUÉS de conciliar,
-          así que no hay nada que aplicarles. Se dice el número, porque "algunas"
-          no deja comprobar nada. */}
-      {datos?.filasConProductoDeBaja > 0 && (
-        <Aviso tono="warning">
-          {datos.filasConProductoDeBaja === 1
-            ? "Una fila quedó afuera: el producto que tenía vinculado se dio de baja después de conciliar. No se le escribe costo."
-            : `${datos.filasConProductoDeBaja} filas quedaron afuera: los productos que tenían vinculados se dieron de baja después de conciliar. No se les escribe costo.`}
-        </Aviso>
-      )}
-
-      {/* ── LA COLUMNA QUE EXPLICA POCO, ARRIBA Y CON SU SALIDA ────────────
-          Cuando la columna con la que se leyó explica menos de la MITAD de los
-          productos comparables, hay motivo para dudar de ella — y el caso que
-          originó esto demuestra que dudar tarde sale caro: la columna
-          equivocada no da un disparate visible, da un aumento plausible que se
-          aplica solo.
-          Va arriba de todo y con el botón al lado, porque un aviso que dice que
-          algo puede estar mal sin decir qué hacer es peor que no avisar. */}
-      {explicaPoco(lectura) && abierta && (
-        <Aviso tono="warning">
-          <p className="leading-snug">
-            Los precios salieron de la columna «{lectura.titulo}», que coincide con tus costos en{" "}
-            {lectura.explicadas} de cada {lectura.comparables} productos. Puede no ser la columna
-            del precio que te factura este proveedor.
-          </p>
-          <div className="mt-2">
-            <SunmiButton
-              color="cyan"
-              onClick={() => setCambiandoColumna(true)}
-              disabled={pasando}
-              className="w-full min-h-toque text-sm3"
-            >
-              Leer con otra columna
-            </SunmiButton>
-          </div>
-        </Aviso>
-      )}
-
-      {/* CON QUÉ COLUMNA SE LEYÓ. Es la decisión de la que cuelga todo lo demás,
-          así que se dice, y se dice con su respaldo.
-          NO se muestra cuando arriba está el aviso: los dos dicen lo mismo, y
-          además lo dicen con denominadores distintos —"0 de cada 9" y "0 de cada
-          100"— así que juntos se leen como dos mediciones que no coinciden. */}
-      {lectura?.titulo && !(explicaPoco(lectura) && abierta) && (
-        <p className="text-sm2 sunmi-text-muted leading-snug">
-          Los precios salieron de la columna «{lectura.titulo}»
-          {lectura.conDescuento ? ", con el descuento aplicado" : ""}
-          {lectura.comparables
-            ? `, que coincide con tus costos en ${Math.round((lectura.explicadas / lectura.comparables) * 100)} de cada 100 productos.`
-            : "."}
-          {/* QUIÉN LA ELIGIÓ, y las tres respuestas son distintas para quien
-              audita: no es lo mismo una decisión tomada hoy mirando esta lista
-              que una tomada hace un mes mirando otra, ni que ninguna. */}
-          {lectura.origenDeLaEleccion === "LA_ELEGISTE_AHORA" || (lectura.aMano && !lectura.origenDeLaEleccion)
-            ? " La elegiste vos."
-            : lectura.origenDeLaEleccion === "LA_ELEGISTE_ANTES"
-              ? " La elegiste vos en una lista anterior de este proveedor."
-              : " La eligió el sistema."}
-        </p>
-      )}
-
-      {/* ── LAS SEIS TARJETAS DE NÚMEROS SE FUERON ─────────────────────────
-          Las del control y las del resultado: cada una llevaba a otra pantalla
-          con otro pedazo de la misma pregunta. Ahora la pregunta se contesta
-          producto por producto, más abajo. */}
-      {/* ── LAS QUE ESTÁN LISTAS Y NO SE VAN A ESCRIBIR ──────────────────
-          Hasta esta tanda estas filas se contaban entre las que "se actualizan",
-          y aplicar las salteaba porque consulta por `seleccionada`. Sacarlas del
-          número grande era la mitad del arreglo; la otra mitad es decirlas. Si
-          no, el número baja de 8 a 0 sin que nadie entienda a dónde se fueron —
-          que es la misma clase de mentira, al revés.
-
-          Solo se dibuja cuando hay alguna: una tarjeta en cero acá sería un
-          problema que no existe ocupando lugar. */}
-      {!controlando && (conteo.listosSinTildar ?? 0) > 0 && (
-        <SunmiCard className="p-3">
-          <p className="text-sm2 sunmi-text-warning leading-snug">
-            <span className="font-bold sunmi-text-strong">{conteo.listosSinTildar}</span>{" "}
-            {conteo.listosSinTildar === 1 ? "está listo" : "están listos"} pero sin tildar, así que
-            aplicar no {conteo.listosSinTildar === 1 ? "lo" : "los"} va a tocar.
-          </p>
-          {abierta && (
-            <SunmiButton
-              color="ghost"
-              onClick={() => irA("/actualizan")}
-              className="mt-2 w-full min-h-toque text-sm3"
-            >
-              Abrirlos para tildarlos
-            </SunmiButton>
-          )}
-        </SunmiCard>
-      )}
-
-      {/* ── LAS QUE APLICAR VA A OMITIR PORQUE EL PRECIO CAMBIÓ ──────────
-          De la importación #12 de producción: la pantalla decía "11 se
-          actualizan · Aplicar los 11 precios", Emanuel aplicó, y se escribieron
-          3. Las otras 8 salieron omitidas por propuesta diferente y NADIE SE
-          ENTERÓ: ni antes —el número las contaba— ni después, porque el aviso de
-          la corrida daba el total y no decía qué les había pasado ni a cuáles.
-
-          Ahora las cuenta `conteo.omitidasAlAplicar`, salen del número grande, y
-          acá se dicen con nombre y con los DOS números. Los dos son el punto:
-          "el costo da distinto" sin decir distinto de qué obliga a abrir cada
-          fila para enterarse, y son justamente las filas que ya se miraron una
-          vez. */}
-      {!controlando && (conteo.omitidasAlAplicar ?? 0) > 0 && (
-        <SunmiCard className="p-3">
-          {/* ── EL CARTEL NO AFIRMA QUE EL PRECIO CAMBIÓ ──────────────────
-              Acá decía "sus precios cambiaron desde que se leyó la lista", y en
-              la #12 eso era FALSO en las siete filas que nombraba: lo que
-              difería eran siete centavos sobre $31.428 por dónde caía un
-              redondeo. El precio no se había movido.
-
-              El sistema no sabe por qué difieren los dos números —puede ser un
-              precio nuevo, o el armado del producto, o la cuenta—. Lo que SÍ
-              sabe es cuánto difieren, así que eso es lo que dice. La causa la
-              ve la persona mirando los dos importes. */}
-          <p className="text-sm2 sunmi-text-warning leading-snug">
-            <span className="font-bold sunmi-text-strong">{conteo.omitidasAlAplicar}</span>{" "}
-            {conteo.omitidasAlAplicar === 1 ? "no se va a actualizar" : "no se van a actualizar"}:
-            con los datos de hoy {conteo.omitidasAlAplicar === 1 ? "el costo da" : "los costos dan"}{" "}
-            distinto del que se había propuesto, y la diferencia es grande como para
-            escribirla sin que la mires.
-          </p>
-
-          {/* Los dos valores, fila por fila: el que se había propuesto y el de
-              hoy. Se muestran hasta cinco —en un teléfono más no se lee— y si
-              hay más se dice cuántas quedan, en vez de cortar en silencio. */}
-          {(omitidas.propuestaDiferente ?? []).length > 0 && (
-            <div className="mt-2 divide-y sunmi-divide">
-              {(omitidas.propuestaDiferente ?? []).slice(0, 5).map((o) => (
-                <div key={o.filaId} className="py-2">
-                  <div className="text-sm2 sunmi-text-strong truncate" title={o.nombre ?? ""}>
-                    {o.nombre ?? `Fila ${o.filaExcel ?? o.filaId}`}
-                  </div>
-                  <div className="text-sm2 sunmi-text-muted tabular-nums">
-                    Antes se iba a poner {money(o.costoGuardado)} y ahora daría{" "}
-                    <span className="sunmi-text-strong">{money(o.costoRecalculado)}</span>
-                  </div>
-                  {/* EN CUÁNTO DIFIERE, que es el dato que decide. Los dos
-                      importes solos obligan a restarlos de cabeza, y con
-                      números de cinco cifras eso no se hace en un teléfono.
-                      Sale del servidor, calculado por la misma función que
-                      decidió frenar: si se restara acá podrían decir cosas
-                      distintas. */}
-                  {o.diferencia?.pesos !== null && o.diferencia?.pesos !== undefined && (
-                    <div className="text-xs2 sunmi-text-warning tabular-nums">
-                      Son {money(Math.abs(o.diferencia.pesos))} de diferencia
-                      {o.diferencia?.pct === null || o.diferencia?.pct === undefined
-                        ? ""
-                        : ` (${pct(o.diferencia.pct)})`}
-                      .
-                    </div>
-                  )}
-                </div>
-              ))}
-              {(omitidas.propuestaDiferente ?? []).length > 5 && (
-                <p className="pt-2 text-xs2 sunmi-text-muted">
-                  Y {(omitidas.propuestaDiferente ?? []).length - 5} más.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* LA SALIDA. Volver a leerlas recalcula la propuesta con los datos de
-              hoy y las deja para mirar de nuevo: no escribe ningún costo. Solo
-              se ofrece con la lista abierta y cuando hay alguna de este motivo —
-              las demás omisiones se arreglan en otro lado y cada una dice dónde. */}
-          {abierta && (omitidas.propuestaDiferente ?? []).length > 0 && (
-            <SunmiButton
-              color="ghost"
-              onClick={releerPropuestas}
-              disabled={releyendo}
-              className="mt-2 w-full min-h-toque text-sm3"
-            >
-              {releyendo
-                ? "Volviendo a leer…"
-                : (omitidas.propuestaDiferente ?? []).length === 1
-                  ? "Volver a leer ese precio"
-                  : `Volver a leer esos ${(omitidas.propuestaDiferente ?? []).length} precios`}
-            </SunmiButton>
-          )}
-
-          {/* Las omisiones que NO son de propuesta diferente también se nombran:
-              cada motivo ya tiene su texto con el qué pasó y el qué hacer, y
-              callarlas dejaría el número sin explicación. */}
-          {(omitidas.porMotivo ?? [])
-            .filter((m) => m.motivo !== "PROPUESTA_DIFERENTE")
-            .map((m) => (
-              <p key={m.motivo} className="mt-2 text-xs2 sunmi-text-muted leading-snug">
-                {m.cantidad === 1 ? "Una más" : `${m.cantidad} más`}: {m.texto}
-              </p>
-            ))}
-        </SunmiCard>
-      )}
-
-      {/* ── EL RESUMEN: DE LO TUYO, CUÁNTO TRAE LA LISTA ───────────────────
-          "De tus 158 productos de Dab, la lista trae 14." Es la única cuenta
-          que importa antes de empezar: cuánto de lo tuyo vino. Los números
-          salen del mismo arreglo que se dibuja abajo. */}
-      <SunmiCard className="p-3 space-y-0.5">
-        <p className="text-sm2 sunmi-text-muted">
-          De tus {tusProductos.conteo.total} productos de {nombreProveedor}
-        </p>
-        <p className="text-xl2 font-bold sunmi-text-strong leading-tight">
-          la lista trae {tusProductos.conteo.traeLaLista}
-        </p>
-        {sinVincular > 0 && abierta && (
-          <p className="text-sm2 sunmi-text-muted leading-snug pt-1">
-            Vinculá los que faltan una sola vez: después {nombreProveedor} los trae solos.
-          </p>
-        )}
-      </SunmiCard>
-
-      {/* Los chips, en el orden del diseño y con su número. "Todos" va último:
-          se arma como un chip más y no con el "Todas" de la pieza, que va
-          primero. Arranca en el primero que tenga algo. */}
-      <SunmiChipsFiltro
-        rotulo={null}
-        textoTodas={null}
-        valor={filtroActivo}
-        onCambiar={(f) => elegirFiltro(f ?? FILTRO.TODOS)}
-        opciones={ORDEN_FILTROS.map((f) => ({
-          clave: f,
-          texto: TEXTO_FILTRO[f],
-          cantidad: cantidadDelFiltro(f, tusProductos.conteo),
-        }))}
-      />
-
-      <SunmiInput
-        type="search"
-        value={buscar}
-        onChange={(e) => setBuscar(e.target.value)}
-        placeholder="Buscar en tus productos"
-        aria-label="Buscar en tus productos"
-        className="min-h-toque text-sm3"
-      />
-
-      {/* ── UNA TARJETA POR PRODUCTO TUYO ─────────────────────────────────
-          Los renglones de la lista que no son tuyos no se listan: solo
-          aparecen en el buscador de la hoja de vincular. */}
-      <div className="space-y-2">
-        {visibles.map((item) => (
-          <TarjetaDeTuProducto
-            key={item.productoBaseId}
-            item={item}
-            proveedor={nombreProveedor}
-            abierta={abierta}
-            controlando={controlando}
-            onVincular={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre })}
-            onRevisar={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
-          />
-        ))}
-        {visibles.length === 0 && (
-          <p className="text-sm2 sunmi-text-muted text-center py-4">
-            {buscar.trim()
-              ? "Ninguno de tus productos se llama así."
-              : "No hay ninguno en este grupo."}
-          </p>
-        )}
-      </div>
-
-      {/* ── LAS DOS ACCIONES DE UN CONTROL ─────────────────────────────────
-          Ninguna de las dos escribe un costo. "Pasar a actualizar precios"
-          convierte ESTA importación sin volver a subir el archivo —que es lo que
-          uno quiere después de mirar el control y decidir que sí— y el que
-          escribe sigue siendo el botón de aplicar de la pantalla de después,
-          con su confirmación. */}
-      {controlando && abierta && (
-        <div className="space-y-2">
+  // ── LA QUE QUEDÓ ATRAPADA EN EL DEFECTO VIEJO ──────────────────────────
+  // Una lista leída con el rango en 0 a 0: el motor no pudo elegir la columna
+  // de precio y dejó todo para revisar. No se arregla sola, así que se avisa al
+  // abrirla y se ofrecen las dos salidas.
+  if (cabecera.quedoAtrapada) {
+    avisos.push(
+      <Aviso key="atrapada" tono="warning">
+        <p className="leading-snug">{cabecera.avisoAtrapada}</p>
+        <div className="mt-2 space-y-2">
           <SunmiButton
             color="cyan"
-            onClick={() => setPasandoAActualizar(true)}
+            onClick={pasarAControlar}
             disabled={pasando}
-            className="w-full min-h-toque text-base font-bold"
+            className="w-full min-h-toque text-sm3"
           >
-            {pasando ? "Pasando…" : "Pasar a actualizar precios"}
+            {pasando ? "Pasando…" : "Pasarla a control"}
           </SunmiButton>
           <SunmiButton
             color="slate"
-            onClick={descargarElControl}
+            onClick={() => setCancelando(true)}
+            disabled={pasando}
             className="w-full min-h-toque text-sm3"
           >
-            Descargar el control
+            Cancelar esta lista
           </SunmiButton>
-          <p className="text-sm2 sunmi-text-muted text-center leading-snug">
-            Pasar a actualizar no cambia nada todavía: vuelve a leer esta misma lista con el
-            aumento que esperás y te muestra el resultado antes de aplicar.
-          </p>
         </div>
-      )}
+      </Aviso>
+    );
+  }
 
-      {/* ── APLICAR, AL FINAL DE LA LISTA Y NO PEGADO AL PIE ────────────────
-          Va después de la última tarjeta, como un elemento más: un botón
-          pegado abajo tapa la tarjeta que pasa por debajo (Emanuel, recepción,
-          2026-10-22). El número es `conteo.listos`, el mismo que consulta
-          aplicar y que decide qué tarjetas dicen «Cambia». La confirmación y
-          las reglas de rango son las de siempre. */}
-      {!controlando && abierta && listos > 0 && (
-        <div className="space-y-2">
+  if (aviso) avisos.push(<Aviso key="aviso" tono={aviso.tono}>{aviso.texto}</Aviso>);
+
+  // ── FILAS QUE QUEDARON AFUERA POR UNA BAJA POSTERIOR ───────────────────
+  // El archivo trae N renglones y la pantalla muestra menos: su producto se dio
+  // de baja DESPUÉS de conciliar. Se dice el número, porque "algunas" no deja
+  // comprobar nada.
+  if (datos?.filasConProductoDeBaja > 0) {
+    avisos.push(
+      <Aviso key="bajas" tono="warning">
+        {datos.filasConProductoDeBaja === 1
+          ? "Una fila quedó afuera: el producto que tenía vinculado se dio de baja después de conciliar. No se le escribe costo."
+          : `${datos.filasConProductoDeBaja} filas quedaron afuera: los productos que tenían vinculados se dieron de baja después de conciliar. No se les escribe costo.`}
+      </Aviso>
+    );
+  }
+
+  // ── LA COLUMNA QUE EXPLICA POCO, CON SU SALIDA ─────────────────────────
+  // La columna equivocada no da un disparate visible, da un aumento plausible
+  // que se aplica solo. Un aviso que dice que algo puede estar mal sin decir qué
+  // hacer es peor que no avisar: va con el botón.
+  if (explicaPoco(lectura) && abierta) {
+    avisos.push(
+      <Aviso key="columna" tono="warning">
+        <p className="leading-snug">
+          Los precios salieron de la columna «{lectura.titulo}», que coincide con tus costos en{" "}
+          {lectura.explicadas} de cada {lectura.comparables} productos. Puede no ser la columna
+          del precio que te factura este proveedor.
+        </p>
+        <div className="mt-2">
           <SunmiButton
-            color="primary"
-            onClick={() => setConfirmando(true)}
-            disabled={aplicando}
-            className="w-full min-h-toque text-base font-bold"
+            color="cyan"
+            onClick={() => setCambiandoColumna(true)}
+            disabled={pasando}
+            className="w-full min-h-toque text-sm3"
           >
-            Aplicar los {listos} precios
+            Leer con otra columna
           </SunmiButton>
-          <p className="text-sm2 sunmi-text-muted text-center leading-snug">
-            Solo cambian los que dicen «Cambia». Los demás quedan como están.
-          </p>
         </div>
-      )}
+      </Aviso>
+    );
+  }
 
-      {puedeDeshacer && (
-        <SunmiButton
-          color="slate"
-          onClick={() => setDeshaciendo(true)}
-          disabled={aplicando}
-          className="w-full min-h-toque text-sm3"
-        >
-          {cabecera.productosActualizados === 1
-            ? "Deshacer el que se actualizó"
-            : `Deshacer los ${cabecera.productosActualizados} que se actualizaron`}
-        </SunmiButton>
-      )}
+  // CON QUÉ COLUMNA SE LEYÓ. Es la decisión de la que cuelga todo lo demás, así
+  // que se dice, y se dice con su respaldo. NO se muestra cuando está el aviso de
+  // arriba: dicen lo mismo con denominadores distintos.
+  if (lectura?.titulo && !(explicaPoco(lectura) && abierta)) {
+    avisos.push(
+      <p key="lectura" className="text-sm2 sunmi-text-muted leading-snug">
+        Los precios salieron de la columna «{lectura.titulo}»
+        {lectura.conDescuento ? ", con el descuento aplicado" : ""}
+        {lectura.comparables
+          ? `, que coincide con tus costos en ${Math.round((lectura.explicadas / lectura.comparables) * 100)} de cada 100 productos.`
+          : "."}
+        {/* QUIÉN LA ELIGIÓ, y las tres respuestas son distintas para quien
+            audita. */}
+        {lectura.origenDeLaEleccion === "LA_ELEGISTE_AHORA" || (lectura.aMano && !lectura.origenDeLaEleccion)
+          ? " La elegiste vos."
+          : lectura.origenDeLaEleccion === "LA_ELEGISTE_ANTES"
+            ? " La elegiste vos en una lista anterior de este proveedor."
+            : " La eligió el sistema."}
+      </p>
+    );
+  }
 
-      {/* ── TERMINAR SE OFRECE MIENTRAS LA LISTA ESTÉ ABIERTA ───────────────
-          La primera versión lo mostraba solo con `listos === 0 && paraRevisar
-          === 0`, y esa condición no se cumple casi nunca: la lista real de M Y F
-          quedó con 560 filas para revisar —la mayoría productos que este cliente
-          no vende— y ninguna se va a resolver jamás. Con la regla vieja esa lista
-          se quedaba "a medias" para siempre, ocupando la sección de arriba del
-          historial, sin ninguna forma de cerrarla desde acá.
-          Terminar es justamente decir "con esta lista ya está", y el servidor lo
-          acepta sobre cualquier importación abierta: la pantalla no tiene por qué
-          ser más estricta que él. Va último y en gris, detrás de su modal, que
-          explica qué se pierde y que se puede volver atrás. */}
-      {/* ── LOS DOS SECUNDARIOS, EN UNA FILA ────────────────────────────────
-          Terminar y el reporte ocupaban un renglón cada uno, a ancho completo y
-          en gris, abajo de todo: dos bloques del mismo peso visual que el botón
-          de aplicar, para dos cosas que casi nunca se hacen. En una fila de dos
-          ocupan la mitad y se siguen tocando igual, que es lo que importa. */}
-      {/* ── TERMINAR Y CANCELAR, JUNTOS Y MIENTRAS LA LISTA ESTÉ ABIERTA ──
-          Cancelar existía en UN solo lugar de esta pantalla: adentro del aviso de
-          la lista atrapada en el rango 0 a 0, que es un caso puntual y viejo.
-          Sobre una lista normal no había ninguna salida que no fuera aplicar o
-          terminar, así que subir el archivo equivocado terminaba en «Terminar» —y
-          en el historial quedaba como trabajo terminado.
-          Van en la misma fila porque son la misma decisión mirada de los dos
-          lados: cerrar esto porque ya está, o cerrarlo porque no servía. */}
-      <div className="grid grid-cols-2 gap-2">
-        {abierta ? (
+  // ── LAS QUE ESTÁN LISTAS Y NO SE VAN A ESCRIBIR ──────────────────────────
+  // Sacarlas del número de la barra era la mitad del arreglo; la otra mitad es
+  // decirlas. Solo cuando hay alguna.
+  if (!controlando && (conteo.listosSinTildar ?? 0) > 0) {
+    avisos.push(
+      <SunmiCard key="sinTildar" className="p-3">
+        <p className="text-sm2 sunmi-text-warning leading-snug">
+          <span className="font-bold sunmi-text-strong">{conteo.listosSinTildar}</span>{" "}
+          {conteo.listosSinTildar === 1 ? "está listo" : "están listos"} pero sin tildar, así que
+          aplicar no {conteo.listosSinTildar === 1 ? "lo" : "los"} va a tocar.
+        </p>
+        {abierta && (
+          <SunmiButton
+            color="ghost"
+            onClick={() => irA("/actualizan")}
+            className="mt-2 w-full min-h-toque text-sm3"
+          >
+            Abrirlos para tildarlos
+          </SunmiButton>
+        )}
+      </SunmiCard>
+    );
+  }
+
+  // ── LAS QUE APLICAR VA A OMITIR PORQUE EL COSTO DA DISTINTO ────────────
+  // De la importación #12: la pantalla decía 11, aplicar escribió 3 y nadie se
+  // enteró. Se dicen con nombre y con los DOS números.
+  if (!controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
+    avisos.push(
+      <SunmiCard key="omitidas" className="p-3">
+        {/* ── EL CARTEL NO AFIRMA QUE EL PRECIO CAMBIÓ ──────────────────
+            En la #12 eso era FALSO en las siete filas que nombraba: lo que
+            difería eran siete centavos por dónde caía un redondeo. Lo que el
+            sistema SÍ sabe es cuánto difieren, así que eso es lo que dice. */}
+        <p className="text-sm2 sunmi-text-warning leading-snug">
+          <span className="font-bold sunmi-text-strong">{conteo.omitidasAlAplicar}</span>{" "}
+          {conteo.omitidasAlAplicar === 1 ? "no se va a actualizar" : "no se van a actualizar"}:
+          con los datos de hoy {conteo.omitidasAlAplicar === 1 ? "el costo da" : "los costos dan"}{" "}
+          distinto del que se había propuesto, y la diferencia es grande como para
+          escribirla sin que la mires.
+        </p>
+
+        {(omitidas.propuestaDiferente ?? []).length > 0 && (
+          <div className="mt-2 divide-y sunmi-divide">
+            {(omitidas.propuestaDiferente ?? []).slice(0, 5).map((o) => (
+              <div key={o.filaId} className="py-2">
+                <div className="text-sm2 sunmi-text-strong truncate" title={o.nombre ?? ""}>
+                  {o.nombre ?? `Fila ${o.filaExcel ?? o.filaId}`}
+                </div>
+                <div className="text-sm2 sunmi-text-muted tabular-nums">
+                  Antes se iba a poner {money(o.costoGuardado)} y ahora daría{" "}
+                  <span className="sunmi-text-strong">{money(o.costoRecalculado)}</span>
+                </div>
+                {/* EN CUÁNTO DIFIERE, que es el dato que decide. Sale del
+                    servidor, calculado por la misma función que decidió frenar. */}
+                {o.diferencia?.pesos !== null && o.diferencia?.pesos !== undefined && (
+                  <div className="text-xs2 sunmi-text-warning tabular-nums">
+                    Son {money(Math.abs(o.diferencia.pesos))} de diferencia
+                    {o.diferencia?.pct === null || o.diferencia?.pct === undefined
+                      ? ""
+                      : ` (${pct(o.diferencia.pct)})`}
+                    .
+                  </div>
+                )}
+              </div>
+            ))}
+            {(omitidas.propuestaDiferente ?? []).length > 5 && (
+              <p className="pt-2 text-xs2 sunmi-text-muted">
+                Y {(omitidas.propuestaDiferente ?? []).length - 5} más.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* LA SALIDA. Volver a leerlas recalcula la propuesta con los datos de
+            hoy y las deja para mirar de nuevo: no escribe ningún costo. */}
+        {abierta && (omitidas.propuestaDiferente ?? []).length > 0 && (
+          <SunmiButton
+            color="ghost"
+            onClick={releerPropuestas}
+            disabled={releyendo}
+            className="mt-2 w-full min-h-toque text-sm3"
+          >
+            {releyendo
+              ? "Volviendo a leer…"
+              : (omitidas.propuestaDiferente ?? []).length === 1
+                ? "Volver a leer ese precio"
+                : `Volver a leer esos ${(omitidas.propuestaDiferente ?? []).length} precios`}
+          </SunmiButton>
+        )}
+
+        {/* Las omisiones que NO son de propuesta diferente también se nombran. */}
+        {(omitidas.porMotivo ?? [])
+          .filter((m) => m.motivo !== "PROPUESTA_DIFERENTE")
+          .map((m) => (
+            <p key={m.motivo} className="mt-2 text-xs2 sunmi-text-muted leading-snug">
+              {m.cantidad === 1 ? "Una más" : `${m.cantidad} más`}: {m.texto}
+            </p>
+          ))}
+      </SunmiCard>
+    );
+  }
+
+  return (
+    <Marco>
+      <SunmiPantallaDeTrabajo
+        contexto={
           <>
-            <SunmiButton
-              color="slate"
-              onClick={() => setTerminando(true)}
-              disabled={aplicando || pasando}
-              className="min-h-toque text-sm3"
-            >
-              Terminar lista
-            </SunmiButton>
-            <SunmiButton
-              color="slate"
-              onClick={() => setCancelando(true)}
-              disabled={aplicando || pasando}
-              className="min-h-toque text-sm3"
-            >
-              Cancelar esta lista
-            </SunmiButton>
+            {/* ── 1 · DE QUIÉN ES ESTA LISTA ──────────────────────────────
+                Como "Transferencia #464": el nombre en negrita y el chip del
+                estado al lado. */}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold sunmi-text-strong truncate">{nombreProveedor}</span>
+              <ChipDeEstado cabecera={cabecera} />
+            </div>
+            {/* NO HAY FECHA DE LA LISTA: la base guarda cuándo se subió y
+                cuándo se leyó, pero no la fecha que trae el papel. En su lugar
+                va el archivo, que es lo que la identifica. Controlando se dice
+                además que no cambia nada, que es la primera pregunta de quien
+                abre un control. */}
+            <p className="text-sm2 sunmi-text-muted truncate">
+              {cabecera.archivoNombre} · subida {fechaHora(cabecera.subidaEn ?? cabecera.leidaEn)}
+              {controlando ? " · control: no cambia ningún precio" : ""}
+            </p>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm2 sunmi-text-muted">
+                <span className="tabular-nums sunmi-text-strong font-semibold">
+                  {tusProductos.conteo.traeLaLista} / {tusProductos.conteo.total}
+                </span>{" "}
+                en la lista
+              </span>
+              <span className={`text-sm2 ${sinVincular > 0 ? "sunmi-text-accent" : "sunmi-text-success"}`}>
+                {sinVincular > 0 ? `${sinVincular} sin vincular` : "Nada sin vincular"}
+              </span>
+            </div>
           </>
-        ) : null}
-        <BotonReporte
-          importacionId={id}
-          cabecera={cabecera}
-          proveedor={cabecera.proveedor}
-          usuario={perfil}
-        />
-      </div>
+        }
+        buscador={
+          <SunmiCampoBusquedaVoz
+            value={buscar}
+            onChange={setBuscar}
+            onVoz={setBuscar}
+            placeholder={PLACEHOLDER_BUSCADOR_LISTA}
+            ariaLabel="Buscar tu producto o código"
+          />
+        }
+        filtros={
+          <SunmiFiltroEstado
+            opciones={ORDEN_FILTROS.map((f) => ({
+              clave: f,
+              texto: TEXTO_FILTRO[f],
+              cantidad: cantidadDelFiltro(f, tusProductos.conteo),
+            }))}
+            valor={filtroActivo}
+            onCambiar={elegirFiltro}
+            ariaLabel="Filtrar tus productos por estado"
+          />
+        }
+        antesDeLista={avisos.length > 0 ? <>{avisos}</> : null}
+        lista={
+          <>
+            {/* ── UNA TARJETA POR PRODUCTO TUYO ─────────────────────────
+                Los renglones de la lista que no son tuyos no se listan: solo
+                aparecen en el buscador de la hoja de vincular. */}
+            {visibles.map((item) => (
+              <TarjetaProductoDeLaLista
+                key={item.productoBaseId}
+                item={item}
+                abierta={abierta}
+                controlando={controlando}
+                trabajando={tocando === item.productoBaseId}
+                error={errores.get(item.productoBaseId) ?? ""}
+                onUsar={(it) => usar(it)}
+                onNoViene={noViene}
+                onVincular={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre })}
+                onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+              />
+            ))}
+            {visibles.length === 0 && (
+              <p className="text-center py-6 sunmi-text-muted text-sm2">
+                {buscar.trim()
+                  ? "Ninguno de tus productos se llama así ni tiene ese código."
+                  : "No hay ninguno en este grupo."}
+              </p>
+            )}
+          </>
+        }
+        despuesDeLista={
+          <>
+            {/* ── LAS DOS ACCIONES DE UN CONTROL ───────────────────────────
+                Ninguna de las dos escribe un costo. "Pasar a actualizar
+                precios" convierte ESTA importación sin volver a subir el
+                archivo, y el que escribe sigue siendo aplicar, con su
+                confirmación. */}
+            {controlando && abierta && (
+              <div className="space-y-2">
+                <SunmiButton
+                  color="cyan"
+                  onClick={() => setPasandoAActualizar(true)}
+                  disabled={pasando}
+                  className="w-full min-h-toque text-base font-bold"
+                >
+                  {pasando ? "Pasando…" : "Pasar a actualizar precios"}
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={descargarElControl}
+                  className="w-full min-h-toque text-sm3"
+                >
+                  Descargar el control
+                </SunmiButton>
+                <p className="text-sm2 sunmi-text-muted text-center leading-snug">
+                  Pasar a actualizar no cambia nada todavía: vuelve a leer esta misma lista con el
+                  aumento que esperás y te muestra el resultado antes de aplicar.
+                </p>
+              </div>
+            )}
 
-      <ModalRevertir
-        abierto={deshaciendo}
-        importacionId={id}
-        onCerrar={() => setDeshaciendo(false)}
-        onRevertido={async (r) => {
-          setDeshaciendo(false);
-          // EL AVISO DICE LO QUE QUEDÓ, y los números se releen de la base:
-          // escribir "se deshizo todo" sin volver a preguntar dejaría la pantalla
-          // mostrando el estado de antes con un cartel diciendo lo contrario.
-          const cuantos = r?.resumen?.revierten ?? 0;
-          // ── SI LA LISTA NO SE PUDO REABRIR, SE DICE ─────────────────────
-          //
-          // Deshacer devuelve los costos y además reabre la lista. Lo segundo
-          // no se puede cuando ya hay otra importación abierta del MISMO
-          // archivo —el índice único no deja dos— y eso pasa de verdad: es lo
-          // que queda después de subir la misma lista dos veces. Antes el
-          // servidor explotaba con un P2002 y la pantalla decía "Error
-          // interno"; ahora los costos vuelven igual y acá se explica por qué
-          // la lista quedó cerrada, nombrando a la que ocupa el lugar.
-          const otra = r?.noSePudoReabrir ?? null;
-          setAviso({
-            tono: otra ? "warning" : "success",
-            texto: otra
-              ? `Se deshizo: ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior. ` +
-                `La lista queda cerrada porque ya tenés abierta otra importación del mismo archivo (#${otra.id}).`
-              : `Se deshizo. ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior.`,
-          });
-          await cargar();
-        }}
+            {puedeDeshacer && (
+              <SunmiButton
+                color="slate"
+                onClick={() => setDeshaciendo(true)}
+                disabled={aplicando}
+                className="w-full min-h-toque text-sm3"
+              >
+                {cabecera.productosActualizados === 1
+                  ? "Deshacer el que se actualizó"
+                  : `Deshacer los ${cabecera.productosActualizados} que se actualizaron`}
+              </SunmiButton>
+            )}
+
+            {/* ── TERMINAR Y CANCELAR, JUNTOS Y MIENTRAS LA LISTA ESTÉ ABIERTA
+                Son la misma decisión mirada de los dos lados: cerrar esto
+                porque ya está, o cerrarlo porque no servía. Terminar se ofrece
+                siempre que esté abierta: una lista con productos que nunca se
+                van a resolver tiene que poder cerrarse. */}
+            <div className="grid grid-cols-2 gap-2">
+              {abierta ? (
+                <>
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setTerminando(true)}
+                    disabled={aplicando || pasando}
+                    className="min-h-toque text-sm3"
+                  >
+                    Terminar lista
+                  </SunmiButton>
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setCancelando(true)}
+                    disabled={aplicando || pasando}
+                    className="min-h-toque text-sm3"
+                  >
+                    Cancelar esta lista
+                  </SunmiButton>
+                </>
+              ) : null}
+              <BotonReporte
+                importacionId={id}
+                cabecera={cabecera}
+                proveedor={cabecera.proveedor}
+                usuario={perfil}
+              />
+            </div>
+          </>
+        }
+        /* ── LA BARRA FIJA DE ABAJO, COMO «TOTAL / ✓ CONFIRMAR» ──────────────
+            El número es `conteo.listos`, el mismo que consulta aplicar y que
+            decide qué tarjetas están en «Cambian». La confirmación y las reglas
+            de rango son las de siempre. En un control no hay nada que aplicar, y
+            en una lista cerrada tampoco: sin barra. */
+        pieDePantalla={
+          !controlando && abierta ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-sm2 sunmi-text-muted">Para aplicar</span>
+                <span className="block tabular-nums text-lg2 font-semibold sunmi-text-strong">
+                  {listos} {listos === 1 ? "precio" : "precios"}
+                </span>
+              </span>
+              <SunmiButton
+                color="amber"
+                onClick={() => setConfirmando(true)}
+                disabled={listos === 0 || aplicando}
+                className="shrink-0 justify-center"
+              >
+                {aplicando ? "Aplicando…" : "✓ Aplicar"}
+              </SunmiButton>
+            </div>
+          ) : null
+        }
+        despuesDelPie={
+          <>
+            <ModalRevertir
+              abierto={deshaciendo}
+              importacionId={id}
+              onCerrar={() => setDeshaciendo(false)}
+              onRevertido={async (r) => {
+                setDeshaciendo(false);
+                // EL AVISO DICE LO QUE QUEDÓ, y los números se releen de la base.
+                const cuantos = r?.resumen?.revierten ?? 0;
+                // ── SI LA LISTA NO SE PUDO REABRIR, SE DICE ─────────────────
+                // Deshacer devuelve los costos y además reabre la lista. Lo
+                // segundo no se puede cuando ya hay otra importación abierta del
+                // MISMO archivo; acá se explica por qué la lista quedó cerrada.
+                const otra = r?.noSePudoReabrir ?? null;
+                setAviso({
+                  tono: otra ? "warning" : "success",
+                  texto: otra
+                    ? `Se deshizo: ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior. ` +
+                      `La lista queda cerrada porque ya tenés abierta otra importación del mismo archivo (#${otra.id}).`
+                    : `Se deshizo. ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior.`,
+                });
+                await cargar();
+              }}
+            />
+
+            <ModalTerminar
+              abierto={terminando}
+              sinAplicar={conteo.paraRevisar}
+              actualizados={cabecera.productosActualizados}
+              trabajando={aplicando}
+              onCerrar={() => setTerminando(false)}
+              onTerminar={terminar}
+            />
+
+            {/* ── CANCELAR SE PREGUNTA, Y CON SU PROPIA PALABRA ─────────────
+                No se reusa `ModalTerminar`: enumera cuántos productos quedan
+                sin aplicar, que es el balance de un trabajo hecho. */}
+            <ModalCancelarImportacion
+              abierto={cancelando}
+              archivo={cabecera.archivoNombre}
+              // Cuántos costos ya escribió esta lista: lo aplicado NO se deshace
+              // al cancelar, y el modal lo tiene que decir.
+              aplicados={cabecera.productosActualizados ?? 0}
+              trabajando={pasando}
+              onCerrar={() => setCancelando(false)}
+              onCancelar={cancelarLista}
+            />
+
+            {pasandoAActualizar && (
+              <HojaPasarAActualizar
+                proveedor={cabecera.proveedor?.nombre ?? ""}
+                // El rango del proveedor, si tiene, para no arrancar con dos
+                // campos en blanco.
+                minSugerido={cabecera.rango?.minPct ?? null}
+                maxSugerido={cabecera.rango?.maxPct ?? null}
+                trabajando={pasando}
+                error={errorAlPasar}
+                onPasar={pasarAActualizar}
+                onVolver={() => {
+                  setPasandoAActualizar(false);
+                  setErrorAlPasar(null);
+                }}
+              />
+            )}
+
+            {cambiandoColumna && (
+              <HojaCambiarColumna
+                lectura={lectura}
+                trabajando={pasando}
+                error={errorAlPasar}
+                onCambiar={cambiarColumna}
+                onVolver={() => {
+                  setCambiandoColumna(false);
+                  setErrorAlPasar(null);
+                }}
+              />
+            )}
+
+            {/* ── VINCULAR CON LA LISTA ─────────────────────────────────────
+                Al guardar, la hoja se cierra y la tarjeta cambia en el lugar:
+                se relee sin el cargador y queda fijada aunque su estado nuevo ya
+                no sea el del chip puesto. */}
+            {vinculando && (
+              <HojaVincularConLaLista
+                endpoint={`/api/proveedores/listas/${id}/productos/${vinculando.productoBaseId}/en-la-lista`}
+                nombre={vinculando.nombre}
+                proveedor={nombreProveedor}
+                cuerpoNoViene={{ noViene: true }}
+                onCerrar={() => setVinculando(null)}
+                onListo={async () => {
+                  const productoBaseId = vinculando.productoBaseId;
+                  setVinculando(null);
+                  await despuesDeTocar(productoBaseId);
+                }}
+              />
+            )}
+
+            {/* ── «NO ES ESTE PRODUCTO», DESDE LA HOJA DE CORREGIR ──────────
+                La misma hoja, por la puerta de la fila: mueve el vínculo a otro
+                renglón, o con «No viene en esta lista» lo saca de la lista. */}
+            {eligiendoOtra && (
+              <HojaVincularConLaLista
+                endpoint={`/api/proveedores/listas/${id}/filas/${eligiendoOtra.fila.id}/otra-fila`}
+                nombre={eligiendoOtra.fila.nombre}
+                proveedor={nombreProveedor}
+                cuerpoNoViene={{ noEstaEnLaLista: true }}
+                onCerrar={() => setEligiendoOtra(null)}
+                onListo={async () => {
+                  const productoBaseId = eligiendoOtra.productoBaseId;
+                  setEligiendoOtra(null);
+                  await despuesDeTocar(productoBaseId);
+                }}
+              />
+            )}
+
+            {/* ── CORREGIR: LA DECISIÓN DE SIEMPRE, EN UNA HOJA ─────────────
+                Caja entera, una unidad, No lo cambio, o No es este producto. */}
+            {revisando && (
+              <HojaRevisarPrecio
+                importacionId={id}
+                filaId={revisando.filaId}
+                onCerrar={() => setRevisando(null)}
+                onNoEsEste={(fila) => {
+                  const productoBaseId = revisando.productoBaseId;
+                  setRevisando(null);
+                  setEligiendoOtra({ fila, productoBaseId });
+                }}
+                onListo={async () => {
+                  const productoBaseId = revisando.productoBaseId;
+                  setRevisando(null);
+                  await despuesDeTocar(productoBaseId);
+                }}
+              />
+            )}
+
+            {/* ── «✓ USAR» FUERA DE RANGO SE PREGUNTA, COMO EN LA HOJA ──────
+                La misma pregunta, con el número de hoy y el nuevo enfrentados:
+                el toque en la tarjeta no se saltea lo que la hoja pregunta. */}
+            {preguntaFuera && (
+              <ConfirmarFueraDeRango
+                lectura={preguntaFuera.usar}
+                costoDeHoy={preguntaFuera.costoHoy}
+                rangoTexto={textoDelRango(cabecera.rango, pct)}
+                trabajando={tocando === preguntaFuera.productoBaseId}
+                onCerrar={() => setPreguntaFuera(null)}
+                onConfirmar={async () => {
+                  const item = preguntaFuera;
+                  setPreguntaFuera(null);
+                  await usar(item, { aceptarFueraDeRango: true });
+                }}
+              />
+            )}
+
+            {confirmando && (
+              <HojaConfirmarAplicar
+                cantidad={listos}
+                proveedor={cabecera.proveedor?.nombre ?? ""}
+                paraRevisar={conteo.paraRevisar}
+                trabajando={aplicando}
+                onAplicar={aplicar}
+                onVolver={() => setConfirmando(false)}
+              />
+            )}
+          </>
+        }
       />
-
-      <ModalTerminar
-        abierto={terminando}
-        sinAplicar={conteo.paraRevisar}
-        actualizados={cabecera.productosActualizados}
-        trabajando={aplicando}
-        onCerrar={() => setTerminando(false)}
-        onTerminar={terminar}
-      />
-
-      {/* ── CANCELAR SE PREGUNTA, Y CON SU PROPIA PALABRA ───────────────
-          No se reusa `ModalTerminar`: dice "Sí, terminar" y enumera cuántos
-          productos quedan sin aplicar, que es el balance de un trabajo hecho.
-          Sobre una lista que se está descartando, ese texto cuenta una historia
-          que no ocurrió. */}
-      <ModalCancelarImportacion
-        abierto={cancelando}
-        archivo={cabecera.archivoNombre}
-        // Cuántos costos ya escribió esta lista. Con una PARCIALMENTE_APLICADA
-        // —que sigue abierta, así que se puede cancelar— el modal tiene que decir
-        // que lo aplicado NO se deshace: sin este dato decía "no se cambia ningún
-        // costo" sobre una lista que ya había cambiado varios.
-        aplicados={cabecera.productosActualizados ?? 0}
-        trabajando={pasando}
-        onCerrar={() => setCancelando(false)}
-        onCancelar={cancelarLista}
-      />
-
-      {pasandoAActualizar && (
-        <HojaPasarAActualizar
-          proveedor={cabecera.proveedor?.nombre ?? ""}
-          // El rango del proveedor, si tiene, para no arrancar con dos campos en
-          // blanco. Controlando la cabecera lo guarda en null, así que esto sale
-          // de la ficha y no de la importación.
-          minSugerido={cabecera.rango?.minPct ?? null}
-          maxSugerido={cabecera.rango?.maxPct ?? null}
-          trabajando={pasando}
-          error={errorAlPasar}
-          onPasar={pasarAActualizar}
-          onVolver={() => {
-            setPasandoAActualizar(false);
-            setErrorAlPasar(null);
-          }}
-        />
-      )}
-
-      {cambiandoColumna && (
-        <HojaCambiarColumna
-          lectura={lectura}
-          trabajando={pasando}
-          error={errorAlPasar}
-          onCambiar={cambiarColumna}
-          onVolver={() => {
-            setCambiandoColumna(false);
-            setErrorAlPasar(null);
-          }}
-        />
-      )}
-
-      {/* ── VINCULAR CON LA LISTA ─────────────────────────────────────────
-          Al guardar, la hoja se cierra y la tarjeta cambia en el lugar: se
-          relee sin el cargador y queda fijada aunque su estado nuevo ya no sea
-          el del chip puesto. */}
-      {vinculando && (
-        <HojaVincularConLaLista
-          endpoint={`/api/proveedores/listas/${id}/productos/${vinculando.productoBaseId}/en-la-lista`}
-          nombre={vinculando.nombre}
-          proveedor={nombreProveedor}
-          cuerpoNoViene={{ noViene: true }}
-          onCerrar={() => setVinculando(null)}
-          onListo={async () => {
-            const productoBaseId = vinculando.productoBaseId;
-            setVinculando(null);
-            await despuesDeTocar(productoBaseId);
-          }}
-        />
-      )}
-
-      {/* ── «NO ES ESTE PRODUCTO», DESDE LA HOJA DE REVISAR ─────────────────
-          La misma hoja, por la puerta de la fila: mueve el vínculo a otro
-          renglón, o con «No viene en esta lista» lo saca de la lista. */}
-      {eligiendoOtra && (
-        <HojaVincularConLaLista
-          endpoint={`/api/proveedores/listas/${id}/filas/${eligiendoOtra.fila.id}/otra-fila`}
-          nombre={eligiendoOtra.fila.nombre}
-          proveedor={nombreProveedor}
-          cuerpoNoViene={{ noEstaEnLaLista: true }}
-          onCerrar={() => setEligiendoOtra(null)}
-          onListo={async () => {
-            const productoBaseId = eligiendoOtra.productoBaseId;
-            setEligiendoOtra(null);
-            await despuesDeTocar(productoBaseId);
-          }}
-        />
-      )}
-
-      {/* ── REVISAR: LA DECISIÓN DE SIEMPRE, EN UNA HOJA ────────────────────
-          Caja entera, una unidad, o No lo cambio. */}
-      {revisando && (
-        <HojaRevisarPrecio
-          importacionId={id}
-          filaId={revisando.filaId}
-          onCerrar={() => setRevisando(null)}
-          onNoEsEste={(fila) => {
-            const productoBaseId = revisando.productoBaseId;
-            setRevisando(null);
-            setEligiendoOtra({ fila, productoBaseId });
-          }}
-          onListo={async () => {
-            const productoBaseId = revisando.productoBaseId;
-            setRevisando(null);
-            await despuesDeTocar(productoBaseId);
-          }}
-        />
-      )}
-
-      {confirmando && (
-        <HojaConfirmarAplicar
-          cantidad={listos}
-          proveedor={cabecera.proveedor?.nombre ?? ""}
-          paraRevisar={conteo.paraRevisar}
-          trabajando={aplicando}
-          onAplicar={aplicar}
-          onVolver={() => setConfirmando(false)}
-        />
-      )}
     </Marco>
   );
 }
 
-/** En qué situación está la lista, dicho como lo diría una persona. */
-function estadoEnCastellano(cabecera) {
-  if (cabecera.estado === "CANCELADA") return "cancelada";
-  if (cabecera.estado === "TERMINADA") {
-    return `terminada: se actualizaron ${cabecera.productosActualizados} productos`;
+/**
+ * EL CHIP DE LA CABECERA: Leída, Aplicada, Terminada o Cancelada.
+ *
+ * Con las clases del chip de la transferencia —en curso, recibida y cancelada—,
+ * igual que el control de stock: la lista abierta está "en curso", la terminada
+ * está cerrada como una recibida.
+ */
+function ChipDeEstado({ cabecera }) {
+  if (cabecera.estado === "CANCELADA") return <EstadoTransferenciaBadge estado="Cancelada" />;
+  if (cabecera.estado === "TERMINADA") return <InsigniaTerminada>Terminada</InsigniaTerminada>;
+  if (cabecera.productosActualizados > 0 || cabecera.estado === "APLICADA" || cabecera.estado === "PARCIALMENTE_APLICADA") {
+    return <InsigniaEnCurso>Aplicada</InsigniaEnCurso>;
   }
-  if (cabecera.productosActualizados > 0) {
-    // Los tres números que tienen que cerrar entre sí —éste, el del botón y el
-    // de deshacer— son los que Emanuel mira para saber si algo pasó. "1
-    // productos ya actualizados" al lado de "Deshacer los 1" los hace ver como
-    // texto generado y no como una cuenta.
-    return cabecera.productosActualizados === 1
-      ? "1 producto ya actualizado"
-      : `${cabecera.productosActualizados} productos ya actualizados`;
-  }
-  return "todavía no cambió ningún precio";
+  return <InsigniaEnCurso>Leída</InsigniaEnCurso>;
 }
 
+/**
+ * El contenedor de la página. El gutter de la recepción: el `p-2` de la página
+ * más el `p-4` del `<main>`, que es con lo que cuenta la barra fija de
+ * `SunmiPantallaDeTrabajo`. El ancho máximo es para que en la computadora las
+ * tarjetas no se estiren de punta a punta.
+ */
 function Marco({ children }) {
-  return <div className="p-3 space-y-3 w-full max-w-3xl mx-auto">{children}</div>;
+  return <div className="sunmi-bg w-full min-h-full p-2 lg:p-3 max-w-3xl mx-auto space-y-3">{children}</div>;
 }

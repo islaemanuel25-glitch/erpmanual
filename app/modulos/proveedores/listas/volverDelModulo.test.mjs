@@ -43,6 +43,20 @@ const sinComentarios = (t) =>
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
+/**
+ * LAS QUE DICEN "VOLVER" Y NO SU DESTINO, CON SU MOTIVO.
+ *
+ * Una lista y no un `if`: cada excepción tiene que poder leerse con su porqué.
+ * Si una de éstas vuelve a nombrar su destino, el candado pide sacarla de acá.
+ */
+const DICEN_VOLVER = new Map([
+  // La revisión de una lista, desde el 2026-10-24: el diseño aprobado por
+  // Emanuel la copia de la recepción de transferencias y pide «← Volver», con
+  // la barra diciendo "Lista de precios". De acá se vuelve a UN solo lugar —el
+  // listado—, porque las tres pantallas que se encadenaban debajo se fueron.
+  ["app/modulos/proveedores/listas/[id]/page.jsx", "diseño de Emanuel, 2026-10-24"],
+]);
+
 function pantallasDelModulo() {
   const salida = execFileSync(
     "git",
@@ -106,6 +120,11 @@ test("LA QUE TIENE VOLVER LO REGISTRA EN EL SLOT, CON LA PIEZA DEL KIT Y A 44", 
     );
 
     // Y nombrando su destino, que es para lo que se le agregó `texto` al kit.
+    // Salvo las de `DICEN_VOLVER`, que dicen "Volver" porque el dueño lo decidió.
+    if (DICEN_VOLVER.has(ruta)) {
+      assert.ok(!/<SunmiBackButton[^>]*texto=/.test(fuente), `${ruta} ya nombra su destino: sacala de DICEN_VOLVER`);
+      continue;
+    }
     assert.match(
       fuente,
       /<SunmiBackButton[^>]*texto=/,

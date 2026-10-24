@@ -33,9 +33,7 @@ import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision, MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
-import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
-import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
-import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
+import { CAMPOS_PRODUCTO_PARA_LEER, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { ordenDeLaCola, posicionActual } from "@/lib/proveedores/listas/colaDeRevision";
 import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
 
@@ -193,45 +191,15 @@ export async function GET(req, context) {
 
     const fila = await prisma.importacionListaFila.findFirst({
       where: { id: actualId, importacionId: id },
-      include: { productoBase: { select: { id: true, nombre: true, precio_costo: true, factor_pack: true, unidad_medida: true, modoCompraProveedor: true, pesoReferenciaKg: true, creadoEnLocalId: true, es_combo: true } } },
+      include: { productoBase: { select: CAMPOS_PRODUCTO_PARA_LEER } },
     });
     if (!fila) return NextResponse.json(cuerpo);
 
-    const reg = resolverParserDeProveedor(cab.proveedor);
-    const lecturasPosibles = reg.ok ? reg.config?.lecturasPosibles ?? null : null;
-
-    const base = fila.productoBase
-      ? {
-          id: fila.productoBase.id,
-          precio_costo: numero(fila.productoBase.precio_costo),
-          factor_pack: fila.productoBase.factor_pack,
-          unidad_medida: fila.productoBase.unidad_medida,
-          modoCompraProveedor: fila.productoBase.modoCompraProveedor,
-          pesoReferenciaKg: numero(fila.productoBase.pesoReferenciaKg),
-        }
-      : null;
-
-    const analisis = base
-      ? analizarFila({
-          fila,
-          base,
-          recargoPct: numero(cab.recargoPct),
-          rango,
-          impuestoAdicionalPct: numero(cab.impuestoAdicionalPct),
-          lecturasPosibles,
-        })
-      : { evaluadas: [], recomendada: null, resultado: "REVISAR" };
-
+    // Las lecturas salen de `lecturasDeLaFila`, la MISMA función con la que la
+    // tarjeta de la revisión decide qué acepta «✓ Usar». Estaban escritas acá;
+    // se mudaron tal cual el 2026-10-24.
+    const { lecturas } = lecturasDeLaFila({ fila, producto: fila.productoBase, cab, rango });
     const factorPack = fila.productoBase?.factor_pack ?? null;
-    const lecturas = analisis.evaluadas.map((l) =>
-      lecturaParaPantalla({
-        lectura: l,
-        precioLista: numero(fila.precioConIva),
-        recargoPct: numero(cab.recargoPct),
-        factorPack,
-        recomendada: l.clave === analisis.recomendada,
-      })
-    );
 
     // ¿El costo de hoy tiene forma de cargado a mano? Es una consulta más,
     // sobre UN producto, en una pantalla que ya trae una fila entera. Va acá y

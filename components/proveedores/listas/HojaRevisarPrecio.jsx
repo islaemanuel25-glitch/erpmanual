@@ -395,8 +395,12 @@ function TarjetaDeLectura({ lectura, trabajando, onElegir, rechazada = false }) 
  * que la elección tiene que ser un acto aparte, con el número de hoy y el número
  * nuevo enfrentados, y con el botón diciendo qué se acepta. El texto del botón
  * NO dice "Sí": dice el porcentaje.
+ *
+ * Se exporta porque «✓ Usar», en la tarjeta de la revisión, hace la misma
+ * pregunta antes de confirmar una lectura fuera de rango: un toque en la tarjeta
+ * no puede saltearse lo que la hoja pregunta.
  */
-function ConfirmarFueraDeRango({ lectura, costoDeHoy, rangoTexto, trabajando, onCerrar, onConfirmar }) {
+export function ConfirmarFueraDeRango({ lectura, costoDeHoy, rangoTexto, trabajando, onCerrar, onConfirmar }) {
   return (
     <SunmiModalLayout
       open
