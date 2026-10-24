@@ -63,6 +63,7 @@ import {
   filaParaElMotor,
   productoParaElMotor,
   motorParaEstaLista,
+  ubicacionQueJuzgaElCosto,
   CAMPOS_PRODUCTO_PARA_EL_MOTOR,
   CAMPOS_CABECERA_PARA_EL_MOTOR,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
@@ -289,7 +290,9 @@ export async function POST(req, context) {
       cab,
       reg,
       grupoId,
-      operandoEnLocalId: localId,
+      // Con el dueño del costo y no con la ubicación activa: ver
+      // `ubicacionQueJuzgaElCosto`.
+      operandoEnLocalId: ubicacionQueJuzgaElCosto({ producto, operandoEnLocalId: localId, depositoLocalId }),
       depositoLocalId,
     });
     const productoParaMotor = productoParaElMotor(producto);

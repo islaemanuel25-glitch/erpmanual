@@ -30,7 +30,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision, MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
 import { CAMPOS_PRODUCTO_PARA_LEER, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
@@ -198,7 +198,18 @@ export async function GET(req, context) {
     // Las lecturas salen de `lecturasDeLaFila`, la MISMA función con la que la
     // tarjeta de la revisión decide qué acepta «✓ Usar». Estaban escritas acá;
     // se mudaron tal cual el 2026-10-24.
-    const { lecturas } = lecturasDeLaFila({ fila, producto: fila.productoBase, cab, rango });
+    //
+    // Con la ubicación activa, para que la hoja diga ANTES de tocar si desde acá
+    // se puede usar una lectura: `confirmar` hace la misma pregunta, y antes la
+    // respuesta llegaba recién después de elegir (Emanuel, 2026-10-24).
+    const { lecturas, confirmable, porQueNo } = lecturasDeLaFila({
+      fila,
+      producto: fila.productoBase,
+      cab,
+      rango,
+      operandoEnLocalId: Number(scope.localId),
+      depositoLocalId: await getDepositoIdDeGrupo(grupoId),
+    });
     const factorPack = fila.productoBase?.factor_pack ?? null;
 
     // ¿El costo de hoy tiene forma de cargado a mano? Es una consulta más,
@@ -245,6 +256,12 @@ export async function GET(req, context) {
       // Lo que ya está guardado para este producto con este proveedor, si lo
       // hay. La pantalla lo usa para decir "esto ya lo contestaste".
       sinProducto: !fila.productoBaseId,
+      // Si se puede usar una lectura, y si no, por qué, en criollo. Una fila que
+      // alguien dejó como está tiene su propia salida en la hoja —volver a
+      // cambiarla—, así que viaja aparte.
+      confirmable,
+      porQueNo,
+      excluida: fila.excluidaManual === true,
       // El costo de hoy es contra lo que se calculan TODOS los porcentajes de
       // esta pantalla: si es dudoso, hay que decirlo acá.
       costoRedondo: costoParaMirar({ costoActual: costoDeHoy, vecesAplicado }),

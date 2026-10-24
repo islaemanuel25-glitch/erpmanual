@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
+import { elegirUbicacionActiva } from "@/lib/ubicacionActiva";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import { Store, Warehouse, Loader2 } from "lucide-react";
 
@@ -65,24 +66,12 @@ export default function InicioPage() {
   const seleccionar = async (local) => {
     setSetting(true);
     setError("");
-    try {
-      const res = await fetch("/api/contexto-activo/set", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ localId: local.id }),
-      });
-      const data = await res.json();
-
-      if (data.ok) {
-        router.replace(getDefaultRoute(menuMode));
-        return;
-      }
-      setError(data.error || "Error al seleccionar");
-    } catch (err) {
-      console.error(err);
-      setError("Error de conexión");
+    const data = await elegirUbicacionActiva(local.id);
+    if (data.ok) {
+      router.replace(getDefaultRoute(menuMode));
+      return;
     }
+    setError(data.error || "Error al seleccionar");
     setSetting(false);
   };
 

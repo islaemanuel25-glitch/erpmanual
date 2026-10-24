@@ -42,9 +42,9 @@ import {
   analizarFila,
   cantidadValida,
   resultadoConfirmacion,
-  TEXTO_NO_CONFIRMABLE,
   CANTIDAD_MAX,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
+import { porQueNoSeConfirma, TEXTO_COMBO, TEXTO_SIN_PROPIEDAD_DEL_COSTO } from "@/lib/proveedores/listas/porQueNoSeConfirma";
 
 /**
  * El rango con el que se evalúa esta importación.
@@ -128,7 +128,8 @@ export async function POST(req, context) {
     const permitido = puedeConfirmarse(fila, importacion, { lecturasPropias: Boolean(lecturasPosibles) });
     if (!permitido.ok) {
       return NextResponse.json(
-        { ok: false, error: TEXTO_NO_CONFIRMABLE[permitido.motivo], codigo: permitido.motivo },
+        // El texto de ESTE renglón, no el de los cuatro casos posibles juntos.
+        { ok: false, error: porQueNoSeConfirma(permitido.motivo, fila), codigo: permitido.motivo },
         { status: 409 }
       );
     }
@@ -146,7 +147,7 @@ export async function POST(req, context) {
     }
     if (esComboBase(base)) {
       return NextResponse.json(
-        { ok: false, error: "Es un combo: no tiene costo propio que actualizar." },
+        { ok: false, error: TEXTO_COMBO },
         { status: 409 }
       );
     }
@@ -156,7 +157,7 @@ export async function POST(req, context) {
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     if (!puedeEditarCosto(Number(localId), base.creadoEnLocalId ?? null, depositoLocalId)) {
       return NextResponse.json(
-        { ok: false, error: "Esta ubicación no puede editar el costo de este producto." },
+        { ok: false, error: TEXTO_SIN_PROPIEDAD_DEL_COSTO },
         { status: 409 }
       );
     }

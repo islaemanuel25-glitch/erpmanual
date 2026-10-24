@@ -22,7 +22,7 @@
 //   No lo cambio       excluye la fila, y el proveedor lo puede mandar en las
 //                      próximas listas: lo va a dejar igual (`seleccion`).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -43,6 +43,8 @@ import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
 
 /**
+ * LA HOJA DE «CORREGIR»: la decisión adentro de su hoja.
+ *
  * @param importacionId  la lista
  * @param filaId         el renglón de la lista atado al producto
  * @param onListo        al guardar: `(mensaje)`; la pantalla recarga y cierra
@@ -50,6 +52,58 @@ const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
  * @param onCerrar       cerrar sin decidir
  */
 export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNoEsEste, onCerrar }) {
+  const [titulo, setTitulo] = useState("Revisar");
+  const [trabajando, setTrabajando] = useState(false);
+  return (
+    <SunmiModalLayout
+      open
+      forma="hoja"
+      title={titulo}
+      color="amber"
+      onClose={trabajando ? undefined : onCerrar}
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+    >
+      <DecisionDeLectura
+        importacionId={importacionId}
+        filaId={filaId}
+        onListo={onListo}
+        onNoEsEste={onNoEsEste}
+        onTitulo={setTitulo}
+        onTrabajando={setTrabajando}
+      />
+    </SunmiModalLayout>
+  );
+}
+
+/**
+ * LA DECISIÓN, SIN SU HOJA: cómo se lee el precio, o no cambiarlo.
+ *
+ * ── POR QUÉ SALIÓ DE LA HOJA (Emanuel, 2026-10-24) ─────────────────────────
+ *
+ * Vincular eran dos pasos: elegir el renglón, que la hoja se cerrara, y tocar
+ * «Corregir» para elegir caja o unidad. Ahora la hoja de vincular, al elegir el
+ * renglón, SIGUE con esta misma decisión adentro —sin cerrarse—, así que la
+ * decisión tiene que poder dibujarse en cualquier hoja. Es la misma pieza, con
+ * los mismos candados; no hay una segunda.
+ *
+ * `tomarLaUnica` es lo que trae ese paso: recién vinculado, si el renglón ya
+ * quedó listo no hay nada que decidir, y si hay UNA sola lectura que cae en el
+ * rango del proveedor —la recomendada, que por definición es la única— se toma
+ * sola. Fuera de rango NUNCA se toma sola: eso pregunta, siempre.
+ *
+ * @param onTitulo      el nombre del producto, para el título de la hoja
+ * @param onTrabajando  avisa si hay un pedido en vuelo, para no cerrar a la mitad
+ */
+export function DecisionDeLectura({
+  importacionId,
+  filaId,
+  onListo,
+  onNoEsEste,
+  onTitulo,
+  onTrabajando,
+  tomarLaUnica = false,
+}) {
   const id = importacionId;
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -161,21 +215,74 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
     }
   };
 
+  /**
+   * «Volver a cambiarlo»: deshace un «No lo cambio» (`seleccion` INCLUIR) y
+   * vuelve a leer la fila, que recupera su decisión de lectura. Es la salida de
+   * una tarjeta dejada como está, que si no quedaba sin ninguna acción.
+   */
+  const volverACambiarlo = async () => {
+    if (!fila) return;
+    setTrabajando(true);
+    setRechazo(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "INCLUIR", ids: [fila.id] }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setRechazo({
+          accion: ACCION_NO_LO_CAMBIO,
+          texto: j?.error || "No pude volver a dejarlo para cambiar, y el servidor no dijo por qué.",
+        });
+        return;
+      }
+      await cargar();
+    } catch {
+      setRechazo({
+        accion: ACCION_NO_LO_CAMBIO,
+        texto: "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.",
+      });
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
   // La única lectura que el motor da por creíble, si hay alguna. NO hay caída a
   // "la primera": ver el comentario del botón principal, más abajo.
   const recomendada = fila?.lecturas?.find((l) => l.recomendada) ?? null;
   const rangoTexto = textoDelRango(datos?.cabecera?.rango, pct);
 
+  // El título y el "no cierres ahora" son de la hoja que la contiene.
+  useEffect(() => {
+    if (fila?.nombre) onTitulo?.(fila.nombre);
+  }, [fila?.nombre, onTitulo]);
+  useEffect(() => {
+    onTrabajando?.(trabajando);
+  }, [trabajando, onTrabajando]);
+
+  // ── RECIÉN VINCULADO: LO QUE NO HACE FALTA DECIDIR, NO SE PREGUNTA ────────
+  //
+  // Una sola vez por fila: después de un rechazo la persona decide a mano.
+  const yaSeTomo = useRef(null);
+  useEffect(() => {
+    if (!tomarLaUnica || !fila || yaSeTomo.current === fila.id) return;
+    yaSeTomo.current = fila.id;
+    if (fila.motivo === null && !fila.excluida) {
+      // Ya quedó lista —o con el mismo precio—: no hay nada que elegir.
+      onListo?.("Listo: quedó vinculado y con su precio.");
+      return;
+    }
+    if (fila.confirmable && recomendada && !recomendada.fueraDeRango && !recomendada.absurda) {
+      usarLectura(recomendada, { aceptarFueraDeRango: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tomarLaUnica, fila?.id]);
+
   return (
-    <SunmiModalLayout
-      open
-      forma="hoja"
-      title={fila?.nombre ?? "Revisar"}
-      color="amber"
-      onClose={trabajando ? undefined : onCerrar}
-      espacioCuerpo="mt-2 gap-3"
-      z={9999}
-    >
+    <>
       {cargando && !datos ? (
         <SunmiLoader />
       ) : error ? (
@@ -233,6 +340,34 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
             </span>
           </SunmiCard>
 
+          {/* ── SI ESTE RENGLÓN NO ADMITE UNA LECTURA, SE DICE ANTES ─────────
+              Antes se ofrecían las lecturas igual y el «no» llegaba después de
+              tocar una: "Esta fila no está esperando una lectura… No se guardó
+              nada". El servidor ya sabe la respuesta al abrir la hoja, y la dice
+              en criollo y con qué hacer. */}
+          {fila.confirmable === false ? (
+            <div className="space-y-2">
+              <Aviso tono="warning">{fila.porQueNo}</Aviso>
+              {rechazo && (
+                <Aviso tono="danger">
+                  {rechazo.texto}
+                  <span className="block mt-1 font-semibold">No se guardó nada.</span>
+                </Aviso>
+              )}
+              {fila.excluida && (
+                <SunmiButton
+                  color="cyan"
+                  type="button"
+                  onClick={volverACambiarlo}
+                  disabled={trabajando}
+                  className="w-full min-h-toque text-base font-bold"
+                >
+                  {trabajando ? "Guardando…" : "Volver a cambiarlo"}
+                </SunmiButton>
+              )}
+            </div>
+          ) : (
+          <>
           <p className="text-sm3 sunmi-text-strong leading-snug">
             La lista dice {money(fila.precioLista)}. ¿Cómo hay que leerlo?
           </p>
@@ -256,8 +391,8 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
 
           {fila.lecturas.length === 0 && (
             <Aviso tono="warning">
-              El archivo no dice de qué presentación es este precio, así que no hay forma de saber a
-              qué corresponde. Podés dejarlo como está y mirarlo en el archivo.
+              La lista no dice si este precio es de una unidad o de la caja, así que no sé por
+              cuánto multiplicarlo. Dejalo como está y miralo en el papel del proveedor.
             </Aviso>
           )}
 
@@ -307,6 +442,8 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
               {rechazo?.accion === ACCION_NO_LO_CAMBIO ? "No se pudo" : "No lo cambio"}
             </SunmiButton>
           </div>
+          </>
+          )}
 
           <p className="text-sm2 sunmi-text-muted leading-snug">
             Todo lo que decidas acá lo recuerdo para las próximas listas de {proveedor}: el producto
@@ -329,7 +466,7 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
           }}
         />
       )}
-    </SunmiModalLayout>
+    </>
   );
 }
 

@@ -27,10 +27,13 @@
 //   No viene       «Vincular» arriba: cambiar de idea es vincularlo.
 //   Para revisar   «✓ Usar» arriba si hay una lectura que aceptar, «Corregir» abajo.
 //   Cambia         el mismo «✓ Usar», relleno: tocarlo lo desmarca.
-//   Lo demás       sin botones: ya está decidido.
+//   Mismo precio,  «Corregir» abajo: una tarjeta con renglón vinculado nunca
+//   No lo cambio   queda sin acción (2026-10-24).
+//   Actualizado    sin botones: su costo ya está escrito.
 //
 // Sin la lista abierta no hay ningún botón: el servidor los rechazaría. En una
-// lista de control no hay «Usar»: controlar no escribe ningún costo.
+// lista de control no hay «Usar»: controlar no escribe ningún costo. Desde una
+// ubicación que no administra los costos, solo «Vincular» y «No viene».
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import {
@@ -47,6 +50,7 @@ export const TEXTO_NO_VIENE = "No viene";
 export const TEXTO_CORREGIR = "Corregir";
 export const ROTULO_EN_LA_LISTA = "En la lista:";
 export const TEXTO_NO_ESTA = "no está";
+export const MARCA_VINCULADO = "✓";
 
 /**
  * @param item        uno de `tusProductosDeLaLista().items`
@@ -58,6 +62,10 @@ export default function TarjetaProductoDeLaLista({
   item,
   abierta = false,
   controlando = false,
+  // Si la ubicación activa administra los costos de la lista. Si no, desde acá
+  // se vincula y nada más: ni «Usar» ni «Corregir» (lo explica una sola vez el
+  // aviso de arriba de la pantalla).
+  puedeCambiarCostos = true,
   trabajando = false,
   error = "",
   onUsar,
@@ -75,7 +83,13 @@ export default function TarjetaProductoDeLaLista({
     <>
       <p className="text-xs sunmi-text-muted">{ROTULO_EN_LA_LISTA}</p>
       {item.renglon ? (
+        // El ✓ dice que el vínculo está hecho: sin él, una tarjeta vinculada y
+        // sin costo nuevo no se distinguía de una colgada (ALFAJOR FULBITO,
+        // 2026-10-24).
         <p className="text-sm2 sunmi-text-strong break-words">
+          <span className="sunmi-text-success" aria-label="vinculado">
+            {MARCA_VINCULADO}
+          </span>{" "}
           {[item.renglon.codigo, item.renglon.descripcion].filter(Boolean).join(" · ")}
         </p>
       ) : (
@@ -93,7 +107,7 @@ export default function TarjetaProductoDeLaLista({
         {TEXTO_VINCULAR}
       </SunmiButton>
     );
-  } else if (abierta && !controlando && item.usar && (revisar || cambia)) {
+  } else if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
     // Relleno cuando ya está en uso: es el mismo botón marcado, como un
     // interruptor, y tocarlo lo desmarca. `primary` es el acento del tema.
     accionArriba = (
@@ -117,7 +131,10 @@ export default function TarjetaProductoDeLaLista({
         {TEXTO_NO_VIENE}
       </SunmiButton>
     );
-  } else if (abierta && (revisar || cambia) && item.filaId) {
+  } else if (abierta && puedeCambiarCostos && item.filaId && estado !== ESTADO_TU_PRODUCTO.ACTUALIZADO) {
+    // Toda vinculada tiene «Corregir», también «Mismo precio» y «No lo cambio»:
+    // una tarjeta con renglón nunca queda sin acción. La aplicada no: su costo
+    // ya está escrito, y eso se deshace desde la lista.
     accionAbajo = (
       <SunmiButton onClick={() => onCorregir?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
         {TEXTO_CORREGIR}

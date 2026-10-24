@@ -37,6 +37,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import { elegirUbicacionActiva, nombreDeUbicacion } from "@/lib/ubicacionActiva";
 
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import {
@@ -152,6 +154,9 @@ export default function ResultadoDeListaPage() {
   const [errores, setErrores] = useState(() => new Map());
   /** La tarjeta que pidió «✓ Usar» sobre una lectura fuera de rango. */
   const [preguntaFuera, setPreguntaFuera] = useState(null);
+  /** «Ir a <ubicación de los costos>»: el pedido en vuelo y su rechazo. */
+  const [cambiandoUbicacion, setCambiandoUbicacion] = useState(false);
+  const [errorDeUbicacion, setErrorDeUbicacion] = useState("");
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
@@ -289,6 +294,28 @@ export default function ResultadoDeListaPage() {
       { accion: u.accion, ids: [item.filaId] },
       "El servidor no pudo cambiarlo y no dijo por qué."
     );
+  };
+
+  /**
+   * «Ir a Depósito: depo»: cambia la ubicación activa y vuelve a ESTA lista.
+   *
+   * Se recarga la página entera y no solo los datos: el encabezado de la app y
+   * el contexto activo se leen al montar, y con una recarga parcial la barra
+   * seguiría diciendo "Local: mini el 7" sobre una lista que ya se trabaja
+   * desde el depósito.
+   */
+  const irALaUbicacionDeLosCostos = async () => {
+    const destino = datos?.cabecera?.costos?.ubicacion;
+    if (!destino) return;
+    setCambiandoUbicacion(true);
+    setErrorDeUbicacion("");
+    const r = await elegirUbicacionActiva(destino.localId);
+    if (!r?.ok) {
+      setErrorDeUbicacion(`${r?.error || "No se pudo cambiar de ubicación."} Elegila desde el inicio.`);
+      setCambiandoUbicacion(false);
+      return;
+    }
+    window.location.assign(`/modulos/proveedores/listas/${id}`);
   };
 
   /** «No viene»: lo mismo que el botón de la hoja de vincular, sin abrirla. */
@@ -651,6 +678,15 @@ export default function ResultadoDeListaPage() {
   // mostrar, no una pantalla rota.
   const omitidas = datos.omitidasAlAplicar ?? { total: 0, porMotivo: [], propuestaDiferente: [] };
   const controlando = cabecera.modo === MODO_LISTA.CONTROLAR;
+  // ── DESDE DÓNDE SE TRABAJA (Emanuel, 2026-10-24) ─────────────────────────
+  //
+  // Desde una ubicación que no administra los costos de la lista se puede
+  // vincular y nada más: sin «Usar», sin «Corregir» y sin barra de aplicar, y
+  // un solo aviso arriba en vez de una línea en cada tarjeta. Lo decide el
+  // servidor con la regla de `confirmar`; un servidor viejo sin el dato deja
+  // la pantalla como estaba.
+  const costos = cabecera.costos ?? { puedeCambiar: true, ubicacion: null };
+  const puedeCambiarCostos = costos.puedeCambiar !== false;
   const abierta = esImportacionAbierta(cabecera.estado);
   const listos = conteo.listos;
   const puedeDeshacer = cabecera.productosActualizados > 0;
@@ -776,7 +812,11 @@ export default function ResultadoDeListaPage() {
   // ── LAS QUE ESTÁN LISTAS Y NO SE VAN A ESCRIBIR ──────────────────────────
   // Sacarlas del número de la barra era la mitad del arreglo; la otra mitad es
   // decirlas. Solo cuando hay alguna.
-  if (!controlando && (conteo.listosSinTildar ?? 0) > 0) {
+  // Desde una ubicación sin los costos, ni éste ni el de abajo: los dos piden
+  // una acción que desde acá no se puede hacer, y el de las omisiones además
+  // decía "8 más: el costo lo administra otra ubicación", que es lo que ahora
+  // dice una sola vez el aviso de arriba.
+  if (puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
     avisos.push(
       <SunmiCard key="sinTildar" className="p-3">
         <p className="text-sm2 sunmi-text-warning leading-snug">
@@ -800,7 +840,7 @@ export default function ResultadoDeListaPage() {
   // ── LAS QUE APLICAR VA A OMITIR PORQUE EL COSTO DA DISTINTO ────────────
   // De la importación #12: la pantalla decía 11, aplicar escribió 3 y nadie se
   // enteró. Se dicen con nombre y con los DOS números.
-  if (!controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
+  if (puedeCambiarCostos && !controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
     avisos.push(
       <SunmiCard key="omitidas" className="p-3">
         {/* ── EL CARTEL NO AFIRMA QUE EL PRECIO CAMBIÓ ──────────────────
@@ -878,6 +918,32 @@ export default function ResultadoDeListaPage() {
 
   return (
     <Marco>
+      {/* ── EL AVISO DE LA UBICACIÓN, ARRIBA Y UNA SOLA VEZ ──────────────────
+          Antes se enteraba al final: vinculaba, elegía la lectura, tocaba
+          «Usar» y recién ahí "No se guardó nada", con una línea suelta en cada
+          tarjeta. Ahora se dice al abrir, con la salida al lado. Pasarse lo
+          puede hacer quien puede elegir esa ubicación: la ruta de siempre no le
+          deja a un no administrador elegir otro local, así que a él no se le
+          ofrece un botón que va a fallar. */}
+      {!puedeCambiarCostos && costos.ubicacion && (
+        <SunmiAviso tono="warning">
+          <p className="leading-snug">
+            Esta lista se trabaja desde {nombreDeUbicacion(costos.ubicacion)}. Desde acá podés vincular
+            pero no cambiar costos.
+          </p>
+          {perfil?.esAdmin && (
+            <SunmiButton
+              color="amber"
+              onClick={irALaUbicacionDeLosCostos}
+              disabled={cambiandoUbicacion}
+              className="mt-2 w-full min-h-toque justify-center"
+            >
+              {cambiandoUbicacion ? "Cambiando…" : `Ir a ${nombreDeUbicacion(costos.ubicacion)}`}
+            </SunmiButton>
+          )}
+          {errorDeUbicacion && <p className="mt-2 text-sm2 sunmi-text-danger">{errorDeUbicacion}</p>}
+        </SunmiAviso>
+      )}
       <SunmiPantallaDeTrabajo
         contexto={
           <>
@@ -942,6 +1008,7 @@ export default function ResultadoDeListaPage() {
                 key={item.productoBaseId}
                 item={item}
                 abierta={abierta}
+                puedeCambiarCostos={puedeCambiarCostos}
                 controlando={controlando}
                 trabajando={tocando === item.productoBaseId}
                 error={errores.get(item.productoBaseId) ?? ""}
@@ -1045,7 +1112,7 @@ export default function ResultadoDeListaPage() {
             de rango son las de siempre. En un control no hay nada que aplicar, y
             en una lista cerrada tampoco: sin barra. */
         pieDePantalla={
-          !controlando && abierta ? (
+          !controlando && abierta && puedeCambiarCostos ? (
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0">
                 <span className="block text-sm2 sunmi-text-muted">Para aplicar</span>
@@ -1153,6 +1220,19 @@ export default function ResultadoDeListaPage() {
                 nombre={vinculando.nombre}
                 proveedor={nombreProveedor}
                 cuerpoNoViene={{ noViene: true }}
+                // VINCULAR EN UN SOLO PASO: vinculado, la misma hoja sigue con
+                // caja entera / una unidad / No lo cambio, y se cierra sola si no
+                // hay nada que decidir. Desde una ubicación sin los costos no
+                // sigue: ahí no se puede elegir la lectura.
+                importacionId={id}
+                seguirConLaLectura={puedeCambiarCostos}
+                onNoEsEste={async (fila) => {
+                  const productoBaseId = vinculando.productoBaseId;
+                  setVinculando(null);
+                  setEligiendoOtra({ fila, productoBaseId });
+                  // El vínculo ya quedó guardado: la tarjeta se relee igual.
+                  await despuesDeTocar(productoBaseId);
+                }}
                 onCerrar={() => setVinculando(null)}
                 onListo={async () => {
                   const productoBaseId = vinculando.productoBaseId;
@@ -1167,10 +1247,17 @@ export default function ResultadoDeListaPage() {
                 renglón, o con «No viene en esta lista» lo saca de la lista. */}
             {eligiendoOtra && (
               <HojaVincularConLaLista
+                key={`${eligiendoOtra.fila.id}-${eligiendoOtra.vez ?? 0}`}
                 endpoint={`/api/proveedores/listas/${id}/filas/${eligiendoOtra.fila.id}/otra-fila`}
                 nombre={eligiendoOtra.fila.nombre}
                 proveedor={nombreProveedor}
                 cuerpoNoViene={{ noEstaEnLaLista: true }}
+                // También en un solo paso: el renglón nuevo sigue con su lectura.
+                importacionId={id}
+                seguirConLaLectura={puedeCambiarCostos}
+                // `vez` vuelve a montar la hoja: sin eso se quedaría en el paso de
+                // la lectura del renglón anterior.
+                onNoEsEste={(fila) => setEligiendoOtra({ fila, productoBaseId: eligiendoOtra.productoBaseId, vez: Date.now() })}
                 onCerrar={() => setEligiendoOtra(null)}
                 onListo={async () => {
                   const productoBaseId = eligiendoOtra.productoBaseId;

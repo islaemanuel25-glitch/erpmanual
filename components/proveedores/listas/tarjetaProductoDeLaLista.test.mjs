@@ -21,6 +21,7 @@ import TarjetaProductoDeLaLista, {
   TEXTO_NO_VIENE,
   TEXTO_USAR,
   TEXTO_VINCULAR,
+  MARCA_VINCULADO,
   cuentaDe,
 } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
@@ -128,6 +129,42 @@ test("UNA LISTA CERRADA NO TIENE BOTONES, Y UN CONTROL NO TIENE «USAR»", () =>
   assert.equal(botones(cerrada).length, 0);
   const control = dibujar({ item: itemDe({ filas: [fila()] }), abierta: true, controlando: true });
   assert.deepEqual(botones(control).map((x) => x.texto), [TEXTO_CORREGIR]);
+});
+
+test("DESDE UN LOCAL SIN PROPIEDAD DEL COSTO NO SE OFRECE «USAR» NI «CORREGIR», PERO SÍ VINCULAR", () => {
+  // El `item` sale de `tusProductosDeLaLista` con `puedeCambiarCostos: false`,
+  // que es como lo manda la ruta desde "Local: mini el 7". La contraprueba es
+  // el mismo producto desde el depósito, en el test de «CAMBIA» de arriba.
+  const productos = (filas) => [{ id: 7, nombre: "Solitas Animación 400 g", precio_costo: 1300, filas }];
+  const cambia = tusProductosDeLaLista({ productos: productos([fila()]), rango: RANGO, puedeCambiarCostos: false }).items[0];
+  const html = dibujar({ item: cambia, abierta: true, puedeCambiarCostos: false });
+  assert.deepEqual(botones(html).map((x) => x.texto), [], "desde el local no hay nada que tocar en una que cambia");
+  assert.ok(!html.includes(TEXTO_USAR));
+  // Aunque el servidor mandara un `usar`, la tarjeta tampoco lo dibuja.
+  const conUsar = itemDe({ filas: [fila()] });
+  assert.ok(!dibujar({ item: conUsar, abierta: true, puedeCambiarCostos: false }).includes(TEXTO_USAR));
+  // Vincular sí: el vínculo es del proveedor, no de la ubicación.
+  const sinVincular = tusProductosDeLaLista({ productos: productos([]), rango: RANGO, puedeCambiarCostos: false }).items[0];
+  assert.deepEqual(botones(dibujar({ item: sinVincular, abierta: true, puedeCambiarCostos: false })).map((x) => x.texto), [
+    TEXTO_VINCULAR,
+    TEXTO_NO_VIENE,
+  ]);
+});
+
+test("UNA VINCULADA DICE QUE EL VÍNCULO ESTÁ HECHO, Y NUNCA QUEDA SIN ACCIÓN", () => {
+  const html = dibujar({ item: itemDe({ filas: [fila()] }), abierta: true });
+  assert.match(html, new RegExp(`sunmi-text-success" aria-label="vinculado">${MARCA_VINCULADO}<`));
+  // «Mismo precio» tenía la tarjeta muda: ahora tiene «Corregir».
+  const igual = itemDe({ filas: [fila({ estado: ESTADO_LINEA.SIN_CAMBIOS, diferenciaPct: 0, costoMaestroPropuesto: 1300 })] });
+  assert.deepEqual(botones(dibujar({ item: igual, abierta: true })).map((x) => x.texto), [TEXTO_CORREGIR]);
+  // Sin costo nuevo, «Para revisar» con «Corregir» y el porqué en ámbar.
+  const sinCosto = itemDe({ filas: [fila({ estado: ESTADO_LINEA.SIN_CAMBIOS, costoMaestroPropuesto: null, diferenciaPct: null })] });
+  const h = dibujar({ item: sinCosto, abierta: true });
+  assert.deepEqual(botones(h).map((x) => x.texto), [TEXTO_CORREGIR]);
+  assert.match(h, /sunmi-text-warning">No sé por cuánto multiplicar el precio de la lista/);
+  // La aplicada no: su costo ya está escrito.
+  const aplicada = itemDe({ filas: [fila({ aplicada: true })] });
+  assert.deepEqual(botones(dibujar({ item: aplicada, abierta: true })).map((x) => x.texto), []);
 });
 
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {

@@ -28,6 +28,8 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { money } from "@/components/proveedores/listas/PiezasPantallas";
 import { primerasPalabras } from "@/lib/proveedores/listas/tusProductos";
+// La decisión de lectura, sin su hoja: es la misma pieza que abre «Corregir».
+import { DecisionDeLectura } from "@/components/proveedores/listas/HojaRevisarPrecio";
 
 /** Cuánto se espera a que se deje de escribir antes de buscar. */
 const ESPERA_BUSQUEDA_MS = 350;
@@ -40,14 +42,40 @@ const ESPERA_BUSQUEDA_MS = 350;
  *                      ruta llama distinto
  * @param onListo       al guardar algo: `(respuesta)`; la pantalla recarga
  * @param onCerrar      al cerrar sin guardar
+ * @param importacionId con `seguirConLaLectura`, la lista donde se decide la lectura
+ * @param seguirConLaLectura  al vincular, la MISMA hoja sigue con la decisión de
+ *                      lectura (Emanuel, 2026-10-24). Solo si desde acá se pueden
+ *                      cambiar costos: si no, se vincula y la hoja se cierra
+ * @param onNoEsEste    «No es este producto» desde esa decisión: `(fila)`
  */
-export default function HojaVincularConLaLista({ endpoint, nombre, proveedor = "", cuerpoNoViene, onListo, onCerrar }) {
+export default function HojaVincularConLaLista({
+  endpoint,
+  nombre,
+  proveedor = "",
+  cuerpoNoViene,
+  onListo,
+  onCerrar,
+  importacionId = null,
+  seguirConLaLectura = false,
+  onNoEsEste,
+}) {
   const [buscar, setBuscar] = useState(() => primerasPalabras(nombre));
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [elegida, setElegida] = useState(null);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState("");
+  // ── EL SEGUNDO PASO, EN LA MISMA HOJA ───────────────────────────────────
+  //
+  // Vincular era: elegir el renglón, que la hoja se cerrara, y tocar «Corregir»
+  // para decir si el precio es de la caja o de una unidad. Ahora, vinculado, la
+  // hoja sigue con esa decisión (`DecisionDeLectura`) y se cierra sola cuando no
+  // hay nada que decidir o hay una sola lectura en el rango. `vinculado` es la
+  // respuesta del vínculo, que ya quedó guardado: cerrar acá NO lo deshace, así
+  // que cerrar también avisa que hay que recargar.
+  const [vinculado, setVinculado] = useState(null);
+  const [titulo, setTitulo] = useState(null);
+  const [decidiendo, setDecidiendo] = useState(false);
   const reloj = useRef(null);
 
   const traer = useCallback(
@@ -96,12 +124,41 @@ export default function HojaVincularConLaLista({ endpoint, nombre, proveedor = "
         setError(j?.error || "No se pudo guardar. No cambió nada: probá de nuevo.");
         return;
       }
+      if (seguirConLaLectura && cuerpo?.filaElegidaId && j.filaId) {
+        setVinculado(j);
+        return;
+      }
       onListo?.(j);
     } catch {
       setError("No se pudo conectar con el servidor. No cambió nada: probá de nuevo.");
     } finally {
       setTrabajando(false);
     }
+  }
+
+  if (vinculado) {
+    return (
+      <SunmiModalLayout
+        open
+        forma="hoja"
+        title={titulo ?? nombre}
+        color="amber"
+        onClose={decidiendo ? undefined : () => onListo?.(vinculado)}
+        espacioCuerpo="mt-2 gap-3"
+        z={9999}
+      >
+        {vinculado.mensaje && <p className="text-sm2 sunmi-text-success leading-snug">✓ {vinculado.mensaje}</p>}
+        <DecisionDeLectura
+          importacionId={importacionId}
+          filaId={vinculado.filaId}
+          tomarLaUnica
+          onListo={() => onListo?.(vinculado)}
+          onNoEsEste={onNoEsEste}
+          onTitulo={setTitulo}
+          onTrabajando={setDecidiendo}
+        />
+      </SunmiModalLayout>
+    );
   }
 
   return (

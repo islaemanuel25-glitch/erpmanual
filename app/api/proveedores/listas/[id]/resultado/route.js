@@ -61,7 +61,7 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
-import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
+import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
   lecturaQueMuestraLaTarjeta,
@@ -272,6 +272,8 @@ export async function GET(req, context) {
         // Para el buscador, que busca tus productos por nombre o por código.
         codigo_barra: true,
         codigo_barra_secundario: true,
+        // Quién administra su costo: decide desde dónde se trabaja la lista.
+        creadoEnLocalId: true,
         filasImportacionLista: {
           where: { importacionId: id },
           orderBy: { filaExcel: "asc" },
@@ -289,13 +291,35 @@ export async function GET(req, context) {
       where: { importacionId: id, grupoId },
       select: { productoBaseId: true },
     });
+    // ── DESDE DÓNDE SE TRABAJA ESTA LISTA (Emanuel, 2026-10-24) ──────────
+    //
+    // La abrió desde un local, vinculó, eligió la lectura, tocó «Usar» y recién
+    // ahí le dijeron que desde ahí no. La respuesta se sabe al abrir: es el
+    // dueño del costo de tus productos de este proveedor, con la misma regla
+    // que `confirmar` y `aplicar` (`localPropietarioDelCosto`).
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
+    const dueno = quienAdministraLosCostos(productosDelProveedor, depositoLocalId);
+    const puedeCambiarCostos = dueno === null || dueno === Number(localId);
+    const ubicacionDeLosCostos =
+      dueno === null
+        ? null
+        : await prisma.local.findUnique({ where: { id: dueno }, select: { id: true, nombre: true, es_deposito: true } });
+
     const tusProductos = tusProductosDeLaLista({
       productos: productosDelProveedor.map((p) => ({ ...p, filas: p.filasImportacionLista })),
       rango: rangoDelProveedor,
       omitidas: revision.ids,
       noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
-      lecturaPorFila: await lecturasDeTusFilas({ importacionId: id, grupoId, productos: productosDelProveedor, cab, rango: rangoDelProveedor }),
+      lecturaPorFila: await lecturasDeTusFilas({
+        importacionId: id,
+        productos: productosDelProveedor,
+        cab,
+        rango: rangoDelProveedor,
+        operandoEnLocalId: Number(localId),
+        depositoLocalId,
+      }),
       abierta: esImportacionAbierta(cab.estado),
+      puedeCambiarCostos,
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
@@ -365,6 +389,18 @@ export async function GET(req, context) {
         // motor no pudo elegir la columna y dejó todo para revisar. No se
         // arregla sola —habría que volver a conciliar— así que se avisa cuando
         // alguien la abre y se le ofrece pasarla a control.
+        // Si desde la ubicación activa se pueden cambiar costos, y si no, cuál es
+        // la que los administra: la pantalla lo avisa arriba y ofrece pasarse.
+        costos: {
+          puedeCambiar: puedeCambiarCostos,
+          ubicacion: ubicacionDeLosCostos
+            ? {
+                localId: ubicacionDeLosCostos.id,
+                nombre: ubicacionDeLosCostos.nombre,
+                esDeposito: ubicacionDeLosCostos.es_deposito === true,
+              }
+            : null,
+        },
         quedoAtrapada: quedoAtrapadaEnElCeroACero(cab),
         avisoAtrapada: quedoAtrapadaEnElCeroACero(cab) ? AVISO_QUEDO_ATRAPADA : null,
       },
@@ -606,7 +642,7 @@ function numero(v) {
  *
  * @returns Map filaId → `{ lectura, confirmable }`
  */
-async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rango }) {
+async function lecturasDeTusFilas({ importacionId, productos, cab, rango, operandoEnLocalId, depositoLocalId }) {
   const porFila = new Map();
   if (modoDeImportacion(cab) === MODO_LISTA.CONTROLAR || !esImportacionAbierta(cab.estado)) return porFila;
   const ids = productos.flatMap((p) => p.filasImportacionLista.map((f) => f.id));
@@ -617,7 +653,14 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
   });
   for (const fila of filas) {
     if (!fila.productoBase) continue;
-    const { lecturas, confirmable } = lecturasDeLaFila({ fila, producto: fila.productoBase, cab, rango });
+    const { lecturas, confirmable } = lecturasDeLaFila({
+      fila,
+      producto: fila.productoBase,
+      cab,
+      rango,
+      operandoEnLocalId,
+      depositoLocalId,
+    });
     porFila.set(fila.id, { lectura: lecturaQueMuestraLaTarjeta({ lecturas, fila }), confirmable });
   }
   return porFila;
