@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 12:34
+**Última actualización:** 2026-10-24 14:15
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: revisión de una lista — elegido visible, % por dirección, «¿Es este?», caja, progreso y deshacer (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: fix(listas): chip de vinculados y nunca comparar la unidad contra la caja
 - 2026-10-24: fix(listas): la revisión avisa desde dónde se trabaja y vincula en un solo paso
