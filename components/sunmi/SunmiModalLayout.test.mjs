@@ -866,6 +866,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // que arranca con las primeras palabras del nombre y se vuelve a escribir
     // en un segundo. Elegir un renglón no guarda nada hasta tocar «Vincular».
     "components/proveedores/listas/HojaVincularConLaLista.jsx": false,
+    // La hoja del reporte de una lista (2026-10-24, era un panel desplegable):
+    // tres tarjetas para elegir qué descargar y nada escrito adentro. Cerrarla
+    // sin querer no pierde nada; mientras arma el PDF no se cierra, y eso lo
+    // decide su `onClose`, no el velo.
+    "components/proveedores/listas/HojaReporte.jsx": false,
     // ── LAS DOS HOJAS DE PRODUCTO DEL MÓDULO DE LISTAS ────────────────────
     //
     // La de "Se actualizan" —nombre, cuánto pasa a cuánto, y tres salidas— y la

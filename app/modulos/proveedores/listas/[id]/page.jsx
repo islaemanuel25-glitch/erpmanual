@@ -72,7 +72,11 @@ import {
   TEXTO_FILTRO,
   cantidadDelFiltro,
   filtroInicial,
+  filtroParaMostrar,
+  resumenDeLaCerrada,
   seVe,
+  textoSinTildarEnUnaCerrada,
+  textoTildadosSinAplicarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
 // Pasar un control a actualizar precios: pide el rango, que controlar no
@@ -90,7 +94,7 @@ import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCance
 // para escribir costos, y uno de los dos sin el candado.
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
-import BotonReporte from "@/components/proveedores/listas/BotonReporte";
+import HojaReporte from "@/components/proveedores/listas/HojaReporte";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
 // dos acciones del control.
@@ -105,6 +109,9 @@ export const TEXTO_HECHO = "Listo:";
 export const TEXTO_DESHACER = "Deshacer";
 /** Unos segundos: lo que tarda en leerse y en tocar «Deshacer» si hizo falta. */
 export const DURACION_AVISO_HECHO_MS = 6000;
+
+/** El botón que abre la hoja del reporte. */
+export const TEXTO_REPORTE = "Reporte";
 
 export default function ResultadoDeListaPage() {
   const router = useRouter();
@@ -134,6 +141,8 @@ export default function ResultadoDeListaPage() {
   // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
   // la lista y eso no se deshace desde acá: se pregunta.
   const [cancelando, setCancelando] = useState(false);
+  /** La hoja del reporte, abierta. */
+  const [viendoReporte, setViendoReporte] = useState(false);
   /** Mientras se vuelven a leer las propuestas que quedaron viejas. */
   const [releyendo, setReleyendo] = useState(false);
   // ── LA LISTA DE TUS PRODUCTOS ──────────────────────────────────────────
@@ -744,7 +753,10 @@ export default function ResultadoDeListaPage() {
         return;
       }
       setTerminando(false);
-      setAviso({ tono: "success", texto: "Lista terminada." });
+      // Sin cartel "Lista terminada.": lo dice la píldora del estado, arriba.
+      // Y el chip vuelve a elegirse: el que estaba puesto —"Cambian", para
+      // aplicar— suele quedar en cero en una lista terminada.
+      setFiltro(null);
       await cargar();
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
@@ -816,7 +828,10 @@ export default function ResultadoDeListaPage() {
   const sinVincular = tusProductos.conteo.porEstado?.SIN_VINCULAR ?? 0;
   // Sin «Todos»: si todavía no se eligió, el mismo con el que arranca. Y con
   // texto en el buscador, `seVe` busca en todos sin mirar el chip.
-  const filtroActivo = filtro ?? filtroInicial(tusProductos.conteo);
+  // Cerrada, un chip vacío no se queda puesto: arranca en el primero que tenga
+  // algo (Emanuel, 2026-10-24: arrancaba en "Cambian 0" y "No hay ninguno").
+  // Abierta sí, porque vaciar un chip es lo que pasa al ir resolviendo.
+  const filtroActivo = filtroParaMostrar(filtro, tusProductos.conteo, { abierta });
   const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar }));
   // "X de 158 listos": ni «Sin vincular» ni «Para revisar» (`tusProductos.js`).
   const listosDeLaRevision = tusProductos.conteo.listosDeLaRevision ?? 0;
@@ -953,7 +968,27 @@ export default function ResultadoDeListaPage() {
   // una acción que desde acá no se puede hacer, y el de las omisiones además
   // decía "8 más: el costo lo administra otra ubicación", que es lo que ahora
   // dice una sola vez el aviso de arriba.
-  if (puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
+  // ── CERRADA, LO QUE NO SE APLICÓ SE DICE EN PASADO (2026-10-24) ─────────
+  //
+  // Decía "65 están listos pero sin tildar, así que aplicar no los va a tocar"
+  // en una lista terminada: aplicar en futuro, cuando ya no se puede. Cerrada,
+  // es un aviso de lo que quedó (`textoSinTildarEnUnaCerrada`), sin botón.
+  if (!abierta && puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
+    avisos.push(
+      <Aviso key="sinTildar" tono="warning">
+        {textoSinTildarEnUnaCerrada(conteo.listosSinTildar)}
+      </Aviso>
+    );
+  }
+  if (!abierta && puedeCambiarCostos && !controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
+    avisos.push(
+      <Aviso key="omitidas" tono="warning">
+        {textoTildadosSinAplicarEnUnaCerrada(conteo.omitidasAlAplicar)}
+      </Aviso>
+    );
+  }
+
+  if (abierta && puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
     avisos.push(
       <SunmiCard key="sinTildar" className="p-3">
         <p className="text-sm2 sunmi-text-warning leading-snug">
@@ -961,15 +996,13 @@ export default function ResultadoDeListaPage() {
           {conteo.listosSinTildar === 1 ? "está listo" : "están listos"} pero sin tildar, así que
           aplicar no {conteo.listosSinTildar === 1 ? "lo" : "los"} va a tocar.
         </p>
-        {abierta && (
-          <SunmiButton
-            color="ghost"
-            onClick={() => irA("/actualizan")}
-            className="mt-2 w-full min-h-toque text-sm3"
-          >
-            Abrirlos para tildarlos
-          </SunmiButton>
-        )}
+        <SunmiButton
+          color="ghost"
+          onClick={() => irA("/actualizan")}
+          className="mt-2 w-full min-h-toque text-sm3"
+        >
+          Abrirlos para tildarlos
+        </SunmiButton>
       </SunmiCard>
     );
   }
@@ -977,7 +1010,7 @@ export default function ResultadoDeListaPage() {
   // ── LAS QUE APLICAR VA A OMITIR PORQUE EL COSTO DA DISTINTO ────────────
   // De la importación #12: la pantalla decía 11, aplicar escribió 3 y nadie se
   // enteró. Se dicen con nombre y con los DOS números.
-  if (puedeCambiarCostos && !controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
+  if (abierta && puedeCambiarCostos && !controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
     avisos.push(
       <SunmiCard key="omitidas" className="p-3">
         {/* ── EL CARTEL NO AFIRMA QUE EL PRECIO CAMBIÓ ──────────────────
@@ -1230,34 +1263,36 @@ export default function ResultadoDeListaPage() {
                 porque ya está, o cerrarlo porque no servía. Terminar se ofrece
                 siempre que esté abierta: una lista con productos que nunca se
                 van a resolver tiene que poder cerrarse. */}
-            <div className="grid grid-cols-2 gap-2">
-              {abierta ? (
-                <>
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setTerminando(true)}
-                    disabled={aplicando || pasando}
-                    className="min-h-toque text-sm3"
-                  >
-                    Terminar lista
-                  </SunmiButton>
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setCancelando(true)}
-                    disabled={aplicando || pasando}
-                    className="min-h-toque text-sm3"
-                  >
-                    Cancelar esta lista
-                  </SunmiButton>
-                </>
-              ) : null}
-              <BotonReporte
-                importacionId={id}
-                cabecera={cabecera}
-                proveedor={cabecera.proveedor}
-                usuario={perfil}
-              />
-            </div>
+            {/* Cerrada, el reporte va en la barra fija de abajo; abierta, acá,
+                a lo ancho y con el mismo botón que sus vecinos. Los dos abren
+                la misma hoja. */}
+            {abierta && (
+              <div className="grid grid-cols-2 gap-2">
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setTerminando(true)}
+                  disabled={aplicando || pasando}
+                  className="min-h-toque text-sm3"
+                >
+                  Terminar lista
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setCancelando(true)}
+                  disabled={aplicando || pasando}
+                  className="min-h-toque text-sm3"
+                >
+                  Cancelar esta lista
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setViendoReporte(true)}
+                  className="col-span-2 min-h-toque text-sm3 justify-center"
+                >
+                  {TEXTO_REPORTE}
+                </SunmiButton>
+              </div>
+            )}
           </>
         }
         /* ── LA BARRA FIJA DE ABAJO, COMO «TOTAL / ✓ CONFIRMAR» ──────────────
@@ -1285,6 +1320,19 @@ export default function ResultadoDeListaPage() {
                 {aplicando ? "Aplicando…" : "✓ Aplicar"}
               </SunmiButton>
             </div>
+            </div>
+          ) : !abierta ? (
+            // ── CERRADA: LO QUE QUEDÓ Y EL REPORTE (2026-10-24) ──────────────
+            // La misma barra, con el resumen a la izquierda y el reporte a la
+            // derecha, con el estilo de «✓ Aplicar». Antes era un botón de
+            // medio ancho al final que no se parecía al resto de la pantalla.
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0 tabular-nums text-lg2 font-semibold sunmi-text-strong">
+                {resumenDeLaCerrada(cabecera.productosActualizados)}
+              </span>
+              <SunmiButton color="amber" onClick={() => setViendoReporte(true)} className="shrink-0 justify-center">
+                {TEXTO_REPORTE}
+              </SunmiButton>
             </div>
           ) : (
             avisoHecho
@@ -1464,6 +1512,19 @@ export default function ResultadoDeListaPage() {
                   setPreguntaFuera(null);
                   await usar(item, { aceptarFueraDeRango: true });
                 }}
+              />
+            )}
+
+            {/* ── EL REPORTE, EN UNA HOJA ───────────────────────────────────
+                La misma pieza que la hoja de vincular, con las tres descargas
+                como tarjetas a todo el ancho. */}
+            {viendoReporte && (
+              <HojaReporte
+                importacionId={id}
+                cabecera={cabecera}
+                proveedor={cabecera.proveedor}
+                usuario={perfil}
+                onCerrar={() => setViendoReporte(false)}
               />
             )}
 

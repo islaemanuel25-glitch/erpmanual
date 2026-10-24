@@ -14,11 +14,22 @@
 // encuentra. El menú nativo del sistema manda el PDF por WhatsApp en dos toques,
 // que es lo que realmente se hace con él. Cuando el navegador no lo soporta, se
 // descarga como siempre: no se pierde la función, cambia el camino.
+//
+// ── ES UNA HOJA, NO UN BOTÓN CON UN PANEL (Emanuel, 2026-10-24) ─────────────
+//
+// Era `BotonReporte`: un botón de medio ancho que desplegaba un panel de medio
+// ancho con tres renglones de 10 px y colores propios, que no se parecía a nada
+// de la pantalla. Ahora el botón lo pone la pantalla —en la barra fija de una
+// lista cerrada, como «✓ Aplicar»— y esto es la hoja que abre: la MISMA pieza
+// que la hoja de vincular (`SunmiModalLayout` en forma de hoja), con las tres
+// opciones como tarjetas del kit a todo el ancho, cada una con su ícono, título
+// y descripción, y la línea de compartir al pie, en gris.
 
 import { useState } from "react";
-import { Download, FileText, Share2 } from "lucide-react";
+import { CheckCircle2, CircleDashed, FileText, Share2 } from "lucide-react";
 
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 // LA CASCADA DE COMPARTIR SE MUDÓ A `lib/compartir/compartirArchivo.js`.
 //
 // Estaba escrita acá adentro —`conviensCompartir`, `descargar` y el try/catch con
@@ -30,26 +41,34 @@ import { compartirODescargar, RESULTADO_COMPARTIR } from "@/lib/compartir/compar
 import { TIPO_REPORTE, TITULO_REPORTE } from "@/lib/proveedores/listas/reporteImportacion";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
-const OPCIONES = [
+export const TITULO_HOJA_REPORTE = "Reporte de la lista";
+export const TEXTO_PIE_REPORTE = "En el teléfono se abre el menú para compartir; en la computadora se descarga.";
+
+export const OPCIONES_REPORTE = [
   {
     tipo: TIPO_REPORTE.COMPLETO,
+    Icono: FileText,
     detalle: "Resumen del sistema, actualizados, pendientes y no informados.",
     situaciones: ["ACTUALIZADOS", "PENDIENTES", "AUSENTES"],
   },
   {
     tipo: TIPO_REPORTE.ACTUALIZADOS,
+    Icono: CheckCircle2,
     detalle: "Solo los que ya tienen su costo nuevo, con el recorrido de cada uno.",
     situaciones: ["ACTUALIZADOS"],
   },
   {
     tipo: TIPO_REPORTE.NO_ACTUALIZADOS,
+    Icono: CircleDashed,
     detalle: "Pendientes y no informados, con el motivo de cada uno.",
     situaciones: ["PENDIENTES", "AUSENTES"],
   },
 ];
 
-export default function BotonReporte({ importacionId, cabecera, sistema, proveedor, usuario }) {
-  const [abierto, setAbierto] = useState(false);
+/**
+ * @param onCerrar  cerrar la hoja; también al terminar de compartir o descargar
+ */
+export default function HojaReporte({ importacionId, cabecera, sistema, proveedor, usuario, onCerrar }) {
   const [trabajando, setTrabajando] = useState("");
   const [error, setError] = useState("");
 
@@ -133,14 +152,14 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
         titulo: `${TITULO_REPORTE[opcion.tipo]} · Importación #${cabecera?.id}`,
       });
 
-      // CANCELAR DEJA EL MENÚ ABIERTO, y eso es lo que hacía antes: la cancelación
-      // llegaba como un AbortError que saltaba al `catch` de abajo, así que este
-      // `setAbierto(false)` no se ejecutaba. La pieza ahora devuelve el caso en vez
+      // CANCELAR DEJA LA HOJA ABIERTA, y eso es lo que hacía el menú de antes: la
+      // cancelación llegaba como un AbortError que saltaba al `catch` de abajo,
+      // así que el cierre no se ejecutaba. La pieza ahora devuelve el caso en vez
       // de tirar, así que el corte se escribe acá — es el mismo comportamiento, no
       // uno nuevo. Quien se arrepintió sigue viendo las tres opciones.
       if (resultado === RESULTADO_COMPARTIR.CANCELADO) return;
 
-      setAbierto(false);
+      onCerrar?.();
     } catch (e) {
       // LA GUARDA DE AbortError SE FUE, y conviene saber por qué: cancelar el
       // menú ya no llega acá. La pieza de compartir devuelve CANCELADO en vez de
@@ -154,50 +173,41 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
   };
 
   return (
-    <div data-rol="reporte" className="relative">
-      <SunmiButton
-        color="slate"
-        onClick={() => setAbierto((v) => !v)}
-        aria-expanded={abierto}
-        className="w-full min-h-toque px-3 text-sm3 inline-flex items-center justify-center gap-1"
-      >
-        <FileText size={13} aria-hidden="true" />
-        {/* Decía "Descargar / compartir reporte" y no entraba en media pantalla.
-            Qué hace lo explica el menú que abre, renglón por renglón; el botón
-            solo tiene que decir de qué se trata. */}
-        Reporte
-      </SunmiButton>
-
-      {abierto && (
-        <div className="mt-1 sunmi-surface sunmi-border border rounded-lg p-1.5 space-y-1 max-w-[26rem]">
-          {OPCIONES.map((o) => (
-            <button
-              key={o.tipo}
-              type="button"
-              disabled={!!trabajando}
-              onClick={() => generar(o)}
-              className="w-full text-left rounded p-1.5 sunmi-border border"
-            >
-              <div className="text-[11.5px] font-semibold sunmi-text-strong inline-flex items-center gap-1">
-                {trabajando === o.tipo ? (
-                  <>Generando…</>
-                ) : (
-                  <>
-                    <Download size={11} aria-hidden="true" />
-                    {TITULO_REPORTE[o.tipo]}
-                  </>
-                )}
-              </div>
-              <div className="text-[10px] sunmi-text-muted leading-tight">{o.detalle}</div>
-            </button>
-          ))}
-          <p className="text-[9.5px] sunmi-text-muted leading-tight inline-flex items-start gap-1 px-1">
-            <Share2 size={10} aria-hidden="true" className="shrink-0 mt-0.5" />
-            En el teléfono se abre el menú para compartir; en la computadora se descarga.
-          </p>
-          {error && <p className="text-[10.5px] sunmi-text-danger px-1">{error}</p>}
-        </div>
-      )}
-    </div>
+    <SunmiModalLayout
+      open
+      forma="hoja"
+      title={TITULO_HOJA_REPORTE}
+      color="amber"
+      // Mientras se arma el PDF no se cierra: el compartir llega después.
+      onClose={trabajando ? undefined : onCerrar}
+      espacioCuerpo="mt-2 gap-2"
+      z={9999}
+      footer={
+        <p className="w-full text-sm2 sunmi-text-muted leading-snug flex items-start gap-1.5">
+          <Share2 size={14} aria-hidden="true" className="shrink-0 mt-0.5" />
+          {TEXTO_PIE_REPORTE}
+        </p>
+      }
+    >
+      {OPCIONES_REPORTE.map(({ tipo, Icono, detalle, situaciones }) => (
+        <SunmiActionCard
+          key={tipo}
+          disabled={!!trabajando}
+          onClick={() => generar({ tipo, situaciones })}
+          data-reporte={tipo}
+        >
+          <span className="flex items-start gap-3">
+            <Icono size={22} aria-hidden="true" className="shrink-0 sunmi-text-accent" />
+            <span className="min-w-0">
+              <span className="block text-sm3 font-semibold sunmi-text-strong">
+                {trabajando === tipo ? "Generando…" : TITULO_REPORTE[tipo]}
+              </span>
+              <span className="block text-sm2 sunmi-text-muted leading-snug">{detalle}</span>
+            </span>
+          </span>
+        </SunmiActionCard>
+      ))}
+      {error && <p className="text-sm2 sunmi-text-danger leading-snug">{error}</p>}
+    </SunmiModalLayout>
   );
 }
