@@ -16,153 +16,27 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261019180000_usuario_sesion_invalidada_en` — **Aditiva, sin datos.**
-  Agrega `Usuario.sesionInvalidadaEn` (TIMESTAMP nulo), sin relleno. Cambiar la
-  contraseña o desactivar el usuario la escriben, y desde ese instante no vale
-  ninguna sesión de la cuenta emitida antes, en ningún dispositivo. No toca
-  ninguna fila: las sesiones vigentes al desplegar siguen valiendo. Ojo con el
-  orden: el código nuevo la lee en `proxy.js` en CADA pedido con sesión, así que
-  la migración va ANTES de levantar la imagen nueva. Sin ella, el proxy no puede
-  leer al usuario y deja pasar los pedidos como venían (falla abierta, a
-  propósito), pero `/api/login` sí se cae: lee el usuario con todas sus
-  columnas y Postgres no tiene la nueva.
-- `20261019190000_cobros_offline_turno_terminado_a_pendiente` — **De datos,
-  chica.** Se sacó el corte de la caja por el horario del turno (409
-  `TURNO_TERMINADO`, entró en `7b4f742`). Los cobros offline que ese rechazo
-  mandó a `REQUIERE_REVISION` con `revisionMotivo = 'TURNO_TERMINADO'`: con la
-  caja todavía operativa vuelven a `PENDIENTE` y la cola del POS los manda en la
-  próxima sincronización; con la caja cerrada, anulada o en corte quedan en
-  revisión con el motivo de la regla normal (`TURNO_CERRADO`, `TURNO_ANULADO`,
-  `TURNO_EN_CORTE`). No toca `ultimoRechazo*` ni ningún otro cobro. Correrla
-  dos veces no cambia nada. Puede ir antes o después de levantar la imagen; si
-  va después, un cobro de esos solo espera hasta que corra.
-- `20261019200000_gasto_modalidad_sueldo` — **Aditiva, CON relleno de datos.**
-  Crea el enum `ModalidadSueldo` y la columna nula `Gasto.modalidadSueldo`
-  (Finanzas → Sueldos). El relleno es un UPDATE que marca SUELDO o ADELANTO
-  solo en los gastos de la categoría Sueldos cuyo concepto empieza
-  exactamente con "Sueldo · " o "Adelanto · " —el formato que escribía el
-  POS— y donde la columna está vacía; los sueldos con concepto libre quedan
-  en null. No toca montos, pagos ni caja. Correrla dos veces no cambia nada.
-  Ojo con el orden: va ANTES de levantar la imagen nueva, porque `crearGasto`
-  escribe la columna en todo gasto nuevo y sin ella el alta de cualquier gasto
-  —y "Pagar" del POS— se cae. La imagen vieja con la columna puesta sigue
-  andando: no la conoce y la deja nula.
-- `20261020120000_control_de_stock` — **Aditiva, sin datos.** Stock → Control
-  de stock. Crea el enum `EstadoControlStock`, las tablas `ControlStock` y
-  `ConteoControlStock` (vacías), la columna nula
-  `AuditoriaStock.controlStockId` con su índice y un índice único parcial —un
-  solo control ABIERTO por local—. No toca ninguna fila. Va ANTES de levantar
-  la imagen nueva: la pantalla del control lee las tablas. La imagen vieja con
-  esto puesto sigue andando: no las conoce.
-- `20261020120100_permisos_control_stock_dueno_local` — **De datos, chica.**
-  Agrega `stock.control.gestionar` y `stock.control.contar` a los permisos del
-  rol DUEÑO_LOCAL, concatenando: no saca ninguno ni toca otro rol. **El
-  clasificador la frena** por el UPDATE de `Rol`, igual que
-  `20261017120000_permiso_ventas_ver_dia`; confirmarla es de Emanuel. Correrla
-  dos veces no cambia nada. Puede ir antes o después de la imagen; sin ella el
-  dueño no ve el módulo hasta tildarlos en Roles (el Admin sí, por "*").
-- `20261020180000_permisos_control_stock_encargado` — **De datos, chica.** Lo
-  mismo que la anterior, para el rol ENCARGADO: concatena los dos permisos del
-  Control de stock, no saca ninguno ni toca otro rol. **El clasificador la
-  frena** por el UPDATE de `Rol`; confirmarla es de Emanuel. Idempotente, y
-  puede ir antes o después de la imagen.
-- `20261020200000_control_stock_diferencias` — **Aditiva, sin datos.** El
-  informe de diferencias del Control de stock: la columna nula
-  `ConteoControlStock.sistemaAntes`, la columna nula
-  `ControlStock.diferenciasCongeladasEn` y la tabla `DiferenciaControlStock`,
-  vacía. No toca ninguna fila. Va ANTES de levantar la imagen nueva: guardar un
-  conteo escribe `sistemaAntes` y terminar escribe la tabla. La imagen vieja
-  con esto puesto sigue andando: no las conoce.
-- `20261020210000_control_stock_decision_no_contados` — **Aditiva, sin
-  datos.** Dos columnas nulas en `ControlStock`: `noContadosDecision` (qué se
-  eligió al terminar con lo que nadie contó: ponerlo en 0 o dejarlo como
-  estaba) y `noContadosComoEstaban` (cuántos quedaron como estaban). No toca
-  ninguna fila; los terminados quedan en null, que se lee "se pusieron en 0".
-  Va ANTES de levantar la imagen nueva: terminar las escribe. La imagen vieja
-  con esto puesto sigue andando.
-- `20261022120000_descartar_propuesta_coca_cola_sin_factura` — **De datos,
-  chica, con `DELETE`.** Borra la receta PROPUESTA de Coca-Cola que quedó como
-  "sin factura" en el pedido #259: era una factura cuya letra no se leyó, con
-  IVA, internos y percepciones al pie. Emanuel pidió descartarla, no
-  confirmarla. Solo toca `RecetaPropuestaProveedor`, solo esa fila —proveedor
-  cuyo nombre dice Coca, tipo `SIN_FACTURA`, explicación que nombra
-  percepciones—; ninguna receta confirmada ni la "sin factura" de otro
-  proveedor. Ejercida contra `erpazul_al` con la de Coca-Cola, la A de
-  Coca-Cola y la de Secco: borró solo la primera, y la segunda corrida no
-  encontró nada. Puede ir antes o después de la imagen nueva; con la vieja la
-  propuesta podría volver a armarse si se relee ese papel, la nueva ya no.
-- `20261022180000_control_stock_sistema_al_contar` — **Aditiva, sin datos.**
-  La columna nula `ConteoControlStock.sistemaAlContar`: el stock vivo con que
-  se midió cada conteo. No toca ninguna fila. Va ANTES de levantar la imagen
-  nueva: aceptar un conteo la escribe y el listado del control la lee. La
-  imagen vieja con esto puesto sigue andando: no la conoce. **Después de
-  levantar la imagen, y aparte del despliegue**, los conteos del control
-  abierto escritos antes de la columna se reconstruyen desde la aplicación: en
-  Control de stock, como dueño o admin sin PIN, el panel "El stock no coincide
-  con lo contado" es el modo prueba (dice cuáles corregiría y cuáles no puede,
-  con su motivo) y "Corregir todos" la aplica
-  (`POST /api/stock_locales/control/revision` con `{ "todos": true }`).
-  Idempotente: una segunda vez no ajusta nada. El script
-  `scripts/control-stock-reconstruir.mjs` hace lo mismo contra una copia de
-  desarrollo; en producción no corre, a propósito.
-- `20261022215306_deposito_revision_de_linea` — **Aditiva, sin datos.** La
-  columna nula `PosTransferenciaDetalle.revisadoEn`: cuándo el depósito decidió
-  cada línea de un pedido de local (Pedidos de locales en el celular). No toca
-  ninguna fila; las líneas de antes quedan en null y se leen como hasta hoy. Va
-  ANTES de levantar la imagen nueva: `detalle/editar` la escribe y `enviar`,
-  `solicitados` y el criterio de "empezado" la leen. La imagen vieja con esto
-  puesto sigue andando: no la conoce. El clasificador sale en 0.
-- `20261024000040_lista_producto_que_no_viene` — **Aditiva, sin datos.** La
-  tabla nueva `ProductoQueNoVieneEnLaLista`: el "No viene en esta lista" de la
-  hoja de vincular en la revisión de una lista, por lista y producto. No toca
-  ninguna fila ni ninguna columna existente. Va ANTES de levantar la imagen
-  nueva: el resultado de una lista la lee y `en-la-lista` la escribe; sin
-  ella, abrir una lista da error. La imagen vieja con esto puesto sigue
-  andando: no la conoce.
-- `20261024120000_permiso_turnos_y_cierres` — **De datos, chica.** Agrega
-  `posventas.turnos.ver` a los permisos del rol DUEÑO_LOCAL, concatenando: no
-  saca ninguno ni toca otro rol. **El clasificador la frena** por el UPDATE de
-  `Rol`, igual que `20261020120100_permisos_control_stock_dueno_local`;
-  confirmarla es de Emanuel. Idempotente (ejercida contra `erpazul_al`: la
-  segunda corrida actualiza 0). **Va ANTES de levantar la imagen nueva**: la
-  imagen nueva exige ese permiso para "Turnos y cierres" y "(anterior)", así
-  que sin la migración el dueño deja de verlas hasta tildarlo en Roles (el
-  Admin sí, por "*").
-- `20261024135738_lista_kilos_por_pieza` — **Aditiva, sin datos.** Dos
-  columnas nulas DECIMAL(10,3): `LecturaProductoProveedor.kilosPorPieza` (los
-  kilos de la pieza que contesta una persona en la tarjeta, para un producto
-  que guarda el costo por kilo, GRANIX de Dab) e
-  `ImportacionListaFila.kilosConfirmados` (entre cuántos kilos se dividió el
-  precio en la lectura que se usó). No toca ninguna fila ni `ProductoBase`. Va
-  ANTES de levantar la imagen nueva: el resultado de una lista, revisar,
-  confirmar y aplicar las leen o escriben, y sin ellas abrir una lista da
-  error. La imagen vieja con esto puesto sigue andando: no las conoce.
-- `20261024164309_lista_renglon_que_no_es_el_producto` — **Aditiva, sin
-  datos.** Una tabla nueva, vacía, `RenglonQueNoEsElProducto`: el «No» de
-  "Pueden ser de…" en una lista de proveedor (este renglón, por su código, no
-  es este producto). No toca ninguna fila existente ni `ProductoBase`. Va ANTES
-  de levantar la imagen nueva: «Buscar en el resto de mis productos» la lee y
-  la escribe, y sin ella esa búsqueda da error (el resto de la lista anda). La
-  imagen vieja con esto puesto sigue andando: no la conoce.
+Ninguna.
 
-Producción está en **71 migraciones**, la última
-`20261019120000_operador_sesion_invalidada_en`.
+Producción está en **86 migraciones**, la última
+`20261024164309_lista_renglon_que_no_es_el_producto`.
 
-**De dónde sale el 71.** Lo informó Emanuel en el cierre del despliegue de
-`7b4f742d` (2026-10-19): la base de producción está en 71, al día, sin
-migraciones en ese despliegue. Son las 69 de antes más
-`20261018180000_permisos_proveedores_eliminar_y_listas` y
-`20261019120000_operador_sesion_invalidada_en`, que esta lista tenía
-pendientes. *Sin verificar desde esta sesión*, que es de nube y no ve el VPS.
-Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy` (mismo usuario y
-base que el backup del skill):
+**De dónde sale el 86.** Emanuel informó el 2026-10-24 que el despliegue de
+`77c4646f` aplicó `20261024164309_lista_renglon_que_no_es_el_producto`, la
+última del árbol. `prisma migrate deploy` aplica en orden y no saltea, así que
+con ésa aplicada están aplicadas las 14 que esta lista todavía nombraba —desde
+`20261019180000_usuario_sesion_invalidada_en` hasta
+`20261024135738_lista_kilos_por_pieza`—, que nadie había borrado al
+desplegarlas. *Inferido, sin verificar desde esta sesión*, que es de nube y no
+ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy`
+(mismo usuario y base que el backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `71|20261019120000_operador_sesion_invalidada_en`. Si dice
-otra cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
-descripción de las que salieron está en el `git log` de este archivo.
+que tiene que decir `86|20261024164309_lista_renglon_que_no_es_el_producto`.
+Si dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir.
+La descripción de las que salieron está en el `git log` de este archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261019120000_operador_sesion_invalidada_en`— salieron de acá: la historia de cuándo
+`20261024164309_lista_renglon_que_no_es_el_producto`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los
