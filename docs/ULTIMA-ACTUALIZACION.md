@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 15:19
+**Fecha:** 2026-10-24 16:04
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA), feat: listas — la hoja de «Corregir» deja contestar los kilos o la caja, precargados del nombre (SIN VERIFICAR EN PANTALLA), feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA)
+- feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA), fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA), feat: listas — la hoja de «Corregir» deja contestar los kilos o la caja, precargados del nombre (SIN VERIFICAR EN PANTALLA)
 - Archivos: 2 nuevos, 18 modificados (20 total)
 
 ### transferencias
