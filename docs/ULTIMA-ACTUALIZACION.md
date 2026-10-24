@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 16:56
+**Fecha:** 2026-10-24 18:15
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA), fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA)
+- fix: listas — terminar o cancelar con precios sin aplicar abre una hoja en vez de cerrar directo (SIN VERIFICAR EN PANTALLA), feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA)
 - Archivos: 3 nuevos, 18 modificados (21 total)
 
 ### transferencias
