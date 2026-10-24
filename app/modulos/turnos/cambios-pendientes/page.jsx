@@ -22,6 +22,7 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -66,8 +67,8 @@ export default function CambiosPendientesPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
-  const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
+  // La puerta es la de "Turnos y cierres" (dueño y admin, 2026-10-24).
+  const puedeUsar = puedeVerTurnosYCierres(perfil);
 
   const cargar = useCallback(async () => {
     setError("");

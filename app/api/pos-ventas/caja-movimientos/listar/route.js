@@ -3,10 +3,12 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { identidadParaMirar, puedeVerCaja } from "@/lib/caja/identidadCajaServer";
+import { PERMISO_VER_TURNOS_Y_CIERRES } from "@/lib/turnosYCierres/alcance";
 
 export async function GET(req) {
   try {
-    const perm = requirePerm(req, "pos.usar");
+    // Solo la usa "Turnos y cierres (anterior)": su misma puerta (dueño y admin).
+    const perm = requirePerm(req, PERMISO_VER_TURNOS_Y_CIERRES);
     if (!perm.ok)
       return NextResponse.json(
         { ok: false, error: perm.error },

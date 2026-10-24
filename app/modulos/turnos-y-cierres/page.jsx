@@ -1,7 +1,7 @@
 // app/modulos/turnos-y-cierres/page.jsx
 //
-// TURNOS Y CIERRES: los turnos del período con sus cajas, y para el cajero
-// solo sus cajas. Tiene entrada propia en el menú, así que no registra Volver;
+// TURNOS Y CIERRES: los turnos del período con sus cajas. Desde el 2026-10-24
+// solo para el dueño y el admin (`puedeVerTurnosYCierres`). Tiene entrada propia en el menú, así que no registra Volver;
 // el título del shell sale del ítem del menú.
 //
 // La entrada mira los permisos para no dibujar algo que el servidor va a
@@ -16,7 +16,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import PantallaTurnosYCierres from "@/components/turnos-y-cierres/PantallaTurnosYCierres";
 import { useTurnosYCierres } from "@/components/turnos-y-cierres/useTurnosYCierres";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { PERMISO_CAJERO, PERMISO_CLASIFICAR_PAGOS, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
+import { PERMISO_CLASIFICAR_PAGOS, puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 
 export default function TurnosYCierresPage() {
   return (
@@ -34,8 +34,7 @@ export default function TurnosYCierresPage() {
 
 function TurnosYCierres() {
   const { perfil, cargando } = useUser();
-  const permisos = perfil?.permisos || [];
-  const puede = permisos.includes("*") || [PERMISO_CAJERO, ...PERMISOS_VER_TODO].some((p) => permisos.includes(p));
+  const puede = puedeVerTurnosYCierres(perfil);
 
   if (cargando) return null;
   if (!puede) return <SinPermisos />;

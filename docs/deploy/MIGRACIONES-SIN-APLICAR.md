@@ -119,6 +119,15 @@ Si la lista está vacía, el despliegue es solo de código.
   nueva: el resultado de una lista la lee y `en-la-lista` la escribe; sin
   ella, abrir una lista da error. La imagen vieja con esto puesto sigue
   andando: no la conoce.
+- `20261024120000_permiso_turnos_y_cierres` — **De datos, chica.** Agrega
+  `posventas.turnos.ver` a los permisos del rol DUEÑO_LOCAL, concatenando: no
+  saca ninguno ni toca otro rol. **El clasificador la frena** por el UPDATE de
+  `Rol`, igual que `20261020120100_permisos_control_stock_dueno_local`;
+  confirmarla es de Emanuel. Idempotente (ejercida contra `erpazul_al`: la
+  segunda corrida actualiza 0). **Va ANTES de levantar la imagen nueva**: la
+  imagen nueva exige ese permiso para "Turnos y cierres" y "(anterior)", así
+  que sin la migración el dueño deja de verlas hasta tildarlo en Roles (el
+  Admin sí, por "*").
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

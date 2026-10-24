@@ -37,7 +37,7 @@ import {
 } from "@/lib/finanzas/periodoFinanciero";
 import { primerDiaComercialDelLocal } from "@/lib/finanzas/primerDiaComercialServer";
 import { rangoDeTesoreria } from "@/lib/tesoreria/lecturaTesoreriaServer";
-import { ALCANCE, PERMISO_CAJERO, PERMISOS_VER_TODO, alcanceDeCajas } from "@/lib/turnosYCierres/alcance";
+import { ALCANCE, PERMISO_VER_TURNOS_Y_CIERRES, alcanceDeCajas } from "@/lib/turnosYCierres/alcance";
 import { leerMisCajas, leerTurnosYCierres } from "@/lib/turnosYCierres/lecturaTurnosYCierresServer";
 
 const ERROR_OTRO_SIN_DESPLAZAMIENTO = "Un período elegido con «Otro» no se desplaza: no mandes desplazamiento.";
@@ -47,8 +47,8 @@ export async function GET(req) {
     const session = getUsuarioSession(req);
     if (!session) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
 
-    // Alcanza con uno: el cajero entra con pos.usar y ve solo lo suyo.
-    const perm = checkPerm(session, [PERMISO_CAJERO, ...PERMISOS_VER_TODO]);
+    // La puerta (dueño y admin); qué cajas ve adentro lo decide el alcance.
+    const perm = checkPerm(session, PERMISO_VER_TURNOS_Y_CIERRES);
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const vista = await resolveVistaOperativa(req);

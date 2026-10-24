@@ -5,6 +5,7 @@ import { requirePerm } from "@/lib/authorize";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { estadoDelTurno, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
+import { PERMISO_VER_TURNOS_Y_CIERRES } from "@/lib/turnosYCierres/alcance";
 import {
   construirWhereTurnos,
   normalizarEstado,
@@ -20,7 +21,8 @@ function toPositiveInt(value) {
 
 export async function GET(req) {
   try {
-    const perm = requirePerm(req, "pos.usar");
+    // Solo la usa "Turnos y cierres (anterior)": su misma puerta (dueño y admin).
+    const perm = requirePerm(req, PERMISO_VER_TURNOS_Y_CIERRES);
     if (!perm.ok)
       return NextResponse.json(
         { ok: false, error: perm.error },

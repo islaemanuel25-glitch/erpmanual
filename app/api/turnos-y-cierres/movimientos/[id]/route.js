@@ -17,12 +17,15 @@ import { resolveVistaOperativa } from "@/lib/grupos";
 import { clasificarMovimientos } from "@/lib/finanzas/movimientosDeCaja";
 import { vinculosDeMovimientos } from "@/lib/finanzas/movimientosDeCajaServer";
 import { ETIQUETA_TIPO_EGRESO, esTipoEgreso, sePuedeClasificar } from "@/lib/caja/tipoEgreso";
-import { PERMISO_CLASIFICAR_PAGOS } from "@/lib/turnosYCierres/alcance";
+import { PERMISO_CLASIFICAR_PAGOS, PERMISO_VER_TURNOS_Y_CIERRES } from "@/lib/turnosYCierres/alcance";
 
 export async function PATCH(req, { params }) {
   try {
     const session = getUsuarioSession(req);
     if (!session) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    // Las dos: la puerta del módulo (dueño y admin) y la de clasificar.
+    const puerta = checkPerm(session, PERMISO_VER_TURNOS_Y_CIERRES);
+    if (!puerta.ok) return NextResponse.json({ ok: false, error: puerta.error }, { status: puerta.status });
     const perm = checkPerm(session, PERMISO_CLASIFICAR_PAGOS);
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 

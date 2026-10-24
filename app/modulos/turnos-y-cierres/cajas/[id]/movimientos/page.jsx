@@ -17,7 +17,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import { MovimientosDeCaja } from "@/components/turnos-y-cierres/DetalleDeCaja";
 import { useCajaDeTurnosYCierres } from "@/components/turnos-y-cierres/useCajaDeTurnosYCierres";
-import { PERMISO_CAJERO, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 import { urlDeCaja, urlDelZ } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 export default function MovimientosDeCajaPage() {
@@ -36,8 +36,7 @@ export default function MovimientosDeCajaPage() {
 
 function Movimientos() {
   const { perfil, cargando } = useUser();
-  const permisos = perfil?.permisos || [];
-  const puede = permisos.includes("*") || [PERMISO_CAJERO, ...PERMISOS_VER_TODO].some((p) => permisos.includes(p));
+  const puede = puedeVerTurnosYCierres(perfil);
 
   const params = useParams();
   const qs = useSearchParams().toString();

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
@@ -117,7 +118,8 @@ export default function TurnosPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-  const puedeUsar = esAdmin || permisos.includes("pos.usar");
+  // La puerta es la de "Turnos y cierres" (dueño y admin, 2026-10-24).
+  const puedeUsar = puedeVerTurnosYCierres(perfil);
   const puedeVerTodos = esAdmin || permisos.includes("turnos.ver_todos");
 
   const localId = contexto?.localId ? String(contexto.localId) : "";

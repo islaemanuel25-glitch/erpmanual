@@ -66,6 +66,7 @@ import {
 } from "@/lib/caja/conteoBilletes";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 import { ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import {
   armarBorradorCierre,
@@ -130,6 +131,9 @@ export default function CierrePorTokenPage() {
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
+  // La ficha del turno es de "Turnos y cierres (anterior)": dueño y admin.
+  // Sin eso el botón llevaría a "Sin permisos".
+  const puedeVerFichaDelTurno = puedeVerTurnosYCierres(perfil);
   const storage = typeof window !== "undefined" ? window.localStorage : null;
 
   const cierre = datos?.cierre;
@@ -443,7 +447,7 @@ export default function CierrePorTokenPage() {
             />
           </div>
           <div className="space-y-2">
-            {resultado.turnoId && (
+            {resultado.turnoId && puedeVerFichaDelTurno && (
               <SunmiButton
                 color="amber"
                 onClick={() => router.push(`/modulos/turnos/${resultado.turnoId}`)}

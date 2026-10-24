@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -73,9 +74,8 @@ export default function TurnoDetallePage() {
   const [movMotivo, setMovMotivo] = useState("");
   const [guardandoMov, setGuardandoMov] = useState(false);
 
-  const permisos = perfil?.permisos || [];
-  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-  const puedeUsar = esAdmin || permisos.includes("pos.usar");
+  // La puerta es la de "Turnos y cierres" (dueño y admin, 2026-10-24).
+  const puedeUsar = puedeVerTurnosYCierres(perfil);
 
   const cargarMovimientos = useCallback(async () => {
     if (!turnoId) return;

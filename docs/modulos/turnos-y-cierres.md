@@ -61,7 +61,23 @@ móvil" (A2 364:577, A3 364:674, B 359:523, C 359:605, D 359:2367).
 
 ## Quién ve qué
 
-`reportes.ver`, `tesoreria.ver`, `turnos.ver_todos` (desde 2026-10-13), Admin o
+**La puerta, desde 2026-10-24: `posventas.turnos.ver`.** Decisión de Emanuel:
+el módulo —y también "Turnos y cierres (anterior)"— lo ven solo DUEÑO_LOCAL y
+Admin. Ningún otro rol ni un operador por PIN (se le resta en
+`lib/rbac/permisosDelOperador.js`; el Admin con operador tampoco). Cierra en el
+menú (los dos ítems), en cada pantalla (`puedeVerTurnosYCierres`) y en cada
+ruta: las del módulo y las dos que solo usa el viejo
+(`pos-ventas/turnos/listar`, `pos-ventas/caja-movimientos/listar`). Las demás
+rutas que usa el viejo las comparte con el POS y quedan como estaban. Se lo da
+al dueño existente la migración `20261024120000_permiso_turnos_y_cierres`.
+Candado: `lib/turnosYCierres/puertaTurnosYCierres.test.mjs`. *(verificado en
+código; migración ejercida contra Postgres)*
+
+El módulo viejo no se borró: tiene lo que éste no hace —cambios pendientes de
+cambio entre cajas, ingreso y retiro desde la ficha del turno—. *(verificado en
+código)*
+
+Detrás de la puerta, el alcance de siempre: `reportes.ver`, `tesoreria.ver`, `turnos.ver_todos` (desde 2026-10-13), Admin o
 el dueño (`puedeOperarSinOperador`) ven el local entero. Solo `pos.usar` ve
 únicamente sus cajas (`whereCajaPropia`), hoy y las últimas 30, sin período; la
 de otro operador da 403. *(verificado en código y ejercido)*
