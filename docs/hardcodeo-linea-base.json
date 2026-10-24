@@ -2,13 +2,13 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-22 22:36",
-  "commit": "48998663f4fb84c3c060c29a22c26b8c2afcdc07",
+  "generada": "2026-10-24 00:18",
+  "commit": "8d5e1a69d46cd516b851c832380e0bce4e66321e",
   "total": {
     "color": 273,
-    "medida": 1536,
+    "medida": 1516,
     "modal": 34,
-    "crudo": 267,
+    "crudo": 265,
     "celda": 429,
     "kit-pisado": 0,
     "tema-paralelo": 87
@@ -304,9 +304,9 @@
     },
     "proveedores": {
       "color": 1,
-      "medida": 54,
+      "medida": 34,
       "modal": 0,
-      "crudo": 9,
+      "crudo": 7,
       "celda": 8,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -2309,19 +2309,6 @@
         "text-[22px]": 1,
         "text-[11.5px]": 3,
         "text-[10.5px]": 1
-      }
-    },
-    "components/proveedores/listas/PanelVincular.jsx": {
-      "medida": {
-        "text-[13px]": 2,
-        "text-[11px]": 12,
-        "text-[12.5px]": 2,
-        "max-h-[280px]": 1,
-        "text-[10.5px]": 1,
-        "text-[12px]": 2
-      },
-      "crudo": {
-        "<button>": 2
       }
     },
     "components/reportes-ventas/AccionesTicket.jsx": {
