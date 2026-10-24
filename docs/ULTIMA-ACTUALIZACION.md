@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 02:38
+**Fecha:** 2026-10-24 03:26
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix(listas): la revisión avisa desde dónde se trabaja y vincula en un solo paso, feat(listas): la revisión de una lista con la forma de recibir una transferencia, refactor(listas): borrar las tres rutas que quedaron sin pantalla
+- fix(listas): chip de vinculados y nunca comparar la unidad contra la caja, fix(listas): la revisión avisa desde dónde se trabaja y vincula en un solo paso, feat(listas): la revisión de una lista con la forma de recibir una transferencia
 - Archivos: 16 modificados (16 total)
 
 ### transferencias

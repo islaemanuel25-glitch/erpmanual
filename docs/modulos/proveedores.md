@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 02:38
+**Última actualización:** 2026-10-24 03:26
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: fix(listas): chip de vinculados y nunca comparar la unidad contra la caja
 - 2026-10-24: fix(listas): la revisión avisa desde dónde se trabaja y vincula en un solo paso
 - 2026-10-24: feat(listas): la revisión de una lista con la forma de recibir una transferencia
 - 2026-10-24: refactor(listas): borrar las tres rutas que quedaron sin pantalla
