@@ -95,8 +95,14 @@ test("CERRADA, LA BARRA DE ABAJO DICE CUÁNTOS SE ACTUALIZARON Y TIENE EL «REPO
   // siempre, o antes "Estos productos bajan de precio" si alguno baja.
   assert.match(pie, /color="amber"\s+onClick=\{alAplicar\}/);
   assert.match(p, /const alAplicar = \(\) =>[\s\S]*?: setConfirmando\(true\);/);
-  // Abierta, el reporte va con Terminar y Cancelar, y nada de eso cerrada.
-  assert.match(p, /\{abierta && \(\s*<div className="grid grid-cols-2 gap-2">[\s\S]*?Terminar lista[\s\S]*?Cancelar esta lista[\s\S]*?setViendoReporte\(true\)/);
+  // Sin cerrar, Terminar y Cancelar; nada de eso en una terminada o cancelada.
+  // Desde el 2026-10-24 "sin cerrar" incluye la APLICADA (todo aplicado), que
+  // tiene el reporte en la barra de abajo: el del medio va solo si está abierta.
+  assert.match(p, /const sinCerrar = esImportacionSinCerrar\(cabecera\.estado\);/);
+  assert.match(
+    p,
+    /\{sinCerrar && \(\s*<div className="grid grid-cols-2 gap-2">[\s\S]*?Terminar lista[\s\S]*?Cancelar esta lista[\s\S]*?\{abierta && \(\s*<SunmiButton[\s\S]*?setViendoReporte\(true\)/
+  );
   // Y los dos botones abren la misma hoja.
   assert.match(p, /\{viendoReporte && \(\s*<HojaReporte/);
   // El resumen, con su singular, de la misma función que usa la pantalla.

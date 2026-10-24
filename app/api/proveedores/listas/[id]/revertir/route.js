@@ -90,18 +90,18 @@ async function contexto(req, context) {
     return { error: NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 }) };
   }
 
-  // QUÉ IMPORTACIONES SE PUEDEN DESHACER. Las abiertas y las TERMINADAS: una
-  // lista terminada es justo la que ya escribió cientos de costos, y cerrarla no
-  // puede cerrar también la salida de emergencia. Una CANCELADA no entra —nunca
-  // escribió un costo, el endpoint de cancelar la rechaza si estaba aplicada—,
-  // así que ahí no hay nada que deshacer.
+  // QUÉ IMPORTACIONES SE PUEDEN DESHACER: las que nadie cerró —abiertas y
+  // APLICADA— (`esImportacionRevertible`, 2026-10-24). TERMINADA y CANCELADA
+  // son las cerradas de verdad: terminar es "queda como está", y cancelar ya
+  // deshizo lo aplicado. Esta misma previa es la que muestra "Cancelar la
+  // lista", así que cancelar llega exactamente hasta donde llega deshacer.
   if (!esImportacionRevertible(importacion.estado)) {
     return {
       error: NextResponse.json(
         {
           ok: false,
           error:
-            "Esta importación no se puede deshacer: solo se deshacen las que están en curso o terminadas.",
+            "Esta lista ya está cerrada (terminada o cancelada), así que no se puede deshacer.",
         },
         { status: 409 }
       ),

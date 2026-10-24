@@ -122,7 +122,11 @@ import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
 // dos acciones del control.
 import { MODO_LISTA, textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
-import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+import {
+  esImportacionAbierta,
+  esImportacionRevertible,
+  esImportacionSinCerrar,
+} from "@/lib/proveedores/listas/persistencia";
 
 /** El texto del buscador, como el de la recepción pero sobre lo tuyo. */
 export const PLACEHOLDER_BUSCADOR_LISTA = "Buscar tu producto o código…";
@@ -405,7 +409,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
     } catch {
       // Quedaría la marca en la dirección; no cambia lo que se abre ahora.
     }
-    if (!esImportacionAbierta(datos.cabecera.estado)) return;
+    if (!esImportacionSinCerrar(datos.cabecera.estado)) return;
     abrirTerminar(pendientesDeLaLista(datos));
   }, [terminarAlEntrar, datos]);
 
@@ -978,8 +982,12 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   const costos = cabecera.costos ?? { puedeCambiar: true, ubicacion: null };
   const puedeCambiarCostos = costos.puedeCambiar !== false;
   const abierta = esImportacionAbierta(cabecera.estado);
+  // Nadie la cerró: abierta, o APLICADA (todo aplicado). Se termina y se
+  // cancela; solo TERMINADA y CANCELADA son cerradas de verdad (2026-10-24).
+  const sinCerrar = esImportacionSinCerrar(cabecera.estado);
   const listos = conteo.listos;
-  const puedeDeshacer = cabecera.productosActualizados > 0;
+  // Deshacer, y cancelar deshaciendo: solo lo que nadie cerró y aplicó algo.
+  const puedeDeshacer = esImportacionRevertible(cabecera.estado) && cabecera.productosActualizados > 0;
 
   // ── CERRAR CON ALGO PARA APLICAR, NO DIRECTO (2026-10-24) ───────────────
   // Terminar cerraba sin avisar y 56 precios de Dab se perdieron. Con algo
@@ -1572,7 +1580,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
             {/* Cerrada, el reporte va en la barra fija de abajo; abierta, acá,
                 a lo ancho y con el mismo botón que sus vecinos. Los dos abren
                 la misma hoja. */}
-            {abierta && (
+            {sinCerrar && (
               <div className="grid grid-cols-2 gap-2">
                 <SunmiButton
                   color="slate"
@@ -1590,13 +1598,16 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                 >
                   Cancelar esta lista
                 </SunmiButton>
-                <SunmiButton
-                  color="slate"
-                  onClick={() => setViendoReporte(true)}
-                  className="col-span-2 min-h-toque text-sm3 justify-center"
-                >
-                  {TEXTO_REPORTE}
-                </SunmiButton>
+                {/* Una APLICADA ya tiene el reporte en la barra de abajo. */}
+                {abierta && (
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setViendoReporte(true)}
+                    className="col-span-2 min-h-toque text-sm3 justify-center"
+                  >
+                    {TEXTO_REPORTE}
+                  </SunmiButton>
+                )}
               </div>
             )}
           </>

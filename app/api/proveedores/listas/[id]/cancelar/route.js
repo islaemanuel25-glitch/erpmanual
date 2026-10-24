@@ -49,7 +49,7 @@ import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import {
   ESTADO_IMPORTACION,
   OPCIONES_TX,
-  esImportacionAbierta,
+  esImportacionCancelable,
 } from "@/lib/proveedores/listas/persistencia";
 import {
   difiereDeLaPrevia,
@@ -104,36 +104,27 @@ export async function POST(req, context) {
       });
     }
 
-    // ── SOLO SE CANCELA LO QUE ESTÁ SIN CERRAR ───────────────────────────
+    // ── SOLO SE CANCELA LO QUE NADIE CERRÓ (`esImportacionCancelable`) ────
     //
-    // Abierta —CONCILIADA o PARCIALMENTE_APLICADA— o en BORRADOR, que es la que
-    // quedó a medio leer. Nada más.
+    // Abierta —CONCILIADA o PARCIALMENTE_APLICADA—, APLICADA —todo aplicado,
+    // pero nadie la cerró (2026-10-24)— o en BORRADOR, que es la que quedó a
+    // medio leer. Nada más: TERMINADA y CANCELADA son las cerradas de verdad.
     //
-    // ── POR QUÉ NO ALCANZABA CON RECHAZAR LA APLICADA ────────────────────
+    // ── POR QUÉ IMPORTA QUE UNA TERMINADA NO SE CANCELE ──────────────────
     //
-    // Porque hasta el 2026-09-18 lo único rechazado era APLICADA, así que una
-    // lista TERMINADA se podía cancelar por la API: quedaba con `terminadaEn` Y
-    // `canceladaEn`, o sea terminada y cancelada a la vez. Nada fallaba y el
-    // historial mostraba una de las dos según qué campo mirara cada pantalla.
-    //
-    // No era un agujero teórico: desde esta tanda el botón de cancelar aparece en
-    // el listado, y en el listado conviven las abiertas con las terminadas.
-    //
-    // Y el motivo NO es el mismo para las dos, así que se dicen distinto: una
-    // aplicada tiene costos escritos y llamarla cancelada sería mentir; una
-    // terminada ya la cerró alguien y lo que corresponde es mirarla, no
-    // descartarla.
-    const abierta =
-      esImportacionAbierta(importacion.estado) ||
-      importacion.estado === ESTADO_IMPORTACION.BORRADOR;
-
-    if (!abierta) {
-      const error =
-        importacion.estado === ESTADO_IMPORTACION.APLICADA
-          ? "Esta lista ya se aplicó entera y quedó cerrada. Si querés volver atrás, usá «Deshacer»."
-          : "Esta lista ya está cerrada, así que no hay nada que cancelar.";
+    // Hasta el 2026-09-18 una lista TERMINADA se podía cancelar por la API:
+    // quedaba con `terminadaEn` Y `canceladaEn`, o sea terminada y cancelada a
+    // la vez. Nada fallaba y el historial mostraba una de las dos según qué
+    // campo mirara cada pantalla. Y desde que cancelar deshace, cancelar una
+    // terminada además movería costos que alguien decidió dejar como estaban.
+    if (!esImportacionCancelable(importacion.estado)) {
       return NextResponse.json(
-        { ok: false, error, codigo: "NO_ESTA_ABIERTA", estado: importacion.estado },
+        {
+          ok: false,
+          error: "Esta lista ya está cerrada, así que no hay nada que cancelar.",
+          codigo: "NO_ESTA_ABIERTA",
+          estado: importacion.estado,
+        },
         { status: 409 }
       );
     }
@@ -155,9 +146,7 @@ export async function POST(req, context) {
       // El MISMO predicado que afuera, no una lista de estados escrita otra vez:
       // dos copias de esta regla se separan el día que alguien agregue un estado,
       // y la de adentro de la transacción es la que decide.
-      const sigueAbierta =
-        esImportacionAbierta(actual.estado) || actual.estado === ESTADO_IMPORTACION.BORRADOR;
-      if (!sigueAbierta) return { carrera: true, estado: actual.estado };
+      if (!esImportacionCancelable(actual.estado)) return { carrera: true, estado: actual.estado };
 
       // ── LO APLICADO SE DESHACE, CON LA PREVIA QUE SE VIO ──────────────
       // El plan se arma acá adentro, con datos de esta transacción. Si la

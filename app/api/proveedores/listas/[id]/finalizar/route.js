@@ -23,7 +23,7 @@ import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import {
   ESTADO_IMPORTACION,
-  esImportacionAbierta,
+  esImportacionSinCerrar,
   OPCIONES_TX,
 } from "@/lib/proveedores/listas/persistencia";
 
@@ -57,11 +57,15 @@ export async function POST(req, context) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
     }
 
-    // Idempotente: cerrar algo ya cerrado es la misma intención, no un error.
-    if (importacion.estado === ESTADO_IMPORTACION.APLICADA) {
+    // Idempotente: terminar una terminada es la misma intención, no un error.
+    if (importacion.estado === ESTADO_IMPORTACION.TERMINADA) {
       return NextResponse.json({ ok: true, yaFinalizada: true });
     }
-    if (!esImportacionAbierta(importacion.estado)) {
+    // Se termina lo que nadie cerró: las abiertas y la APLICADA, que es todo
+    // aplicado sin que nadie la cerrara (2026-10-24). Antes la APLICADA se
+    // daba por terminada sin pasar a TERMINADA, y quedaba sin poder cerrarse
+    // ni cancelarse.
+    if (!esImportacionSinCerrar(importacion.estado)) {
       return NextResponse.json(
         { ok: false, error: "Esta importación no está abierta." },
         { status: 409 }
@@ -75,7 +79,7 @@ export async function POST(req, context) {
         where: { id: importacionId },
         select: { estado: true },
       });
-      if (!esImportacionAbierta(actual.estado)) return { carrera: true };
+      if (!esImportacionSinCerrar(actual.estado)) return { carrera: true };
 
       // Las pendientes quedan sin resultado a propósito: nadie decidió sobre
       // ellas, y marcarlas como omitidas diría que se evaluaron.
@@ -100,8 +104,8 @@ export async function POST(req, context) {
         data: {
           // TERMINADA, no APLICADA. Son cosas distintas: aplicada la escribió el
           // motor cuando no quedaba nada pendiente; terminada la cerró una
-          // persona diciendo "con esto alcanza". Y sobre todo, una TERMINADA se
-          // puede revertir — que es la razón de que el estado exista.
+          // persona diciendo "con esto alcanza", y queda como está: desde el
+          // 2026-10-24 una TERMINADA no se cancela ni se deshace.
           estado: ESTADO_IMPORTACION.TERMINADA,
           terminadaEn: new Date(),
           terminadaPorUsuarioId: usuarioId,
