@@ -783,6 +783,19 @@
   border-color: color-mix(in srgb, var(--pos-accent) 70%, transparent);
 }
 
+/* LA OPCIÓN ELEGIDA DE UNA LISTA DE OPCIONES (2026-10-24).
+   El renglón elegido en la hoja de vincular una lista de proveedor solo tenía
+   un borde fino de acento y casi no se distinguía de los demás. Es el fondo
+   tenue de `accent-suave` con el borde ENTERO de acento y de 2 px: no se reusó
+   `accent-suave` porque su borde es el acento al 45 %, y pisarlo con
+   `sunmi-border-accent` no funciona —esa clase está antes en esta hoja y pierde—.
+   Va después de los colores de botón, como sus hermanas, para ganarles. */
+.sunmi-opcion-elegida {
+  background: color-mix(in srgb, var(--pos-accent) 18%, transparent);
+  border: 2px solid var(--pos-accent);
+  color: var(--app-fg);
+}
+
 .sunmi-btn-link-soft {
   background: color-mix(in srgb, var(--pos-link) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--pos-link) 40%, transparent);

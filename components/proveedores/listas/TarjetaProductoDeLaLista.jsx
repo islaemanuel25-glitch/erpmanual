@@ -34,14 +34,34 @@
 // Sin la lista abierta no hay ningún botón: el servidor los rechazaría. En una
 // lista de control no hay «Usar»: controlar no escribe ningún costo. Desde una
 // ubicación que no administra los costos, solo «Vincular» y «No viene».
+//
+// ── DOS PREGUNTAS EN LA TARJETA (Emanuel, 2026-10-24) ─────────────────────
+//
+//   Sin vincular con un renglón parecido (`item.sugerencia`): "¿Es 101 ·
+//   BIZCOCHITOS CAMPEON 300G?" con su precio, «✓ Sí» arriba, «Otro» y «No
+//   viene» abajo. «Otro» abre la hoja de vincular. Nunca vincula sola.
+//
+//   Para revisar sin ninguna lectura porque no se sabe cuántas trae la caja
+//   (`item.preguntarCaja`): "¿Cuántas trae la caja?", un número y «Listo».
+
+import { useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import {
   CLASE_ACCION_CORREGIR,
   CLASE_ACCION_RAPIDA,
   TarjetaDeRevision,
 } from "@/components/revision/PiezasDeRevision";
-import { money, pct } from "@/components/proveedores/listas/PiezasPantallas";
+import {
+  EtiquetaFueraDeRango,
+  money,
+  pct,
+  tonoDelPorcentaje,
+} from "@/components/proveedores/listas/PiezasPantallas";
+
+/** El borde ámbar de una tarjeta fuera de rango. Solo el borde: el fondo no cambia. */
+export const CLASE_TARJETA_FUERA_DE_RANGO = "border-1.5 sunmi-border-warning";
 import { ACCION_USAR, ESTADO_TU_PRODUCTO } from "@/lib/proveedores/listas/tusProductos";
 
 export const TEXTO_USAR = "✓ Usar";
@@ -51,6 +71,15 @@ export const TEXTO_CORREGIR = "Corregir";
 export const ROTULO_EN_LA_LISTA = "En la lista:";
 export const TEXTO_NO_ESTA = "no está";
 export const MARCA_VINCULADO = "✓";
+export const TEXTO_SI = "✓ Sí";
+export const TEXTO_OTRO = "Otro";
+export const TEXTO_PREGUNTA_CAJA = "¿Cuántas trae la caja?";
+export const TEXTO_LISTO = "Listo";
+
+/** "¿Es 101 · BIZCOCHITOS CAMPEON 300G?" */
+export function preguntaDeLaSugerencia(sugerencia) {
+  return `¿Es ${[sugerencia?.codigo, sugerencia?.descripcion].filter(Boolean).join(" · ")}?`;
+}
 
 /**
  * @param item        uno de `tusProductosDeLaLista().items`
@@ -72,17 +101,30 @@ export default function TarjetaProductoDeLaLista({
   onVincular,
   onNoViene,
   onCorregir,
+  // «✓ Sí» sobre el renglón sugerido, y «Listo» con cuántas trae la caja.
+  onSi,
+  onCaja,
 }) {
   const { estado } = item;
   const sinRenglon = estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR || estado === ESTADO_TU_PRODUCTO.NO_VIENE;
   const revisar = estado === ESTADO_TU_PRODUCTO.REVISAR;
   const cambia = estado === ESTADO_TU_PRODUCTO.CAMBIA;
+  const sugerencia = abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR ? item.sugerencia ?? null : null;
+  const preguntarCaja = abierta && !controlando && puedeCambiarCostos && item.preguntarCaja === true;
+  const [cantidadCaja, setCantidadCaja] = useState("");
 
   // ── DEBAJO DEL NOMBRE: QUÉ RENGLÓN LE TOCÓ, Y LA CUENTA ──────────────────
   const debajo = (
     <>
       <p className="text-xs sunmi-text-muted">{ROTULO_EN_LA_LISTA}</p>
-      {item.renglon ? (
+      {sugerencia ? (
+        <>
+          <p className="text-sm2 sunmi-text-strong break-words">{preguntaDeLaSugerencia(sugerencia)}</p>
+          <p className="text-xs sunmi-text-muted tabular-nums break-words">
+            {`${money(sugerencia.precio)} · hoy ${money(item.costoHoy)}`}
+          </p>
+        </>
+      ) : item.renglon ? (
         // El ✓ dice que el vínculo está hecho: sin él, una tarjeta vinculada y
         // sin costo nuevo no se distinguía de una colgada (ALFAJOR FULBITO,
         // 2026-10-24).
@@ -95,13 +137,19 @@ export default function TarjetaProductoDeLaLista({
       ) : (
         <p className="text-sm2 sunmi-text-warning">{TEXTO_NO_ESTA}</p>
       )}
-      <p className="text-xs sunmi-text-muted tabular-nums break-words">{cuentaDe(item)}</p>
+      {!sugerencia && <p className="text-xs sunmi-text-muted tabular-nums break-words">{cuentaDe(item)}</p>}
     </>
   );
 
   // ── ARRIBA A LA DERECHA: EL CASO FELIZ ───────────────────────────────────
   let accionArriba = null;
-  if (abierta && sinRenglon) {
+  if (sugerencia) {
+    accionArriba = (
+      <SunmiButton onClick={() => onSi?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+        {TEXTO_SI}
+      </SunmiButton>
+    );
+  } else if (abierta && sinRenglon) {
     accionArriba = (
       <SunmiButton onClick={() => onVincular?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
         {TEXTO_VINCULAR}
@@ -125,7 +173,19 @@ export default function TarjetaProductoDeLaLista({
 
   // ── ABAJO A LA IZQUIERDA: LO DEMÁS ──────────────────────────────────────
   let accionAbajo = null;
-  if (abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR) {
+  if (sugerencia) {
+    // «Otro» es la hoja de vincular de siempre, con todos los renglones.
+    accionAbajo = (
+      <span className="flex flex-wrap gap-2">
+        <SunmiButton onClick={() => onVincular?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
+          {TEXTO_OTRO}
+        </SunmiButton>
+        <SunmiButton onClick={() => onNoViene?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
+          {TEXTO_NO_VIENE}
+        </SunmiButton>
+      </span>
+    );
+  } else if (abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR) {
     accionAbajo = (
       <SunmiButton onClick={() => onNoViene?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
         {TEXTO_NO_VIENE}
@@ -143,16 +203,23 @@ export default function TarjetaProductoDeLaLista({
   }
 
   // ── ABAJO A LA DERECHA: EL COSTO NUEVO Y EL PORCENTAJE ───────────────────
-  // Verde adentro del rango del proveedor, ámbar afuera. Sin costo nuevo, una
-  // raya: un renglón que todavía no se sabe cómo leer no tiene número.
-  const tonoPct = item.enRango === true ? "sunmi-text-success" : item.enRango === false ? "sunmi-text-warning" : "sunmi-text-muted";
+  // El color del % dice SOLO para dónde va —verde sube, rojo baja, gris igual—
+  // (`tonoDelPorcentaje`); fuera de rango se marca aparte, con la etiqueta a la
+  // izquierda del % y el borde ámbar de la tarjeta (Emanuel, 2026-10-24: un
+  // +14,3 % en ámbar se leía como una baja). Sin costo nuevo, una raya.
+  const fueraDeRango = item.enRango === false;
   const alPie = (
     <span className="shrink-0 text-right">
       <span className="block whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
         {item.costoNuevo === null || item.costoNuevo === undefined ? "—" : money(item.costoNuevo)}
       </span>
       {item.costoNuevo !== null && item.costoNuevo !== undefined && item.variacionPct !== null && item.variacionPct !== undefined && (
-        <span className={`block text-sm2 font-semibold tabular-nums ${tonoPct}`}>{pct(item.variacionPct)}</span>
+        <span className="flex items-center justify-end gap-1.5">
+          {fueraDeRango && <EtiquetaFueraDeRango />}
+          <span className={`text-sm2 font-semibold tabular-nums ${tonoDelPorcentaje(item.variacionPct)}`}>
+            {pct(item.variacionPct)}
+          </span>
+        </span>
       )}
     </span>
   );
@@ -160,6 +227,34 @@ export default function TarjetaProductoDeLaLista({
   const avisos = (
     <>
       {revisar && item.motivoTexto && <p className="text-sm2 sunmi-text-warning">{item.motivoTexto}</p>}
+      {preguntarCaja && (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const n = Number(cantidadCaja);
+            if (Number.isInteger(n) && n >= 2) onCaja?.(item, n);
+          }}
+        >
+          <label className="text-sm2 sunmi-text-strong flex-1" htmlFor={`caja-${item.productoBaseId}`}>
+            {TEXTO_PREGUNTA_CAJA}
+          </label>
+          <SunmiInput
+            id={`caja-${item.productoBaseId}`}
+            type="number"
+            inputMode="numeric"
+            min={2}
+            step={1}
+            value={cantidadCaja}
+            onChange={(e) => setCantidadCaja(e.target.value)}
+            disabled={trabajando}
+            className="w-20 text-right tabular-nums"
+          />
+          <SunmiButton type="submit" disabled={trabajando || !(Number(cantidadCaja) >= 2)} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+            {TEXTO_LISTO}
+          </SunmiButton>
+        </form>
+      )}
       {error && (
         <p className="text-sm2 sunmi-text-danger" aria-live="polite">
           {error}
@@ -171,6 +266,8 @@ export default function TarjetaProductoDeLaLista({
   return (
     <TarjetaDeRevision
       nombre={item.nombre}
+      // Fuera de rango, el borde de la tarjeta en ámbar: se ve barriendo la lista.
+      tono={fueraDeRango ? CLASE_TARJETA_FUERA_DE_RANGO : ""}
       debajo={debajo}
       accionArriba={accionArriba}
       avisos={avisos}

@@ -33,7 +33,8 @@ import { requirePerm } from "@/lib/authorize";
 import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision, MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
-import { CAMPOS_PRODUCTO_PARA_LEER, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
+import { CAMPOS_PRODUCTO_PARA_LEER, lecturaElegida, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
+import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
 import { ordenDeLaCola, posicionActual } from "@/lib/proveedores/listas/colaDeRevision";
 import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
 
@@ -202,9 +203,16 @@ export async function GET(req, context) {
     // Con la ubicación activa, para que la hoja diga ANTES de tocar si desde acá
     // se puede usar una lectura: `confirmar` hace la misma pregunta, y antes la
     // respuesta llegaba recién después de elegir (Emanuel, 2026-10-24).
+    // Con la caja recordada: si alguien ya dijo cuántas trae, la hoja ofrece esa
+    // lectura igual que la tarjeta.
+    const cajas = await cargarLecturasRecordadas(prisma, {
+      grupoId,
+      proveedorId: cab.proveedor?.id,
+      productoBaseIds: [fila.productoBaseId],
+    });
     const { lecturas, confirmable, porQueNo } = lecturasDeLaFila({
       fila,
-      producto: fila.productoBase,
+      producto: conLaCajaRecordada(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
       rango,
       operandoEnLocalId: Number(scope.localId),
@@ -232,7 +240,13 @@ export async function GET(req, context) {
       costoAnterior: costoDeHoy,
       precioLista: numero(fila.precioConIva),
       motivo: motivoDeRevision(fila, rango),
-      lecturas,
+      // La marcada en la hoja es la MISMA que la tarjeta eligió y que «✓ Usar»
+      // acepta (`lecturaElegida`): si la hoja marcara otra, la pantalla diría
+      // dos cosas sobre el mismo renglón.
+      lecturas: (() => {
+        const elegida = lecturaElegida({ lecturas, fila });
+        return lecturas.map((l) => ({ ...l, elegida: l.clave === elegida?.clave }));
+      })(),
       // ── CON QUÉ RENGLÓN DE LA LISTA SE LO EMPAREJÓ ────────────────────
       //
       // Es el dato que faltaba para poder desconfiar. El caso: el producto

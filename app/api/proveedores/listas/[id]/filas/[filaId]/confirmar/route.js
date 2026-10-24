@@ -45,6 +45,7 @@ import {
   CANTIDAD_MAX,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { porQueNoSeConfirma, TEXTO_COMBO, TEXTO_SIN_PROPIEDAD_DEL_COSTO } from "@/lib/proveedores/listas/porQueNoSeConfirma";
+import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
 
 /**
  * El rango con el que se evalúa esta importación.
@@ -135,16 +136,25 @@ export async function POST(req, context) {
     }
 
     // El producto VIVO, con el filtro de alcance del grupo.
-    const base = await prisma.productoBase.findFirst({
+    const productoVivo = await prisma.productoBase.findFirst({
       where: { id: fila.productoBaseId, grupoId },
       select: {
         id: true, nombre: true, precio_costo: true, unidad_medida: true, factor_pack: true,
         modoCompraProveedor: true, pesoReferenciaKg: true, creadoEnLocalId: true, es_combo: true,
       },
     });
-    if (!base) {
+    if (!productoVivo) {
       return NextResponse.json({ ok: false, error: "El producto ya no existe." }, { status: 404 });
     }
+    // Con la caja que dijo una persona, si la hay (`cajaRecordada.js`): es lo
+    // que hace que «Usar» sobre "$ 800,45 × 24" encuentre esa lectura entre las
+    // que este endpoint acepta. Es la misma que verá aplicar.
+    const cajas = await cargarLecturasRecordadas(prisma, {
+      grupoId,
+      proveedorId: importacion.proveedor?.id,
+      productoBaseIds: [productoVivo.id],
+    });
+    const base = conLaCajaRecordada(productoVivo, cajas.get(productoVivo.id));
     if (esComboBase(base)) {
       return NextResponse.json(
         { ok: false, error: TEXTO_COMBO },

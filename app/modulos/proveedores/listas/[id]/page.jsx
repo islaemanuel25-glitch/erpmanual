@@ -38,6 +38,8 @@ import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import SunmiBarraDeProgreso from "@/components/sunmi/SunmiBarraDeProgreso";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { elegirUbicacionActiva, nombreDeUbicacion } from "@/lib/ubicacionActiva";
 
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
@@ -98,6 +100,12 @@ import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 /** El texto del buscador, como el de la recepción pero sobre lo tuyo. */
 export const PLACEHOLDER_BUSCADOR_LISTA = "Buscar tu producto o código…";
 
+/** El aviso de abajo después de resolver una tarjeta: "Listo: <producto> · Deshacer". */
+export const TEXTO_HECHO = "Listo:";
+export const TEXTO_DESHACER = "Deshacer";
+/** Unos segundos: lo que tarda en leerse y en tocar «Deshacer» si hizo falta. */
+export const DURACION_AVISO_HECHO_MS = 6000;
+
 export default function ResultadoDeListaPage() {
   const router = useRouter();
   const params = useParams();
@@ -131,12 +139,14 @@ export default function ResultadoDeListaPage() {
   // ── LA LISTA DE TUS PRODUCTOS ──────────────────────────────────────────
   //
   // `filtro` arranca en null y se elige con el primer resultado: el primer
-  // chip que tenga algo. `fijados` son los productos que se tocaron con este
-  // chip puesto: siguen a la vista aunque su estado nuevo ya no sea el del chip,
-  // para que la tarjeta cambie EN EL LUGAR y no desaparezca debajo del dedo.
+  // chip que tenga algo. La tarjeta resuelta SE VA del chip (Emanuel,
+  // 2026-10-24): lo que la reemplaza a la vista es el aviso de abajo, `hecho`
+  // —"Listo: <producto> · Deshacer"—, con el pedido que vuelve atrás.
   const [filtro, setFiltro] = useState(null);
   const [buscar, setBuscar] = useState("");
-  const [fijados, setFijados] = useState(() => new Set());
+  /** `{ nombre, deshacer: { url, cuerpo } | null, vez }` o null. */
+  const [hecho, setHecho] = useState(null);
+  const [volviendoAtras, setVolviendoAtras] = useState(false);
   /** El producto que se está vinculando: `{ productoBaseId, nombre }` o null. */
   const [vinculando, setVinculando] = useState(null);
   /** «No es este producto», desde la hoja de revisar: `{ fila, productoBaseId }`. */
@@ -202,6 +212,7 @@ export default function ResultadoDeListaPage() {
       // El chip con el que arranca: el primero que tenga algo. Solo la primera
       // vez —después manda el que eligió la persona—.
       setFiltro((f) => f ?? filtroInicial(json?.tusProductos?.conteo));
+      return json;
     } catch {
       const texto = "No se pudo conectar con el servidor. Probá de nuevo.";
       if (silencioso) setAviso({ tono: "danger", texto });
@@ -211,17 +222,63 @@ export default function ResultadoDeListaPage() {
     }
   }, [id]);
 
-  /** Cambiar de chip suelta las tarjetas fijadas: ya no hay "en el lugar". */
-  const elegirFiltro = (f) => {
-    setFiltro(f);
-    setFijados(new Set());
+  /**
+   * LO QUE SE ACABA DE RESOLVER: se relee la lista y se avisa abajo.
+   *
+   * La tarjeta que dejó de ser del chip ya no está (`seVe`), y los chips y la
+   * barra salen de la relectura. `deshacer` es el pedido que vuelve atrás esa
+   * acción, o null si no hay uno.
+   */
+  const despuesDeResolver = async (nombre, deshacer) => {
+    await cargar({ silencioso: true });
+    setHecho({ nombre, deshacer, vez: Date.now() });
   };
 
-  /** Lo que se tocó en una hoja se queda a la vista, y la lista se relee. */
-  const despuesDeTocar = async (productoBaseId) => {
-    setFijados((prev) => new Set(prev).add(productoBaseId));
-    await cargar({ silencioso: true });
+  // El aviso dura unos segundos; uno nuevo reinicia la cuenta.
+  useEffect(() => {
+    if (!hecho) return undefined;
+    const reloj = setTimeout(() => setHecho(null), DURACION_AVISO_HECHO_MS);
+    return () => clearTimeout(reloj);
+  }, [hecho]);
+
+  /** «Deshacer»: manda el pedido inverso y relee. Si falla, se dice arriba. */
+  const volverAtras = async () => {
+    const d = hecho?.deshacer;
+    if (!d) return;
+    setVolviendoAtras(true);
+    try {
+      const r = await fetch(d.url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(d.cuerpo),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: `${j?.error || "No se pudo deshacer."} Quedó como estaba.` });
+      }
+      setHecho(null);
+      await cargar({ silencioso: true });
+    } catch {
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor para deshacer. Quedó como estaba." });
+    } finally {
+      setVolviendoAtras(false);
+    }
   };
+
+  /** Deshacer un vínculo hecho en esta lista: la fila vuelve a no ser de nadie. */
+  const deshacerVinculo = (filaId) =>
+    filaId ? { url: `/api/proveedores/listas/${id}/filas/${filaId}/otra-fila`, cuerpo: { noEstaEnLaLista: true } } : null;
+
+  /** Deshacer «No viene»: el producto vuelve a «Sin vincular». */
+  const deshacerNoViene = (productoBaseId) => ({
+    url: `/api/proveedores/listas/${id}/productos/${productoBaseId}/en-la-lista`,
+    cuerpo: { noViene: false },
+  });
+
+  /** Lo que devolvió la hoja de vincular, deshecho: un vínculo o un «No viene». */
+  const deshacerDeLaHoja = (j, productoBaseId) =>
+    j?.accion === "NO_VIENE" ? deshacerNoViene(productoBaseId) : deshacerVinculo(j?.filaId ?? null);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
@@ -231,10 +288,12 @@ export default function ResultadoDeListaPage() {
   /**
    * UN PEDIDO DESDE LA TARJETA, con el error pegado a ella.
    *
-   * Si sale bien, la tarjeta queda fijada y la lista se relee sin el cargador:
-   * el estado nuevo lo dice el servidor, no esta pantalla.
+   * Si sale bien, la lista se relee sin el cargador —el estado nuevo lo dice el
+   * servidor, no esta pantalla— y abajo aparece el aviso con «Deshacer».
+   * `deshacer` es el pedido inverso, o una función que lo arma con la respuesta.
+   * Devuelve la respuesta, o null si no salió.
    */
-  const pedirDesdeLaTarjeta = async (item, url, cuerpo, textoSiFalla) => {
+  const pedirDesdeLaTarjeta = async (item, url, cuerpo, textoSiFalla, deshacer = null) => {
     const pid = item.productoBaseId;
     setTocando(pid);
     setErrores((prev) => {
@@ -252,13 +311,15 @@ export default function ResultadoDeListaPage() {
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
         setErrores((prev) => new Map(prev).set(pid, `${j?.error || textoSiFalla} No se guardó nada.`));
-        return;
+        return null;
       }
-      await despuesDeTocar(pid);
+      await despuesDeResolver(item.nombre, typeof deshacer === "function" ? deshacer(j) : deshacer);
+      return j;
     } catch {
       setErrores((prev) =>
         new Map(prev).set(pid, "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.")
       );
+      return null;
     } finally {
       setTocando(null);
     }
@@ -280,20 +341,68 @@ export default function ResultadoDeListaPage() {
         setPreguntaFuera(item);
         return;
       }
+      // Deshacer una confirmada es destildarla: vuelve a «Para revisar».
       return pedirDesdeLaTarjeta(
         item,
         `/api/proveedores/listas/${id}/filas/${item.filaId}/confirmar`,
         { clave: u.clave, aceptarFueraDeRango },
-        "El servidor no pudo guardar este precio y no dijo por qué."
+        "El servidor no pudo guardar este precio y no dijo por qué.",
+        { url: `/api/proveedores/listas/${id}/seleccion`, cuerpo: { accion: ACCION_USAR.DESMARCAR, ids: [item.filaId] } }
       );
     }
+    // Tildar y destildar se deshacen uno con el otro.
+    const inversa = u.accion === ACCION_USAR.MARCAR ? ACCION_USAR.DESMARCAR : ACCION_USAR.MARCAR;
     return pedirDesdeLaTarjeta(
       item,
       `/api/proveedores/listas/${id}/seleccion`,
       { accion: u.accion, ids: [item.filaId] },
-      "El servidor no pudo cambiarlo y no dijo por qué."
+      "El servidor no pudo cambiarlo y no dijo por qué.",
+      { url: `/api/proveedores/listas/${id}/seleccion`, cuerpo: { accion: inversa, ids: [item.filaId] } }
     );
   };
+
+  /**
+   * «✓ SÍ»: VINCULA CON EL RENGLÓN QUE LA TARJETA SUGIERE (Emanuel, 2026-10-24).
+   *
+   * El mismo pedido que la hoja de vincular hace al elegir un renglón, y el mismo
+   * paso después: si hay una sola lectura en rango se toma sola, si no se abre
+   * la decisión (`tomarLaUnica`). Desde una ubicación sin los costos, solo
+   * vincula, como la hoja.
+   */
+  const si = async (item) => {
+    const s = item.sugerencia;
+    if (!s) return;
+    const j = await pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
+      { filaElegidaId: s.id },
+      "El servidor no pudo vincularlo y no dijo por qué.",
+      (r) => deshacerVinculo(r?.filaId ?? s.id)
+    );
+    if (j?.filaId && puedeCambiarCostosAhora()) {
+      setRevisando({ filaId: j.filaId, productoBaseId: item.productoBaseId, tomarLaUnica: true });
+    }
+  };
+
+  /**
+   * «LISTO» CON CUÁNTAS TRAE LA CAJA: se guarda como lectura recordada de este
+   * producto con este proveedor —no en la ficha— y la tarjeta se relee con su
+   * cuenta. Deshacer vuelve a poner la recordada que había antes.
+   */
+  const caja = (item, cantidad) =>
+    pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/caja`,
+      { cantidad },
+      "El servidor no pudo guardar cuántas trae la caja y no dijo por qué.",
+      (r) => ({
+        url: `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/caja`,
+        cuerpo: { restaurar: r?.anterior ?? null },
+      })
+    );
+
+  /** El mismo criterio que el resto de la pantalla (`costos.puedeCambiar`). */
+  const puedeCambiarCostosAhora = () => (datos?.cabecera?.costos?.puedeCambiar ?? true) !== false;
 
   /**
    * «Ir a Depósito: depo»: cambia la ubicación activa y vuelve a ESTA lista.
@@ -323,7 +432,8 @@ export default function ResultadoDeListaPage() {
       item,
       `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
       { noViene: true },
-      "El servidor no pudo guardarlo y no dijo por qué."
+      "El servidor no pudo guardarlo y no dijo por qué.",
+      deshacerNoViene(item.productoBaseId)
     );
 
   /**
@@ -702,7 +812,26 @@ export default function ResultadoDeListaPage() {
   // Sin «Todos»: si todavía no se eligió, el mismo con el que arranca. Y con
   // texto en el buscador, `seVe` busca en todos sin mirar el chip.
   const filtroActivo = filtro ?? filtroInicial(tusProductos.conteo);
-  const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar, fijados }));
+  const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar }));
+  // "X de 158 listos": ni «Sin vincular» ni «Para revisar» (`tusProductos.js`).
+  const listosDeLaRevision = tusProductos.conteo.listosDeLaRevision ?? 0;
+
+  // ── EL AVISO DE ABAJO: "Listo: <producto> · Deshacer" ───────────────────
+  // Va en la barra fija, arriba de «Aplicar»; sin barra (un control, o desde
+  // una ubicación sin los costos), es la barra él solo.
+  const avisoHecho = hecho ? (
+    <div className="flex items-center justify-between gap-3" role="status" aria-live="polite">
+      <span className="min-w-0 text-sm2 sunmi-text-strong truncate">
+        {TEXTO_HECHO} {hecho.nombre}
+        {hecho.deshacer ? " ·" : ""}
+      </span>
+      {hecho.deshacer && (
+        <SunmiLinkButton onClick={volverAtras} disabled={volviendoAtras} className="shrink-0 text-sm2">
+          {volviendoAtras ? "Deshaciendo…" : TEXTO_DESHACER}
+        </SunmiLinkButton>
+      )}
+    </div>
+  ) : null;
 
   // Los avisos que existen hoy, en el lugar de los caminos de excepción: entre
   // los filtros y la lista, como el "no figura" de la recepción. Se arman como
@@ -975,6 +1104,20 @@ export default function ResultadoDeListaPage() {
                 {sinVincular > 0 ? `${sinVincular} sin vincular` : "Nada sin vincular"}
               </span>
             </div>
+            {/* ── 2 · CUÁNTO FALTA, COMO "0 / 14 REVISADOS" ──────────────
+                Listo es lo que no está ni en «Sin vincular» ni en «Para
+                revisar». Avanza a medida que las tarjetas se resuelven. */}
+            <p className="text-sm2 sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong font-semibold">
+                {listosDeLaRevision} de {tusProductos.conteo.total}
+              </span>{" "}
+              listos
+            </p>
+            <SunmiBarraDeProgreso
+              hechos={listosDeLaRevision}
+              total={tusProductos.conteo.total}
+              etiqueta={`${listosDeLaRevision} de ${tusProductos.conteo.total} listos`}
+            />
           </>
         }
         buscador={
@@ -994,7 +1137,7 @@ export default function ResultadoDeListaPage() {
               cantidad: cantidadDelFiltro(f, tusProductos.conteo),
             }))}
             valor={filtroActivo}
-            onCambiar={elegirFiltro}
+            onCambiar={setFiltro}
             ariaLabel="Filtrar tus productos por estado"
           />
         }
@@ -1017,6 +1160,8 @@ export default function ResultadoDeListaPage() {
                 onNoViene={noViene}
                 onVincular={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre })}
                 onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+                onSi={si}
+                onCaja={caja}
               />
             ))}
             {visibles.length === 0 && (
@@ -1114,6 +1259,8 @@ export default function ResultadoDeListaPage() {
             en una lista cerrada tampoco: sin barra. */
         pieDePantalla={
           !controlando && abierta && puedeCambiarCostos ? (
+            <div className="space-y-2">
+            {avisoHecho}
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0">
                 <span className="block text-sm2 sunmi-text-muted">Para aplicar</span>
@@ -1130,7 +1277,10 @@ export default function ResultadoDeListaPage() {
                 {aplicando ? "Aplicando…" : "✓ Aplicar"}
               </SunmiButton>
             </div>
-          ) : null
+            </div>
+          ) : (
+            avisoHecho
+          )
         }
         despuesDelPie={
           <>
@@ -1212,9 +1362,8 @@ export default function ResultadoDeListaPage() {
             )}
 
             {/* ── VINCULAR CON LA LISTA ─────────────────────────────────────
-                Al guardar, la hoja se cierra y la tarjeta cambia en el lugar:
-                se relee sin el cargador y queda fijada aunque su estado nuevo ya
-                no sea el del chip puesto. */}
+                Al guardar, la hoja se cierra, la lista se relee sin el
+                cargador y abajo queda el aviso con «Deshacer». */}
             {vinculando && (
               <HojaVincularConLaLista
                 endpoint={`/api/proveedores/listas/${id}/productos/${vinculando.productoBaseId}/en-la-lista`}
@@ -1232,13 +1381,13 @@ export default function ResultadoDeListaPage() {
                   setVinculando(null);
                   setEligiendoOtra({ fila, productoBaseId });
                   // El vínculo ya quedó guardado: la tarjeta se relee igual.
-                  await despuesDeTocar(productoBaseId);
+                  await cargar({ silencioso: true });
                 }}
                 onCerrar={() => setVinculando(null)}
-                onListo={async () => {
-                  const productoBaseId = vinculando.productoBaseId;
+                onListo={async (j) => {
+                  const { productoBaseId, nombre } = vinculando;
                   setVinculando(null);
-                  await despuesDeTocar(productoBaseId);
+                  await despuesDeResolver(nombre, deshacerDeLaHoja(j, productoBaseId));
                 }}
               />
             )}
@@ -1261,9 +1410,8 @@ export default function ResultadoDeListaPage() {
                 onNoEsEste={(fila) => setEligiendoOtra({ fila, productoBaseId: eligiendoOtra.productoBaseId, vez: Date.now() })}
                 onCerrar={() => setEligiendoOtra(null)}
                 onListo={async () => {
-                  const productoBaseId = eligiendoOtra.productoBaseId;
                   setEligiendoOtra(null);
-                  await despuesDeTocar(productoBaseId);
+                  await cargar({ silencioso: true });
                 }}
               />
             )}
@@ -1274,6 +1422,9 @@ export default function ResultadoDeListaPage() {
               <HojaRevisarPrecio
                 importacionId={id}
                 filaId={revisando.filaId}
+                // Recién vinculado con «✓ Sí»: el paso que sigue a la hoja de
+                // vincular, con la única lectura en rango tomada sola.
+                tomarLaUnica={revisando.tomarLaUnica === true}
                 onCerrar={() => setRevisando(null)}
                 onNoEsEste={(fila) => {
                   const productoBaseId = revisando.productoBaseId;
@@ -1281,9 +1432,8 @@ export default function ResultadoDeListaPage() {
                   setEligiendoOtra({ fila, productoBaseId });
                 }}
                 onListo={async () => {
-                  const productoBaseId = revisando.productoBaseId;
                   setRevisando(null);
-                  await despuesDeTocar(productoBaseId);
+                  await cargar({ silencioso: true });
                 }}
               />
             )}

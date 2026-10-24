@@ -28,7 +28,17 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import { Aviso, AvisoCostoRedondo, money, pct } from "@/components/proveedores/listas/PiezasPantallas";
+import {
+  Aviso,
+  AvisoCostoRedondo,
+  CLASE_OPCION,
+  CLASE_OPCION_ELEGIDA,
+  EtiquetaFueraDeRango,
+  MarcaDeElegida,
+  money,
+  pct,
+  tonoDelPorcentaje,
+} from "@/components/proveedores/listas/PiezasPantallas";
 // EL RANGO DICHO EN PALABRAS, y vacío cuando no hay ninguno. Vive con el modo
 // porque lo que decide es qué significa un 0 a 0.
 import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
@@ -50,8 +60,10 @@ const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
  * @param onListo        al guardar: `(mensaje)`; la pantalla recarga y cierra
  * @param onNoEsEste     «No es este producto»: `(fila)`, para elegir otro renglón
  * @param onCerrar       cerrar sin decidir
+ * @param tomarLaUnica   recién vinculado con «✓ Sí» en la tarjeta: el mismo paso
+ *                       que sigue a la hoja de vincular (`DecisionDeLectura`)
  */
-export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNoEsEste, onCerrar }) {
+export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNoEsEste, onCerrar, tomarLaUnica = false }) {
   const [titulo, setTitulo] = useState("Revisar");
   const [trabajando, setTrabajando] = useState(false);
   return (
@@ -67,6 +79,7 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
       <DecisionDeLectura
         importacionId={importacionId}
         filaId={filaId}
+        tomarLaUnica={tomarLaUnica}
         onListo={onListo}
         onNoEsEste={onNoEsEste}
         onTitulo={setTitulo}
@@ -479,31 +492,45 @@ export function DecisionDeLectura({
  * verificar contra el papel que el proveedor mandó.
  */
 function TarjetaDeLectura({ lectura, trabajando, onElegir, rechazada = false }) {
-  // El rechazo manda sobre el tono normal: mientras esté, lo que hay que ver es
-  // que ESTA lectura es la que el servidor no aceptó, no si era la recomendada.
-  const tono = rechazada
-    ? "sunmi-state-danger"
-    : lectura.recomendada
-      ? "sunmi-state-success"
-      : lectura.absurda
-        ? "sunmi-state-danger"
-        : lectura.fueraDeRango
-          ? "sunmi-state-warning"
-          : "";
+  // ── LA MARCADA SE VE COMO LA ELEGIDA DE LA HOJA DE VINCULAR (2026-10-24) ──
+  //
+  // Fondo de acento suave, borde de 2 px y el ✓ en un círculo; las demás, la
+  // superficie de siempre. La marcada es la que el servidor eligió para la
+  // tarjeta (`elegida`, de `lecturaElegida`): la misma que «✓ Usar» acepta.
+  //
+  // El rechazo y la absurda mandan sobre eso, en rojo: mientras esté el
+  // rechazo, lo que hay que ver es que ESTA es la que el servidor no aceptó.
+  // Fuera de rango ya no pinta el fondo de ámbar: lleva la etiqueta al lado del
+  // porcentaje y el borde ámbar, como la tarjeta de la lista.
+  const marcada = (lectura.elegida ?? lectura.recomendada) === true && !rechazada;
+  const tono = rechazada || lectura.absurda
+    ? `${CLASE_OPCION} sunmi-state-danger`
+    : marcada
+      ? CLASE_OPCION_ELEGIDA
+      : lectura.fueraDeRango
+        ? "border-1.5 sunmi-border-warning sunmi-card-surface"
+        : CLASE_OPCION;
   return (
     <SunmiButton
       color="ghost"
+      aria-pressed={marcada}
       onClick={onElegir}
       disabled={trabajando}
-      className={`w-full text-left block rounded-xl p-3 min-h-toque sunmi-border border ${tono}`}
+      className={`w-full text-left block rounded-xl p-3 min-h-toque ${tono}`}
     >
-      <span className="block text-sm3 font-semibold sunmi-text-strong">{lectura.titulo}</span>
+      <span className="flex items-start justify-between gap-2">
+        <span className="block text-sm3 font-semibold sunmi-text-strong">{lectura.titulo}</span>
+        {marcada && <MarcaDeElegida />}
+      </span>
       <span className="flex items-baseline justify-between gap-2 mt-1">
         <span className="text-lg font-bold sunmi-text-strong tabular-nums">
           {money(lectura.costoNuevo)}
         </span>
-        <span className="text-sm3 font-semibold tabular-nums shrink-0">
-          {pct(lectura.variacionPct)}
+        <span className="flex items-center gap-1.5 shrink-0">
+          {lectura.fueraDeRango && !lectura.absurda && <EtiquetaFueraDeRango />}
+          <span className={`text-sm3 font-semibold tabular-nums ${tonoDelPorcentaje(lectura.variacionPct)}`}>
+            {pct(lectura.variacionPct)}
+          </span>
         </span>
       </span>
       <span className="block text-xs2 sunmi-text-muted leading-snug mt-1">{lectura.cuenta}</span>

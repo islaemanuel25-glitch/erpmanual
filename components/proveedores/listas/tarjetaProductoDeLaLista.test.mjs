@@ -14,16 +14,26 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { readFileSync } from "node:fs";
+
 import TarjetaProductoDeLaLista, {
+  CLASE_TARJETA_FUERA_DE_RANGO,
   ROTULO_EN_LA_LISTA,
   TEXTO_CORREGIR,
+  TEXTO_LISTO,
   TEXTO_NO_ESTA,
   TEXTO_NO_VIENE,
+  TEXTO_OTRO,
+  TEXTO_PREGUNTA_CAJA,
+  TEXTO_SI,
   TEXTO_USAR,
   TEXTO_VINCULAR,
   MARCA_VINCULADO,
   cuentaDe,
 } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
+import { TEXTO_FUERA_DE_RANGO, tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
+import { sugerenciaDeRenglon } from "@/lib/proveedores/listas/vincularConUnaFila";
+import { conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
 import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
 import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
@@ -123,10 +133,32 @@ test("CAMBIA: el mismo «✓ Usar», relleno y apretado", () => {
   assert.ok(!b[0].atributos.includes(CLASE_ACCION_RAPIDA), "relleno no puede ser el contorno");
 });
 
-test("FUERA DEL RANGO EL PORCENTAJE VA EN ÁMBAR", () => {
-  const f = fila({ diferenciaPct: 99.5 });
-  const html = dibujar({ item: itemDe({ filas: [f] }), abierta: true });
-  assert.match(html, /sunmi-text-warning[^>]*>\+99,5 %</);
+test("UNA SUBA FUERA DE RANGO VA EN VERDE, CON «FUERA DE RANGO» APARTE Y EL BORDE ÁMBAR (ALICANTE PEREJIL)", () => {
+  // +14,3 % sobre el 0 a 12 de Dab: antes salía en ámbar y se leía como baja.
+  const rango = { minPct: 0, maxPct: 12 };
+  const f = fila({ diferenciaPct: 14.3, costoMaestroPropuesto: 1485.9, aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12 });
+  const item = tusProductosDeLaLista({ productos: [{ id: 7, nombre: "ALICANTE PEREJIL 25G", precio_costo: 1300, filas: [f] }], rango }).items[0];
+  const html = dibujar({ item, abierta: true });
+  assert.match(html, /sunmi-text-success[^>]*>\+14,3 %</, "la suba no está en verde");
+  assert.ok(!/sunmi-text-warning[^>]*>\+14,3 %</.test(html), "el porcentaje volvió a ámbar");
+  assert.ok(html.includes(TEXTO_FUERA_DE_RANGO), "falta la etiqueta «Fuera de rango»");
+  assert.ok(html.includes(CLASE_TARJETA_FUERA_DE_RANGO), "falta el borde ámbar de la tarjeta");
+  // Contraprueba: la misma suba ADENTRO del rango no lleva ni etiqueta ni borde.
+  const adentro = tusProductosDeLaLista({
+    productos: [{ id: 7, nombre: "ALICANTE PEREJIL 25G", precio_costo: 1300, filas: [f] }],
+    rango: { minPct: 0, maxPct: 15 },
+  }).items[0];
+  const h2 = dibujar({ item: adentro, abierta: true });
+  assert.match(h2, /sunmi-text-success[^>]*>\+14,3 %</);
+  assert.ok(!h2.includes(TEXTO_FUERA_DE_RANGO));
+  assert.ok(!h2.includes(CLASE_TARJETA_FUERA_DE_RANGO));
+});
+
+test("EL COLOR DEL PORCENTAJE DICE SOLO LA DIRECCIÓN: verde sube, rojo baja, gris igual", () => {
+  assert.equal(tonoDelPorcentaje(14.3), "sunmi-text-success");
+  assert.equal(tonoDelPorcentaje(-0.5), "sunmi-text-danger");
+  assert.equal(tonoDelPorcentaje(0.05), "sunmi-text-muted", "dentro de la tolerancia es el mismo precio");
+  assert.equal(tonoDelPorcentaje(null), "sunmi-text-muted");
 });
 
 test("UNA LISTA CERRADA NO TIENE BOTONES, Y UN CONTROL NO TIENE «USAR»", () => {
@@ -172,14 +204,14 @@ test("UNA VINCULADA DICE QUE EL VÍNCULO ESTÁ HECHO, Y NUNCA QUEDA SIN ACCIÓN"
   assert.deepEqual(botones(dibujar({ item: aplicada, abierta: true })).map((x) => x.texto), []);
 });
 
-test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en ámbar, y «✓ Usar» además de «Corregir»", () => {
+test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en rojo y fuera de rango, y «✓ Usar» además de «Corregir»", () => {
   // Las lecturas salen de `lecturasDeLaFila` con los números del renglón 281 de
   // Dab; no se escriben a mano.
   const f = fila({
     id: 281, estado: ESTADO_LINEA.FACTOR_DUDOSO, seleccionada: false, costoAnterior: 19200,
     costoMaestroPropuesto: null, diferenciaPct: null, codigoCrudo: "281",
     descripcionProveedor: "9 DE ORO AGRIDULCE 200G", precioConIva: 955, unidadesPorBulto: null,
-    codigoNormalizado: "281", unidadProveedor: "UN", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12,
+    codigoNormalizado: "281", unidadProveedor: "", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12,
   });
   const producto = {
     id: 7, nombre: "9 DE ORO AGRIDULCE", precio_costo: 19200, factor_pack: 20, unidad_medida: "pack",
@@ -197,9 +229,138 @@ test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en ámbar, y �
   assert.equal(conEspacios(cuentaDe(item)), "$ 955,00 × 20 = $ 19.100,00 · hoy $ 19.200,00");
   const html = dibujar({ item, abierta: true });
   assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
-  assert.match(html, /sunmi-text-warning[^>]*>-0,5 %</);
+  // Una baja va en rojo; que esté fuera del 0 a 12 lo dice la etiqueta aparte.
+  assert.match(html, /sunmi-text-danger[^>]*>-0,5 %</);
+  assert.ok(html.includes(TEXTO_FUERA_DE_RANGO));
+  // El cartel ámbar que explica el motivo se mantiene.
   assert.ok(html.includes("Bajó 0,5 %. Dab suele aumentar entre 0 % y 12 %."));
   assert.ok(!html.includes(">—<"), "volvió el costo nuevo en raya");
+});
+
+// ── «¿ES ESTE?» EN LA TARJETA SIN VINCULAR (Emanuel, 2026-10-24) ─────────
+//
+// Los renglones tienen los campos que la ruta del resultado le pide a la base
+// para sugerir (`sugerenciasParaLosSinVincular`), y la sugerencia sale de
+// `sugerenciaDeRenglon`, no se escribe a mano.
+function renglonLibre(cambios = {}) {
+  return {
+    id: proximoId++,
+    codigoCrudo: "101",
+    descripcionProveedor: "BIZCOCHITOS CAMPEON 300G",
+    unidadProveedor: "",
+    unidadesPorBulto: null,
+    precioConIva: 1250.5,
+    productoBaseId: null,
+    ...cambios,
+  };
+}
+
+function sinVincularConSugerencia(renglones, { abierta = true } = {}) {
+  const nombre = "Bizcochitos Campeón 300 g";
+  const s = sugerenciaDeRenglon({ filas: renglones, nombreDelProducto: nombre, productoBaseId: 7 });
+  return tusProductosDeLaLista({
+    productos: [{ id: 7, nombre, precio_costo: 1200, filas: [] }],
+    rango: RANGO,
+    abierta,
+    sugerencias: s ? new Map([[7, s]]) : new Map(),
+  }).items[0];
+}
+
+test("SIN VINCULAR CON UN RENGLÓN PARECIDO: pregunta «¿Es 101 · …?» con su precio, «✓ Sí» arriba y «Otro» y «No viene» abajo", () => {
+  const item = sinVincularConSugerencia([renglonLibre(), renglonLibre({ codigoCrudo: "900", descripcionProveedor: "YERBA AGUANTADORA 1KG" })]);
+  assert.equal(item.sugerencia?.codigo, "101");
+  const html = dibujar({ item, abierta: true });
+  assert.ok(html.includes("¿Es 101 · BIZCOCHITOS CAMPEON 300G?"), "falta la pregunta");
+  assert.ok(conEspacios(html).includes("$ 1.250,50"), "falta el precio del renglón");
+  const b = botones(html);
+  assert.deepEqual(b.map((x) => x.texto), [TEXTO_SI, TEXTO_OTRO, TEXTO_NO_VIENE]);
+  assert.ok(b[0].atributos.includes(CLASE_ACCION_RAPIDA));
+});
+
+test("«✓ SÍ» AVISA CON EL ITEM DE LA SUGERENCIA, Y LA PANTALLA VINCULA CON ESE RENGLÓN", () => {
+  // La pieza no llama rutas: el botón dispara `onSi(item)`. La pantalla manda
+  // `filaElegidaId: item.sugerencia.id` a la misma ruta que la hoja.
+  const item = sinVincularConSugerencia([renglonLibre({ id: 4242 })]);
+  assert.equal(item.sugerencia.id, 4242);
+  const fuente = readFileSync(new URL("../../../app/modulos/proveedores/listas/[id]/page.jsx", import.meta.url), "utf8").replace(
+    /\/\/[^\n]*/g,
+    ""
+  );
+  const si = fuente.match(/const si = async \(item\) => \{[\s\S]*?\n {2}\};/)?.[0] ?? "";
+  assert.ok(si, "no está el «✓ Sí» de la pantalla");
+  assert.match(si, /\/en-la-lista`/);
+  assert.match(si, /\{ filaElegidaId: s\.id \}/);
+  assert.match(si, /const s = item\.sugerencia;/);
+  // Y sigue el camino de la hoja: la única en rango se toma sola.
+  assert.match(si, /tomarLaUnica: true/);
+  assert.match(fuente, /onSi=\{si\}/);
+});
+
+test("SIN CANDIDATO PARECIDO, LA TARJETA QUEDA COMO ANTES; Y NUNCA SE VINCULA SOLA", () => {
+  const item = sinVincularConSugerencia([renglonLibre({ descripcionProveedor: "YERBA AGUANTADORA 1KG", codigoCrudo: "900" })]);
+  assert.equal(item.sugerencia, null);
+  assert.deepEqual(botones(dibujar({ item, abierta: true })).map((x) => x.texto), [TEXTO_VINCULAR, TEXTO_NO_VIENE]);
+  // Un renglón que ya es de otro producto no se sugiere.
+  const tomado = sinVincularConSugerencia([renglonLibre({ productoBaseId: 99 })]);
+  assert.equal(tomado.sugerencia, null);
+  // Con la lista cerrada, tampoco.
+  assert.equal(sinVincularConSugerencia([renglonLibre()], { abierta: false }).sugerencia, null);
+  // La sugerencia no vincula: el producto sigue sin renglón.
+  const sugerido = sinVincularConSugerencia([renglonLibre()]);
+  assert.equal(sugerido.renglones, 0);
+  assert.equal(sugerido.filaId, null);
+});
+
+// ── «¿CUÁNTAS TRAE LA CAJA?» (ALICANTE PIMENTÓN 25G, Emanuel, 2026-10-24) ──
+//
+// Con los números del renglón 4233 de Dab: $ 800,45 la unidad, hoy $ 19.680, y
+// ni el catálogo ni el papel dicen cuántas trae.
+function pimenton({ cajaRecordada = null, puedeCambiarCostos = true } = {}) {
+  const f = fila({
+    id: 4233, estado: ESTADO_LINEA.FACTOR_DUDOSO, seleccionada: false, costoAnterior: 19680,
+    costoMaestroPropuesto: null, diferenciaPct: null, codigoCrudo: "4233",
+    descripcionProveedor: "ALICANTE PIMENTON 25G", precioConIva: 800.45, unidadesPorBulto: null,
+    // Vacío: el lector genérico no trae unidad comercial (`importacionGenerica.js`).
+    codigoNormalizado: "4233", unidadProveedor: "", aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12,
+  });
+  const producto = conLaCajaRecordada(
+    {
+      id: 9, nombre: "ALICANTE PIMENTÓN 25G", precio_costo: 19680, factor_pack: null, unidad_medida: "unidad",
+      modoCompraProveedor: null, pesoReferenciaKg: null, creadoEnLocalId: null, es_combo: false,
+    },
+    cajaRecordada
+  );
+  const cab = { estado: "CONCILIADA", recargoPct: 0, impuestoAdicionalPct: null, proveedor: { id: 1, nombre: "Dab", parserListaId: null } };
+  const rango = { minPct: 0, maxPct: 12 };
+  const { lecturas, confirmable, admiteCaja } = lecturasDeLaFila({ fila: f, producto, cab, rango });
+  return tusProductosDeLaLista({
+    productos: [{ id: 9, nombre: "ALICANTE PIMENTÓN 25G", precio_costo: 19680, filas: [f] }],
+    rango,
+    lecturaPorFila: new Map([[f.id, { lectura: lecturaElegida({ lecturas, fila: f }), delPropuesto: null, confirmable, admiteCaja }]]),
+    proveedor: "Dab",
+    puedeCambiarCostos,
+  }).items[0];
+}
+
+test("SIN SABER CUÁNTAS TRAE LA CAJA, LA TARJETA LO PREGUNTA AHÍ MISMO, CON UN CAMPO Y «LISTO»", () => {
+  const item = pimenton();
+  assert.equal(item.preguntarCaja, true);
+  assert.equal(item.costoNuevo, null);
+  const html = dibujar({ item, abierta: true });
+  assert.ok(html.includes(TEXTO_PREGUNTA_CAJA));
+  assert.match(html, /<input[^>]*type="number"/);
+  assert.ok(botones(html).some((b) => b.texto === TEXTO_LISTO));
+  // Desde una ubicación que no administra el costo, no se pregunta.
+  assert.equal(pimenton({ puedeCambiarCostos: false }).preguntarCaja, false);
+});
+
+test("CON LA CAJA DE 24 RECORDADA, LA CUENTA SE ARMA Y LA PREGUNTA SE VA", () => {
+  const item = pimenton({ cajaRecordada: { clave: "CAJA_DE_24", multiplicador: 24, cantidad: 24 } });
+  assert.equal(item.preguntarCaja, false);
+  assert.equal(conEspacios(cuentaDe(item)), "$ 800,45 × 24 = $ 19.210,80 · hoy $ 19.680,00");
+  const html = dibujar({ item, abierta: true });
+  assert.ok(!html.includes(TEXTO_PREGUNTA_CAJA));
+  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
 });
 
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {

@@ -194,7 +194,11 @@ export async function POST(req, context) {
     // revisión que arranca de tus productos, no guardarlo dejaba la tarjeta
     // "Sin vincular" para siempre, como si nadie la hubiera mirado. Es un hecho
     // de ESTA lista (`ProductoQueNoVieneEnLaLista`): no toca vínculos ni costos.
-    if (body?.noViene === true) {
+    // ── Y SE DESHACE (2026-10-24) ─────────────────────────────────────────
+    //
+    // `{ noViene: false }` borra la marca: es el «Deshacer» del aviso que sale
+    // al tocar «No viene» en la tarjeta. Las mismas guardas que marcarla.
+    if (body?.noViene === true || body?.noViene === false) {
       const cabNo = await prisma.importacionListaProveedor.findFirst({
         where: { id: importacionId, grupoId, ...ctx.propia },
         select: { id: true, estado: true },
@@ -214,6 +218,15 @@ export async function POST(req, context) {
       });
       if (!productoNo) {
         return NextResponse.json({ ok: false, error: "El producto ya no existe." }, { status: 404 });
+      }
+      if (body.noViene === false) {
+        await prisma.productoQueNoVieneEnLaLista.deleteMany({ where: { importacionId, productoBaseId } });
+        return NextResponse.json({
+          ok: true,
+          accion: "VUELVE_A_SIN_VINCULAR",
+          productoBaseId,
+          mensaje: `${productoNo.nombre} vuelve a estar sin vincular.`,
+        });
       }
       await prisma.productoQueNoVieneEnLaLista.upsert({
         where: { no_viene_unico_por_lista_y_producto: { importacionId, productoBaseId } },

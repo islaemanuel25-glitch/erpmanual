@@ -64,6 +64,7 @@ import {
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import { modoDeImportacion, MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
+import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
 
 const numeroONull = (v) => {
   if (v === null || v === undefined) return null;
@@ -156,7 +157,14 @@ export async function POST(req, context) {
           select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
         })
       : [];
-    const porId = new Map(productos.map((p) => [p.id, p]));
+    // Las cajas recordadas, como en aplicar: sin ellas, una fila confirmada con
+    // la caja que dijo una persona saldría acá como "no se puede calcular".
+    const cajas = await cargarLecturasRecordadas(prisma, {
+      grupoId,
+      proveedorId: importacion.proveedorId,
+      productoBaseIds: baseIds,
+    });
+    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const revision = revisarAntesDeAplicar({
@@ -226,6 +234,9 @@ export async function POST(req, context) {
             operandoEnLocalId: localId,
             depositoLocalId,
             cabecera: importacion,
+            // Lo que una persona ya contestó —incluida la caja—, como en la
+            // conciliación: releer no puede olvidar lo que se recordó.
+            lecturasRecordadas: cajas,
           },
           config: {
             ...reg.config,

@@ -26,7 +26,12 @@ import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import { money } from "@/components/proveedores/listas/PiezasPantallas";
+import {
+  CLASE_OPCION,
+  CLASE_OPCION_ELEGIDA,
+  MarcaDeElegida,
+  money,
+} from "@/components/proveedores/listas/PiezasPantallas";
 import { primerasPalabras } from "@/lib/proveedores/listas/tusProductos";
 // La decisión de lectura, sin su hoja: es la misma pieza que abre «Corregir».
 import { DecisionDeLectura } from "@/components/proveedores/listas/HojaRevisarPrecio";
@@ -235,16 +240,24 @@ export default function HojaVincularConLaLista({
                 aria-pressed={marcada}
                 onClick={() => setElegida(c)}
                 disabled={trabajando}
-                className={`w-full text-left block rounded-xl p-3 min-h-toque border ${
-                  marcada ? "sunmi-border-accent" : "sunmi-border"
+                // El elegido con fondo de acento suave, borde de 2 px y el ✓ en
+                // su círculo: con el borde fino de antes casi no se distinguía
+                // (Emanuel, 2026-10-24). Ver `CLASE_OPCION_ELEGIDA`.
+                className={`w-full text-left block rounded-xl p-3 min-h-toque ${
+                  marcada ? CLASE_OPCION_ELEGIDA : CLASE_OPCION
                 }`}
               >
-                <span className="block text-sm3 font-semibold sunmi-text-strong leading-snug break-words">
-                  {c.codigo} · {c.descripcion}
-                </span>
-                <span className="block text-sm2 sunmi-text-muted tabular-nums">
-                  {money(c.precio)}
-                  {c.cantidad > 1 ? ` por ${c.cantidad}` : ""}
+                <span className="flex items-start justify-between gap-2">
+                  <span className="min-w-0">
+                    <span className="block text-sm3 font-semibold sunmi-text-strong leading-snug break-words">
+                      {c.codigo} · {c.descripcion}
+                    </span>
+                    <span className="block text-sm2 sunmi-text-muted tabular-nums">
+                      {money(c.precio)}
+                      {c.cantidad > 1 ? ` por ${c.cantidad}` : ""}
+                    </span>
+                  </span>
+                  {marcada && <MarcaDeElegida />}
                 </span>
                 {/* Elegir una que ya es de otro producto no es un error —puede
                     ser ése el mal vinculado—, pero se dice antes de elegir. */}

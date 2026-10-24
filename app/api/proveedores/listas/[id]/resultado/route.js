@@ -62,6 +62,8 @@ import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
+import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
+import { sugerenciasDeRenglones } from "@/lib/proveedores/listas/vincularConUnaFila";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
   lecturaDelPropuesto,
@@ -313,6 +315,7 @@ export async function GET(req, context) {
       noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
       lecturaPorFila: await lecturasDeTusFilas({
         importacionId: id,
+        grupoId,
         productos: productosDelProveedor,
         cab,
         rango: rangoDelProveedor,
@@ -323,6 +326,12 @@ export async function GET(req, context) {
       puedeCambiarCostos,
       // Para el cartel: "Dab suele aumentar entre 0 % y 12 %".
       proveedor: cab.proveedor?.nombre ?? null,
+      sugerencias: await sugerenciasParaLosSinVincular({
+        importacionId: id,
+        productos: productosDelProveedor,
+        noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
+        abierta: esImportacionAbierta(cab.estado),
+      }),
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
@@ -645,7 +654,7 @@ function numero(v) {
  *
  * @returns Map filaId → `{ lectura, delPropuesto, confirmable }`
  */
-async function lecturasDeTusFilas({ importacionId, productos, cab, rango, operandoEnLocalId, depositoLocalId }) {
+async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rango, operandoEnLocalId, depositoLocalId }) {
   const porFila = new Map();
   if (modoDeImportacion(cab) === MODO_LISTA.CONTROLAR || !esImportacionAbierta(cab.estado)) return porFila;
   const ids = productos.flatMap((p) => p.filasImportacionLista.map((f) => f.id));
@@ -654,25 +663,69 @@ async function lecturasDeTusFilas({ importacionId, productos, cab, rango, operan
     where: { id: { in: ids }, importacionId },
     include: { productoBase: { select: CAMPOS_PRODUCTO_PARA_LEER } },
   });
+  // La caja que dijo una persona arma su lectura acá también: es lo que hace
+  // que la tarjeta muestre "$ 800,45 × 24" después de contestar.
+  const cajas = await cargarLecturasRecordadas(prisma, {
+    grupoId,
+    proveedorId: cab.proveedor?.id,
+    productoBaseIds: filas.map((f) => f.productoBaseId),
+  });
   for (const fila of filas) {
     if (!fila.productoBase) continue;
-    const { lecturas, confirmable } = lecturasDeLaFila({
+    const { lecturas, confirmable, admiteCaja } = lecturasDeLaFila({
       fila,
-      producto: fila.productoBase,
+      producto: conLaCajaRecordada(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
       rango,
       operandoEnLocalId,
       depositoLocalId,
     });
     // Dos: la que se ELIGE para revisar —«Usar» la acepta— y la del costo que la
-    // fila ya propone, que es la cuenta de las que no se revisan.
+    // fila ya propone, que es la cuenta de las que no se revisan. Y si este
+    // lector puede preguntar cuántas trae la caja, para cuando no hay ninguna.
     porFila.set(fila.id, {
       lectura: lecturaElegida({ lecturas, fila }),
       delPropuesto: lecturaDelPropuesto({ lecturas, fila }),
       confirmable,
+      admiteCaja,
     });
   }
   return porFila;
+}
+
+/**
+ * EL RENGLÓN QUE SE LE SUGIERE A CADA PRODUCTO SIN VINCULAR (2026-10-24).
+ *
+ * Con los mismos renglones y la misma cuenta que la hoja de vincular
+ * (`sugerenciaDeRenglon` sobre `candidatasConPuntaje`), así que "¿Es …?" en la
+ * tarjeta es el renglón que la hoja pondría primero. Solo los renglones sin
+ * dueño: uno tomado por otro producto no se sugiere.
+ *
+ * Una sola consulta para todos: son los renglones libres del archivo, no uno
+ * por producto. Y una sola pasada (`sugerenciasDeRenglones`), que compara cada
+ * producto solo con los renglones que comparten alguna palabra.
+ *
+ * @returns Map productoBaseId → candidato
+ */
+async function sugerenciasParaLosSinVincular({ importacionId, productos, noVienen, abierta }) {
+  const sugerencias = new Map();
+  if (!abierta) return sugerencias;
+  const sinRenglon = productos.filter((p) => p.filasImportacionLista.length === 0 && !noVienen.has(p.id));
+  if (sinRenglon.length === 0) return sugerencias;
+  const libres = await prisma.importacionListaFila.findMany({
+    where: { importacionId, productoBaseId: null },
+    select: {
+      id: true,
+      codigoCrudo: true,
+      descripcionProveedor: true,
+      unidadProveedor: true,
+      unidadesPorBulto: true,
+      precioConIva: true,
+      productoBaseId: true,
+    },
+    orderBy: { filaExcel: "asc" },
+  });
+  return sugerenciasDeRenglones({ filas: libres, productos: sinRenglon });
 }
 
 /**
@@ -726,7 +779,14 @@ async function loQueElRecalculoVaAOmitir({ importacionId, grupoId, localId, cab 
           select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
         })
       : [];
-    const porId = new Map(productos.map((p) => [p.id, p]));
+    // La caja recordada, como en aplicar: si acá faltara, el resultado contaría
+    // como omitida una fila que aplicar sí escribe.
+    const cajas = await cargarLecturasRecordadas(prisma, {
+      grupoId,
+      proveedorId: cab.proveedor?.id,
+      productoBaseIds: baseIds,
+    });
+    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
 
     const revision = revisarAntesDeAplicar({
       filas,

@@ -67,6 +67,7 @@ import {
 import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Una de control no escribe costos.
 import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
+import { cargarLecturasRecordadas, conLaCajaRecordada } from "@/lib/proveedores/listas/cajaRecordada";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 /** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
@@ -146,6 +147,9 @@ export async function GET(req, context) {
       where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true, estado: true, recargoPct: true, localOperativoId: true,
+        // De quién es la lista: con él se leen las cajas recordadas
+        // (`cajaRecordada.js`), igual que en la escritura de más abajo.
+        proveedorId: true,
         // CON QUÉ LECTOR SE LEYÓ. Sin este campo la previa calcularía con las
         // reglas de Arcor sobre una lista que no es de Arcor.
         parser: true,
@@ -198,7 +202,14 @@ export async function GET(req, context) {
           select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
         })
       : [];
-    const porId = new Map(productos.map((p) => [p.id, p]));
+    // Con la caja que dijo una persona, si la hay: sin ella, una fila
+    // confirmada con "la caja trae 24" se confirmaba y no se aplicaba.
+    const cajas = await cargarLecturasRecordadas(prisma, {
+      grupoId,
+      proveedorId: importacion.proveedorId,
+      productoBaseIds: baseIds,
+    });
+    const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     // La CABECERA viaja en el contexto porque de ahí sale el rango con el que se
@@ -405,7 +416,14 @@ export async function POST(req, context) {
         // transacción que escribe.
         select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
       });
-      const porId = new Map(productos.map((p) => [p.id, p]));
+      // La misma caja recordada que en la previa, leída en la misma transacción
+      // que escribe.
+      const cajas = await cargarLecturasRecordadas(tx, {
+        grupoId,
+        proveedorId: importacion.proveedorId,
+        productoBaseIds: baseIds,
+      });
+      const porId = new Map(productos.map((p) => [p.id, conLaCajaRecordada(p, cajas.get(p.id))]));
 
       const overrides = await tx.productoLocal.findMany({
         where: { baseId: { in: baseIds } },
