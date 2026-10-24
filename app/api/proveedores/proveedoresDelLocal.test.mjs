@@ -258,8 +258,10 @@ test("6. DUEÑO_LOCAL toca solo las listas de un proveedor de su local; admin to
 
 test("6. CENSO: cada ruta de listas pide proveedores.listas y acota a lo propio", () => {
   const rutas = rutasDeListas();
-  // Contra la enumeración vacía o corta: hoy son 29.
-  assert.ok(rutas.length >= 29, `la enumeración devolvió ${rutas.length} rutas`);
+  // Contra la enumeración vacía o corta: hoy son 26. Eran 29 hasta el
+  // 2026-10-24, cuando se borraron `productos`, `filas/[filaId]/vincular` y
+  // `no-cambian`, que habían quedado sin pantalla.
+  assert.ok(rutas.length >= 26, `la enumeración devolvió ${rutas.length} rutas`);
   const sinPermiso = [];
   const sinAlcance = [];
   for (const f of rutas) {
