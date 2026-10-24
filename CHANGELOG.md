@@ -1,8 +1,11 @@
 # Changelog
 
-## [2026-10-24] - Actualización: proveedores, transferencias
+## [2026-10-24] - Actualización: proveedores, transferencias, turnos-y-cierres
 
 ### Modificado
+- **turnos-y-cierres**: feat(turnos): "Turnos y cierres" y "(anterior)" solo
+  para dueño y admin, con el permiso nuevo `posventas.turnos.ver` (menú,
+  pantallas y rutas; migración `20261024120000`). La anterior no se borra.
 - **proveedores**: refactor(listas): borrar las tres rutas que quedaron sin pantalla
 - **proveedores**: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
 - **transferencias**: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
