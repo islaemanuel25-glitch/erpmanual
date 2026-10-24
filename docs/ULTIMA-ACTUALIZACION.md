@@ -1,15 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 16:04
+**Fecha:** 2026-10-24 16:56
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA), fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA), feat: listas — la hoja de «Corregir» deja contestar los kilos o la caja, precargados del nombre (SIN VERIFICAR EN PANTALLA)
-- Archivos: 2 nuevos, 18 modificados (20 total)
+- feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA), fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA)
+- Archivos: 3 nuevos, 18 modificados (21 total)
 
 ### transferencias
-- feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA), feat(turnos): Turnos y cierres, nueva y anterior, solo para dueño y admin — SIN VERIFICAR en pantalla, feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)
+- feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA), feat(turnos): Turnos y cierres, nueva y anterior, solo para dueño y admin — SIN VERIFICAR en pantalla
 - Archivos: 1 modificados (1 total)
 
 ### pos-ventas
@@ -18,6 +18,7 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/proveedores/listas/[id]/posibles/route.js
 - app/api/proveedores/listas/[id]/productos/[productoBaseId]/caja/route.js
 - app/api/proveedores/listas/[id]/productos/[productoBaseId]/lectura-recordada/route.js
 

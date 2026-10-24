@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-24 14:15
+**Última actualización:** 2026-10-24 16:56
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-24: feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat(turnos): Turnos y cierres, nueva y anterior, solo para dueño y admin — SIN VERIFICAR en pantalla
 - 2026-10-24: feat(listas): la revisión de una lista es una sola pantalla que arranca de tus productos (pantalla SIN VERIFICAR en navegador)

@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 16:04
+**Última actualización:** 2026-10-24 16:56
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: fix: listas — ningún nombre de la revisión se corta con "…" (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: listas — la hoja de «Corregir» deja contestar los kilos o la caja, precargados del nombre (SIN VERIFICAR EN PANTALLA)
