@@ -96,6 +96,14 @@ import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import HojaReporte from "@/components/proveedores/listas/HojaReporte";
 import HojaPosibles from "@/components/proveedores/listas/HojaPosibles";
+import HojaCerrarConPendientes from "@/components/proveedores/listas/HojaCerrarConPendientes";
+import {
+  AL_CERRAR,
+  CIERRE,
+  aplicarYTerminar,
+  pendientesAlCerrar,
+  queAbreAlCerrar,
+} from "@/lib/proveedores/listas/cerrarConPendientes";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
 // dos acciones del control.
@@ -145,6 +153,11 @@ export default function ResultadoDeListaPage() {
   // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
   // la lista y eso no se deshace desde acá: se pregunta.
   const [cancelando, setCancelando] = useState(false);
+  /**
+   * "Te quedan precios sin aplicar": `CIERRE.TERMINAR` o `CIERRE.CANCELAR`
+   * cuando se quiso cerrar con algo para aplicar; null, cerrada.
+   */
+  const [cerrandoConPendientes, setCerrandoConPendientes] = useState(null);
   /** La hoja del reporte, abierta. */
   const [viendoReporte, setViendoReporte] = useState(false);
   /** La hoja "Pueden ser de…", abierta: busca recién al montarse. */
@@ -637,6 +650,7 @@ export default function ResultadoDeListaPage() {
         return;
       }
       setCancelando(false);
+      setCerrandoConPendientes(null);
       setAviso({ tono: "success", texto: "Lista cancelada. No se cambió ningún costo." });
       await cargar();
     } catch {
@@ -683,6 +697,7 @@ export default function ResultadoDeListaPage() {
     return partes.join(" ") + (resto > 0 ? ` Y ${resto} por otros motivos.` : "");
   };
 
+  /** Devuelve `{ ok, escritos }`, para que «Aplicar y terminar» sepa si seguir. */
   const aplicar = async () => {
     setAplicando(true);
     setAviso(null);
@@ -696,7 +711,7 @@ export default function ResultadoDeListaPage() {
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
         setAviso({ tono: "danger", texto: j?.error || "No se pudieron aplicar los precios." });
-        return;
+        return { ok: false };
       }
       setConfirmando(false);
       // ── EL NÚMERO SALE DE DONDE EL SERVIDOR LO MANDA ────────────────────
@@ -738,16 +753,22 @@ export default function ResultadoDeListaPage() {
         });
       }
       await cargar();
+      return { ok: true, escritos };
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+      return { ok: false };
     } finally {
       setAplicando(false);
     }
   };
 
-  const terminar = async () => {
+  /**
+   * Devuelve `true` si cerró. Con `conservarAviso` —después de aplicar— el
+   * cartel de lo que se actualizó queda a la vista.
+   */
+  const terminar = async ({ conservarAviso = false } = {}) => {
     setAplicando(true);
-    setAviso(null);
+    if (!conservarAviso) setAviso(null);
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
         method: "POST",
@@ -756,16 +777,19 @@ export default function ResultadoDeListaPage() {
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
         setAviso({ tono: "danger", texto: j?.error || "No se pudo terminar la lista." });
-        return;
+        return false;
       }
       setTerminando(false);
+      setCerrandoConPendientes(null);
       // Sin cartel "Lista terminada.": lo dice la píldora del estado, arriba.
       // Y el chip vuelve a elegirse: el que estaba puesto —"Cambian", para
       // aplicar— suele quedar en cero en una lista terminada.
       setFiltro(null);
       await cargar();
+      return true;
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+      return false;
     } finally {
       setAplicando(false);
     }
@@ -822,6 +846,20 @@ export default function ResultadoDeListaPage() {
   const abierta = esImportacionAbierta(cabecera.estado);
   const listos = conteo.listos;
   const puedeDeshacer = cabecera.productosActualizados > 0;
+
+  // ── CERRAR CON ALGO PARA APLICAR, NO DIRECTO (2026-10-24) ───────────────
+  // Terminar cerraba sin avisar y 56 precios de Dab se perdieron. Con algo
+  // para aplicar, terminar y cancelar abren "Te quedan precios sin aplicar";
+  // sin nada, lo de siempre.
+  const pendientes = pendientesAlCerrar(conteo, { controlando, puedeCambiarCostos });
+  const alTerminar = () =>
+    queAbreAlCerrar(pendientes) === AL_CERRAR.HOJA_PENDIENTES
+      ? setCerrandoConPendientes(CIERRE.TERMINAR)
+      : setTerminando(true);
+  const alCancelar = () =>
+    queAbreAlCerrar(pendientes) === AL_CERRAR.HOJA_PENDIENTES
+      ? setCerrandoConPendientes(CIERRE.CANCELAR)
+      : setCancelando(true);
 
   const irA = (sub) => router.push(`/modulos/proveedores/listas/${id}${sub}`);
 
@@ -892,7 +930,7 @@ export default function ResultadoDeListaPage() {
           </SunmiButton>
           <SunmiButton
             color="slate"
-            onClick={() => setCancelando(true)}
+            onClick={alCancelar}
             disabled={pasando}
             className="w-full min-h-toque text-sm3"
           >
@@ -1276,7 +1314,7 @@ export default function ResultadoDeListaPage() {
               <div className="grid grid-cols-2 gap-2">
                 <SunmiButton
                   color="slate"
-                  onClick={() => setTerminando(true)}
+                  onClick={alTerminar}
                   disabled={aplicando || pasando}
                   className="min-h-toque text-sm3"
                 >
@@ -1284,7 +1322,7 @@ export default function ResultadoDeListaPage() {
                 </SunmiButton>
                 <SunmiButton
                   color="slate"
-                  onClick={() => setCancelando(true)}
+                  onClick={alCancelar}
                   disabled={aplicando || pasando}
                   className="min-h-toque text-sm3"
                 >
@@ -1387,8 +1425,27 @@ export default function ResultadoDeListaPage() {
               actualizados={cabecera.productosActualizados}
               trabajando={aplicando}
               onCerrar={() => setTerminando(false)}
-              onTerminar={terminar}
+              onTerminar={() => terminar()}
             />
+
+            {cerrandoConPendientes && (
+              <HojaCerrarConPendientes
+                accion={cerrandoConPendientes}
+                pendientes={pendientes}
+                trabajando={aplicando || pasando}
+                // Si no cerró —aplicar falló, o no escribió nada—, la hoja se
+                // va igual: el aviso que lo explica está arriba, debajo de ella.
+                onAplicarYTerminar={async () => {
+                  await aplicarYTerminar({ listos: pendientes.listos, aplicar, terminar });
+                  setCerrandoConPendientes(null);
+                }}
+                onCerrarSinAplicar={async () => {
+                  await (cerrandoConPendientes === CIERRE.CANCELAR ? cancelarLista() : terminar());
+                  setCerrandoConPendientes(null);
+                }}
+                onVolver={() => setCerrandoConPendientes(null)}
+              />
+            )}
 
             {/* ── CANCELAR SE PREGUNTA, Y CON SU PROPIA PALABRA ─────────────
                 No se reusa `ModalTerminar`: enumera cuántos productos quedan

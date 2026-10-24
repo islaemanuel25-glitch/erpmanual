@@ -61,10 +61,18 @@ export default function SunmiHojaDeConfirmacion({
   textoAlternativa = null,
   colorAlternativa = "secondary",
   onAlternativa = null,
+  // ── LA FORMA, OPCIONAL ─────────────────────────────────────────────────
+  //
+  // La pidió terminar una lista de proveedor con precios sin aplicar: la
+  // pantalla abre todo lo demás en la hoja de abajo (vincular, reporte), y esta
+  // confirmación tenía que ser la misma pieza. Sin `forma`, centrada como
+  // siempre.
+  forma = "centrado",
 }) {
   return (
     <SunmiModalLayout
       open
+      forma={forma}
       title={titulo}
       color="amber"
       onClose={trabajando ? undefined : onVolver}
