@@ -31,6 +31,7 @@ import {
   TITULO_PENDIENTES,
   aplicarYTerminar,
   pendientesAlCerrar,
+  pendientesDeLaLista,
   queAbreAlCerrar,
   textoDePendientes,
 } from "@/lib/proveedores/listas/cerrarConPendientes";
@@ -75,14 +76,24 @@ test("CON PRECIOS PENDIENTES, TERMINAR ABRE LA HOJA Y NO TERMINA", () => {
   // ni el modal de siempre ni el pedido de terminar.
   const pantalla = codigoDe(PANTALLA);
   assert.match(pantalla, /onClick=\{alTerminar\}[\s\S]{0,160}Terminar lista/);
+  // Desde el 2026-10-24 el botón y la llegada desde «Terminar lista» del
+  // listado abren con la misma función, `abrirTerminar`.
   const alTerminar = funcion(pantalla, "alTerminar");
+  assert.match(alTerminar, /const alTerminar = \(\) => abrirTerminar\(pendientes\);/);
+  const abrirTerminar = funcion(pantalla, "abrirTerminar");
   assert.match(
-    alTerminar,
-    /queAbreAlCerrar\(pendientes\) === AL_CERRAR\.HOJA_PENDIENTES\s*\?\s*setCerrandoConPendientes\(CIERRE\.TERMINAR\)\s*:\s*setTerminando\(true\)/
+    abrirTerminar,
+    /queAbreAlCerrar\(pend\) === AL_CERRAR\.HOJA_PENDIENTES\s*\?\s*setCerrandoConPendientes\(CIERRE\.TERMINAR\)\s*:\s*setTerminando\(true\)/
   );
-  assert.doesNotMatch(alTerminar, /terminar\(|finalizar/);
+  for (const f of [alTerminar, abrirTerminar]) assert.doesNotMatch(f, /terminar\(|finalizar/);
   // Las cuentas son las de la barra: el mismo `conteo`.
-  assert.match(pantalla, /const pendientes = pendientesAlCerrar\(conteo, \{ controlando, puedeCambiarCostos \}\)/);
+  // Desde el 2026-10-24 sale de `pendientesDeLaLista`, que comparte con la
+  // llegada desde «Terminar lista» del listado; lee lo mismo: el control y la
+  // ubicación sin costos no tienen pendientes.
+  assert.match(pantalla, /const pendientes = pendientesDeLaLista\(\{ conteo, cabecera \}\);/);
+  assert.deepEqual(pendientesDeLaLista({ conteo: DAB, cabecera: { modo: "ACTUALIZAR" } }), p);
+  assert.equal(pendientesDeLaLista({ conteo: DAB, cabecera: { modo: "CONTROLAR" } }).hay, false);
+  assert.equal(pendientesDeLaLista({ conteo: DAB, cabecera: { costos: { puedeCambiar: false } } }).hay, false);
   assert.match(pantalla, /\{listos\} \{listos === 1 \? "precio" : "precios"\}/);
   assert.match(pantalla, /const listos = conteo\.listos;/);
   // Ningún otro lugar abre el modal de terminar.

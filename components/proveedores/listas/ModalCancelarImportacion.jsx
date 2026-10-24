@@ -15,6 +15,14 @@
 // usuario leyendo la palabra que no es. Lo que sí se reusa es el layout del kit,
 // que es la pieza de verdad.
 //
+// ── SOLO PARA UNA LISTA SIN NADA APLICADO (2026-10-24) ──────────────────────
+//
+// Desde que cancelar una lista aplicada DESHACE lo aplicado, ese caso se
+// pregunta en "Cancelar la lista" (`HojaCancelarLaLista`), que dice qué precios
+// vuelven y cuáles no. Acá quedó el caso sin costos escritos, y por eso este
+// modal ya no habla de aplicados: el texto que decía "los costos que ya
+// aplicaste NO se deshacen" pasó a ser falso y se fue.
+//
 // ── DE DÓNDE SALE ───────────────────────────────────────────────────────────
 //
 // Del aviso de la lista que quedó leída con el rango en 0 a 0. Hasta ahora
@@ -25,37 +33,14 @@
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
-export default function ModalCancelarImportacion({
-  abierto,
-  archivo,
-  // ── CUÁNTOS COSTOS YA ESCRIBIÓ ESTA LISTA ──────────────────────────────
-  //
-  // Una lista PARCIALMENTE_APLICADA sigue abierta y por lo tanto se puede
-  // cancelar, pero ya escribió costos. Sin este dato el modal decía "No se cambia
-  // ningún costo" sobre una lista que había cambiado cuarenta: cierto para la
-  // mayoría de los casos y falso justo en el que más importa.
-  //
-  // Va como número y no como booleano porque el texto lo dice: "los 4 costos que
-  // ya aplicaste quedan como están" es accionable, "hay costos aplicados" manda a
-  // averiguar cuántos.
-  aplicados = 0,
-  trabajando = false,
-  onCerrar,
-  onCancelar,
-}) {
+export default function ModalCancelarImportacion({ abierto, archivo, trabajando = false, onCerrar, onCancelar }) {
   if (!abierto) return null;
-
-  const hayAplicados = Number(aplicados) > 0;
 
   return (
     <SunmiModalLayout
       open={abierto}
       title="¿Cancelar esta lista?"
-      subtitle={
-        hayAplicados
-          ? "La lista se cierra y sale del trabajo pendiente. Los costos que ya aplicaste NO se deshacen."
-          : "No se cambia ningún costo. La lista se cierra y sale del trabajo pendiente."
-      }
+      subtitle="No se cambia ningún costo. La lista se cierra y sale del trabajo pendiente."
       color="amber"
       onClose={trabajando ? undefined : onCerrar}
       maxWidth="max-w-lg"
@@ -85,26 +70,9 @@ export default function ModalCancelarImportacion({
       }
     >
       <p className="text-sm3 sunmi-text-strong leading-snug">
-        {archivo ? `Se cancela ${archivo}.` : "Se cancela esta importación."}{" "}
-        {hayAplicados
-          ? `Ya no vas a poder aplicar ni revisar nada más de esta lista, y queda en el historial como cancelada.`
-          : `Los costos de tus productos quedan como están.`}
+        {archivo ? `Se cancela ${archivo}.` : "Se cancela esta importación."} Los costos de tus productos
+        quedan como están.
       </p>
-
-      {/* ── LO QUE YA SE ESCRIBIÓ, Y CÓMO VOLVER ATRÁS ────────────────────
-          Lo más importante del modal cuando hay costos aplicados, así que va en
-          su propio párrafo y con el número. Cancelar NO revierte: una persona
-          que cancele creyendo que deshace se queda con los costos nuevos y la
-          lista cerrada, o sea sin el botón de deshacer a mano. */}
-      {hayAplicados && (
-        <p className="text-sm3 sunmi-text-warning leading-snug">
-          {aplicados === 1
-            ? "El costo que ya aplicaste queda aplicado."
-            : `Los ${aplicados} costos que ya aplicaste quedan aplicados.`}{" "}
-          Cancelar no los deshace. Si querés volver atrás, primero usá «Deshacer» y después
-          cancelá.
-        </p>
-      )}
 
       <p className="text-sm2 sunmi-text-muted leading-snug">
         Si querés volver a intentarlo, subí el archivo de nuevo desde «Subir una lista».

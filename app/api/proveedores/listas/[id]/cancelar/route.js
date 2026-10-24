@@ -14,17 +14,31 @@
 // mantiene, porque sigue sin poder haber dos importaciones VIVAS del mismo
 // archivo.
 //
+// ── CANCELAR DESHACE LO QUE LA LISTA APLICÓ (Emanuel, 2026-10-24) ──────────
+//
+// Terminar es "queda como está": lo aplicado queda aplicado. Cancelar es "esto
+// no servía": si la lista ya escribió costos, se DESHACEN con la reversión de
+// siempre (`revertirEnLaBase.js`, las mismas reglas de «Deshacer»: vuelve al
+// previo de la primera aplicación, devuelve la venta y las ubicaciones, y lo
+// que alguien tocó a mano después se omite y se informa, nunca se pisa) y la
+// lista queda Cancelada. Todo en UNA transacción: si la reversión falla, la
+// lista no queda cancelada y ningún costo cambió.
+//
+// Con algo aplicado, cancelar exige la previa que vio la persona
+// (`confirmacion`, los números de GET /revertir): sin ella no se escribe nada,
+// y si cambiaron mientras tanto, tampoco.
+//
+// La bitácora es la de una reversión: `escribirReversion` declara
+// LISTA_PROVEEDOR_REVERTIR con esta importación, y `requirePerm` —primero de
+// todo— abre el contexto que pone quién.
+//
 // ── QUÉ NO TOCA ─────────────────────────────────────────────────────────────
 //
-// Ni un costo, ni un precio, ni un producto, ni un vínculo. Cancelar es una
-// decisión sobre el PROCESO, no sobre los datos del catálogo. Las filas se
-// conservan tal como estaban para poder explicar después qué proponía esta
-// importación; lo único que se les toca es la marca de selección, porque una
-// fila seleccionada dentro de un proceso cancelado es una contradicción.
-//
-// Una importación YA APLICADA no se cancela: sus costos están escritos y decir
-// "cancelada" sobre eso sería mentir. Para revertir una aplicación hace falta
-// otra herramienta, que todavía no existe.
+// Ni un vínculo, ni una lectura recordada, ni un «No»: dicen quién es cada
+// producto, no cuánto sale. Las filas se conservan para poder explicar después
+// qué proponía esta importación; se les toca la marca de aplicación (al
+// deshacer) y la de selección, porque una fila seleccionada dentro de un
+// proceso cancelado es una contradicción.
 
 import { NextResponse } from "next/server";
 
@@ -37,6 +51,12 @@ import {
   OPCIONES_TX,
   esImportacionAbierta,
 } from "@/lib/proveedores/listas/persistencia";
+import {
+  difiereDeLaPrevia,
+  escribirReversion,
+  omitidosDelPlan,
+  planDeLaImportacion,
+} from "@/lib/proveedores/listas/revertirEnLaBase";
 
 export async function POST(req, context) {
   try {
@@ -65,6 +85,7 @@ export async function POST(req, context) {
       select: {
         id: true,
         estado: true,
+        proveedorId: true,
         archivoNombre: true,
         canceladaEn: true,
         terminadaEn: true,
@@ -109,8 +130,7 @@ export async function POST(req, context) {
     if (!abierta) {
       const error =
         importacion.estado === ESTADO_IMPORTACION.APLICADA
-          ? "Esta lista ya se aplicó: sus costos están escritos y cancelarla no los revierte. " +
-            "Si querés volver atrás, primero deshacé la aplicación."
+          ? "Esta lista ya se aplicó entera y quedó cerrada. Si querés volver atrás, usá «Deshacer»."
           : "Esta lista ya está cerrada, así que no hay nada que cancelar.";
       return NextResponse.json(
         { ok: false, error, codigo: "NO_ESTA_ABIERTA", estado: importacion.estado },
@@ -120,6 +140,8 @@ export async function POST(req, context) {
 
     const usuarioId = Number(session?.id ?? session?.userId) || null;
     const ahora = new Date();
+    const body = await req.json().catch(() => ({}));
+    const esperado = body?.confirmacion ?? null;
 
     const resultado = await prisma.$transaction(async (tx) => {
       // Chequeo repetido DENTRO de la transacción: entre la lectura de afuera y
@@ -137,6 +159,22 @@ export async function POST(req, context) {
         esImportacionAbierta(actual.estado) || actual.estado === ESTADO_IMPORTACION.BORRADOR;
       if (!sigueAbierta) return { carrera: true, estado: actual.estado };
 
+      // ── LO APLICADO SE DESHACE, CON LA PREVIA QUE SE VIO ──────────────
+      // El plan se arma acá adentro, con datos de esta transacción. Si la
+      // lista escribió algo (`plan.items`: lo que se revierte y lo que se
+      // omite), sin la previa o con una vieja no se toca nada.
+      const plan = await planDeLaImportacion(tx, {
+        importacionId,
+        grupoId,
+        proveedorId: importacion.proveedorId,
+      });
+      let revertido = null;
+      if (plan.items.length > 0) {
+        if (!esperado) return { faltaPrevia: true, resumen: plan.resumen };
+        if (difiereDeLaPrevia(esperado, plan.resumen)) return { conflicto: true, resumen: plan.resumen };
+        revertido = await escribirReversion(tx, { plan, importacionId, usuarioId, ahora });
+      }
+
       // Las filas conservan su estado y sus números; solo se desmarcan.
       const { count } = await tx.importacionListaFila.updateMany({
         where: { importacionId, seleccionada: true },
@@ -152,8 +190,23 @@ export async function POST(req, context) {
         },
       });
 
-      return { desmarcadas: count };
+      return { desmarcadas: count, revertido, omitidos: revertido ? omitidosDelPlan(plan) : [] };
     }, OPCIONES_TX);
+
+    if (resultado.faltaPrevia || resultado.conflicto) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: resultado.faltaPrevia
+            ? "Esta lista ya aplicó precios: para cancelarla hay que ver antes qué se deshace. No se cambió nada."
+            : "Los números cambiaron desde que se calculó qué se deshace: alguien tocó un producto mientras " +
+              "tanto. No se canceló ni se deshizo nada. Volvé a abrir «Cancelar» para ver el estado de ahora.",
+          codigo: resultado.faltaPrevia ? "FALTA_PREVIA" : "PREVIA_VIEJA",
+          resumen: resultado.resumen,
+        },
+        { status: 409 }
+      );
+    }
 
     if (resultado.carrera) {
       return NextResponse.json(
@@ -175,11 +228,19 @@ export async function POST(req, context) {
       canceladaEn: ahora,
       filasDesmarcadas: resultado.desmarcadas,
       archivoLiberado: true,
+      // Lo que se deshizo (null si no había nada aplicado) y lo que se omitió.
+      revertido: resultado.revertido,
+      omitidos: resultado.omitidos,
     });
   } catch (e) {
+    // El motivo, y lo que más importa saber: la transacción es todo o nada,
+    // así que ni se canceló ni cambió ningún costo.
     console.error("[listas/cancelar] error:", e);
     return NextResponse.json(
-      { ok: false, error: "No se pudo cancelar la importación." },
+      {
+        ok: false,
+        error: `No se pudo cancelar la lista: ${e?.message ?? "error desconocido"}. La lista sigue abierta y ningún costo cambió.`,
+      },
       { status: 500 }
     );
   }

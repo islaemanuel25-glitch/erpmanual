@@ -101,6 +101,7 @@ import { nombreDeLaColumnaLeida } from "@/lib/proveedores/listas/nombreDeLaColum
 // Cancelar una importación que quedó inservible. Con su propia palabra: no es
 // lo mismo que terminarla.
 import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
+import HojaCancelarLaLista from "@/components/proveedores/listas/HojaCancelarLaLista";
 // Deshacer y terminar YA tenían su modal, con su previa y su candado contra la
 // previa vieja. Se reusan: escribir otro botón al lado sería tener dos caminos
 // para escribir costos, y uno de los dos sin el candado.
@@ -113,8 +114,9 @@ import {
   AL_CERRAR,
   CIERRE,
   aplicarYTerminar,
-  pendientesAlCerrar,
+  pendientesDeLaLista,
   queAbreAlCerrar,
+  textoDeLaCancelada,
 } from "@/lib/proveedores/listas/cerrarConPendientes";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
@@ -192,6 +194,8 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
   // la lista y eso no se deshace desde acá: se pregunta.
   const [cancelando, setCancelando] = useState(false);
+  /** "Cancelar la lista": cancelar una lista que ya aplicó, deshaciendo. */
+  const [cancelandoConReversion, setCancelandoConReversion] = useState(false);
   /**
    * "Te quedan precios sin aplicar": `CIERRE.TERMINAR` o `CIERRE.CANCELAR`
    * cuando se quiso cerrar con algo para aplicar; null, cerrada.
@@ -374,6 +378,36 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
     if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id]);
+
+  // ── «TERMINAR LISTA» DESDE EL LISTADO (2026-10-24) ───────────────────────
+  // Llega con `?terminar=1`. Apenas está la lista, se abre lo mismo que abre
+  // «Terminar lista» de acá —la hoja de pendientes o la confirmación—, con las
+  // mismas cuentas (`pendientesDeLaLista`). Se abre una vez: la marca se saca
+  // de la dirección.
+  const [terminarAlEntrar, setTerminarAlEntrar] = useState(false);
+  /** Lo que abre terminar: con pendientes, la hoja; si no, la confirmación. */
+  const abrirTerminar = (pend) =>
+    queAbreAlCerrar(pend) === AL_CERRAR.HOJA_PENDIENTES
+      ? setCerrandoConPendientes(CIERRE.TERMINAR)
+      : setTerminando(true);
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("terminar") === "1") setTerminarAlEntrar(true);
+    } catch {
+      // Sin la dirección, se entra como siempre.
+    }
+  }, []);
+  useEffect(() => {
+    if (!terminarAlEntrar || !datos?.cabecera) return;
+    setTerminarAlEntrar(false);
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      // Quedaría la marca en la dirección; no cambia lo que se abre ahora.
+    }
+    if (!esImportacionAbierta(datos.cabecera.estado)) return;
+    abrirTerminar(pendientesDeLaLista(datos));
+  }, [terminarAlEntrar, datos]);
 
   /**
    * UN PEDIDO DESDE LA TARJETA, con el error pegado a ella.
@@ -732,7 +766,10 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
     }
   };
 
-  /** Cancela la importación. No toca ningún costo: solo la cierra. */
+  /**
+   * Cancela una importación SIN nada aplicado: solo la cierra. Con algo
+   * aplicado se cancela desde "Cancelar la lista", que deshace.
+   */
   const cancelarLista = async () => {
     setPasando(true);
     setAviso(null);
@@ -748,7 +785,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       }
       setCancelando(false);
       setCerrandoConPendientes(null);
-      setAviso({ tono: "success", texto: "Lista cancelada. No se cambió ningún costo." });
+      setAviso({ tono: "success", texto: textoDeLaCancelada(j) });
       await cargar();
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
@@ -948,15 +985,17 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // Terminar cerraba sin avisar y 56 precios de Dab se perdieron. Con algo
   // para aplicar, terminar y cancelar abren "Te quedan precios sin aplicar";
   // sin nada, lo de siempre.
-  const pendientes = pendientesAlCerrar(conteo, { controlando, puedeCambiarCostos });
-  const alTerminar = () =>
-    queAbreAlCerrar(pendientes) === AL_CERRAR.HOJA_PENDIENTES
-      ? setCerrandoConPendientes(CIERRE.TERMINAR)
-      : setTerminando(true);
+  const pendientes = pendientesDeLaLista({ conteo, cabecera });
+  const alTerminar = () => abrirTerminar(pendientes);
+  // ── CANCELAR DESHACE LO APLICADO (Emanuel, 2026-10-24) ───────────────────
+  // Con algo aplicado, cancelar abre "Cancelar la lista": deshace y cierra.
+  // Sin nada aplicado, lo de siempre (con su aviso de pendientes).
   const alCancelar = () =>
-    queAbreAlCerrar(pendientes) === AL_CERRAR.HOJA_PENDIENTES
-      ? setCerrandoConPendientes(CIERRE.CANCELAR)
-      : setCancelando(true);
+    puedeDeshacer
+      ? setCancelandoConReversion(true)
+      : queAbreAlCerrar(pendientes) === AL_CERRAR.HOJA_PENDIENTES
+        ? setCerrandoConPendientes(CIERRE.CANCELAR)
+        : setCancelando(true);
 
   const irA = (sub) => router.push(`/modulos/proveedores/listas/${id}${sub}`);
 
@@ -1672,13 +1711,24 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
             <ModalCancelarImportacion
               abierto={cancelando}
               archivo={cabecera.archivoNombre}
-              // Cuántos costos ya escribió esta lista: lo aplicado NO se deshace
-              // al cancelar, y el modal lo tiene que decir.
-              aplicados={cabecera.productosActualizados ?? 0}
               trabajando={pasando}
               onCerrar={() => setCancelando(false)}
               onCancelar={cancelarLista}
             />
+
+            {/* Con algo aplicado: deshace y cancela en una transacción. */}
+            {cancelandoConReversion && (
+              <HojaCancelarLaLista
+                importacionId={id}
+                onCancelada={async (j) => {
+                  setCancelandoConReversion(false);
+                  setFiltro(null);
+                  setAviso({ tono: "success", texto: textoDeLaCancelada(j) });
+                  await cargar();
+                }}
+                onVolver={() => setCancelandoConReversion(false)}
+              />
+            )}
 
             {pasandoAActualizar && (
               <HojaPasarAActualizar

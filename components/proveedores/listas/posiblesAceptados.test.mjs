@@ -36,7 +36,7 @@ import TarjetaProductoDeLaLista, { TEXTO_CORREGIR, textoNoEsDe } from "@/compone
 import { desvinculada, proveedoresDeAntes } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { textoSumadoA, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { pendientesAlCerrar } from "@/lib/proveedores/listas/cerrarConPendientes";
-import { botonesDeLaLista, explicacionDelPaquete2 } from "@/app/modulos/proveedores/listas/page";
+import { botonesDeCierre, botonesDeLaLista, explicacionDelPaquete2 } from "@/app/modulos/proveedores/listas/page";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const codigoDe = (rel) =>
@@ -142,10 +142,12 @@ test("APLICAR DESDE CUALQUIERA DE LAS DOS PANTALLAS APLICA LOS DOS PAQUETES", ()
 test("TERMINAR CUENTA LOS PENDIENTES DE LOS DOS PAQUETES", () => {
   const p1 = codigoDe(PANTALLA);
   // Las cuentas de la hoja son el mismo `conteo` de la lista entera.
-  assert.match(p1, /const pendientes = pendientesAlCerrar\(conteo, \{ controlando, puedeCambiarCostos \}\)/);
+  assert.match(p1, /const pendientes = pendientesDeLaLista\(\{ conteo, cabecera \}\);/);
   // `conteo` es el de la respuesta entera, no el de `tusProductos` (el paquete 1).
   assert.match(p1, /const \{ cabecera, conteo, lectura \} = datos;/);
-  assert.doesNotMatch(p1, /pendientesAlCerrar\(tusProductos/);
+  assert.doesNotMatch(p1, /pendientes(AlCerrar|DeLaLista)\(\{?\s*(conteo: )?tusProductos/);
+  // Y la llegada desde «Terminar lista» del listado lee la respuesta entera.
+  assert.match(p1, /abrirTerminar\(pendientesDeLaLista\(datos\)\);/);
   // Un listo del paquete 1 y uno del 2 son dos pendientes.
   assert.deepEqual(pendientesAlCerrar({ listos: 2, listosSinTildar: 0 }), { listos: 2, sinTildar: 0, hay: true });
 });
@@ -163,7 +165,13 @@ test("EL LISTADO: UN BOTÓN POR PAQUETE, EL DEL 2 SOLO CON ALGO; CANCELAR EN ROJ
 
   const listado = codigoDe("app/modulos/proveedores/listas/page.jsx");
   assert.match(listado, /useTituloDePagina\("Listas"\)/);
-  assert.match(listado, /color="peligro"\s+onClick=\{\(\) => onCancelar\(item\)\}\s+className="w-full/);
+  // Cancelar en rojo, a todo el ancho (desde el 2026-10-24 sale de
+  // `botonesDeCierre`, con «Terminar lista» arriba si ya aplicó algo).
+  assert.deepEqual(botonesDeCierre({ id: 12 }).map((b) => [b.texto, b.color]), [["Cancelar esta lista", "peligro"]]);
+  assert.match(
+    listado,
+    /\{botonesDeCierre\(item\)\.map\(\(b\) => \(\s*<SunmiButton\s+key=\{b\.clave\}\s+color=\{b\.color\}\s+onClick=\{\(\) => \(b\.href \? router\.push\(b\.href\) : onCancelar\(item\)\)\}\s+className="w-full/
+  );
   assert.doesNotMatch(listado, />\s*Seguir\s*</, "el «Seguir» se reemplazó por los dos botones");
   // M es por confirmar + confirmados, con el `where` único de la pantalla.
   const ruta = codigoDe("app/api/proveedores/listas/route.js");

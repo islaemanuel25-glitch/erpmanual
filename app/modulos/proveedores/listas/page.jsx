@@ -41,6 +41,7 @@ import { Paginacion, Vacio, ErrorRecuperable } from "@/components/proveedores/li
 // dos versiones de lo que pasa con los costos aplicados, y el día que una se
 // corrija la otra miente.
 import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
+import HojaCancelarLaLista from "@/components/proveedores/listas/HojaCancelarLaLista";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
@@ -126,6 +127,37 @@ export function botonesDeLaLista(item) {
     });
   }
   return botones;
+}
+
+/**
+ * LOS BOTONES DE CERRAR UNA LISTA ABIERTA (Emanuel, 2026-10-24).
+ *
+ * Con algo aplicado, terminar y cancelar ya no son lo mismo: terminar deja lo
+ * aplicado como está, cancelar lo deshace. Por eso ahí van los dos, uno arriba
+ * del otro, para que se vea que son dos cosas. Sin nada aplicado, cancelar
+ * solo, como estaba.
+ *
+ * «Terminar lista» lleva a la lista con `?terminar=1`: ahí se abre lo de
+ * siempre —"Te quedan precios sin aplicar" si queda algo, si no la
+ * confirmación—, que necesita las cuentas de la lista y no se escribe dos veces.
+ */
+export function botonesDeCierre(item) {
+  const botones = [];
+  if (Number(item?.productosActualizados ?? 0) > 0) {
+    botones.push({
+      clave: "TERMINAR",
+      texto: "Terminar lista",
+      color: "secondary",
+      href: `/modulos/proveedores/listas/${item?.id}?terminar=1`,
+    });
+  }
+  botones.push({ clave: "CANCELAR", texto: "Cancelar esta lista", color: "peligro" });
+  return botones;
+}
+
+/** ¿Cancelar esta lista deshace precios? Con algo aplicado, sí. */
+export function cancelarDeshace(item) {
+  return Number(item?.productosActualizados ?? 0) > 0;
 }
 
 const FILTROS = [
@@ -340,13 +372,23 @@ export default function HistorialListasPage() {
         </Grupo>
       )}
 
-      {/* El mismo modal que usa el resultado, con el mismo texto. Escribir acá
-          una confirmación parecida dejaría dos versiones de lo que pasa con los
-          costos aplicados, y el día que una se corrija la otra miente. */}
+      {/* El mismo modal y la misma hoja que usa el resultado, con el mismo
+          texto. Escribir acá una confirmación parecida dejaría dos versiones de
+          lo que pasa con los costos aplicados, y el día que una se corrija la
+          otra miente. Con algo aplicado, la hoja que deshace. */}
+      {aCancelar !== null && cancelarDeshace(aCancelar) && (
+        <HojaCancelarLaLista
+          importacionId={aCancelar.id}
+          onCancelada={async () => {
+            setACancelar(null);
+            await cargar();
+          }}
+          onVolver={() => setACancelar(null)}
+        />
+      )}
       <ModalCancelarImportacion
-        abierto={aCancelar !== null}
+        abierto={aCancelar !== null && !cancelarDeshace(aCancelar)}
         archivo={aCancelar?.archivoNombre}
-        aplicados={aCancelar?.productosActualizados ?? 0}
         trabajando={cancelando}
         onCerrar={() => {
           setACancelar(null);
@@ -430,14 +472,18 @@ function TarjetaLista({ item, router, onCancelar }) {
           {/* ── CANCELAR, DESDE ACÁ Y SOLO EN LAS QUE QUEDARON A MEDIAS ─────
               Es la pantalla donde se ve el problema: la sección "Quedaron a
               medias" junta las listas que nadie cerró. Botón a todo el ancho
-              en el color de peligro del kit, con la confirmación de siempre. */}
-          <SunmiButton
-            color="peligro"
-            onClick={() => onCancelar(item)}
-            className="w-full min-h-toque text-sm3 justify-center"
-          >
-            Cancelar esta lista
-          </SunmiButton>
+              en el color de peligro del kit, con su confirmación. Con algo
+              aplicado, arriba va «Terminar lista» (`botonesDeCierre`). */}
+          {botonesDeCierre(item).map((b) => (
+            <SunmiButton
+              key={b.clave}
+              color={b.color}
+              onClick={() => (b.href ? router.push(b.href) : onCancelar(item))}
+              className="w-full min-h-toque text-sm3 justify-center"
+            >
+              {b.texto}
+            </SunmiButton>
+          ))}
         </div>
       )}
     </SunmiCard>

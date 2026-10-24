@@ -75,6 +75,12 @@ export default function SunmiHojaDeConfirmacion({
   // Va debajo de los renglones; sin renglones, en su lugar. Sin `children`, la
   // hoja es la de siempre, letra por letra.
   children = null,
+  // ── CONFIRMAR APAGADO, OPCIONAL ─────────────────────────────────────────
+  //
+  // Lo pidió cancelar una lista aplicada (2026-10-24): mientras se calcula qué
+  // se deshace, o si no se pudo calcular, no se confirma — pero «Volver» y el
+  // velo siguen andando, que es la diferencia con `trabajando`.
+  confirmarDeshabilitado = false,
 }) {
   return (
     <SunmiModalLayout
@@ -93,7 +99,7 @@ export default function SunmiHojaDeConfirmacion({
           <SunmiButton
             color={colorConfirmar}
             onClick={onConfirmar}
-            disabled={trabajando}
+            disabled={trabajando || confirmarDeshabilitado}
             className="w-full min-h-toque text-base font-bold"
           >
             {trabajando ? textoTrabajando : textoConfirmar}
