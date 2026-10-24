@@ -675,6 +675,7 @@ model ProductoBase {
   noVieneEnListas       ProductoQueNoVieneEnLaLista[]
   renglonesQueNoSon     RenglonQueNoEsElProducto[]
   sumadoEnListas        ProductoSumadoALaLista[]
+  puedeSerEnListas      ProductoQuePuedeSerDeLaLista[]
 
   filasImportacionLista ImportacionListaFila[]
 
@@ -4850,6 +4851,10 @@ model ImportacionListaProveedor {
   conciliadaEn DateTime?
   aplicadaEn   DateTime?
   canceladaEn  DateTime?
+  /// Cuándo se calculó por última vez "Pueden ser de…" (`ProductoQuePuedeSerDeLaLista`).
+  /// Null: nunca —una lista de antes de que existiera, o un cálculo que falló—, y
+  /// la primera lectura lo calcula.
+  puedenSerCalculadoEn DateTime?
   canceladaPorUsuarioId Int?
   /// Cuándo y quién cerró la importación por decisión propia. Misma convención
   /// que `canceladaEn`. Nulo significa que nunca se terminó.
@@ -4871,6 +4876,7 @@ model ImportacionListaProveedor {
   filas     ImportacionListaFila[]
   noVienen  ProductoQueNoVieneEnLaLista[]
   sumados   ProductoSumadoALaLista[]
+  puedenSer ProductoQuePuedeSerDeLaLista[]
 
   /// IDEMPOTENCIA REAL, a nivel base. Dos pedidos simultáneos con el mismo
   /// archivo no pueden crear dos importaciones: el segundo choca contra este
@@ -5098,6 +5104,7 @@ model ImportacionListaFila {
 
   importacion  ImportacionListaProveedor @relation(fields: [importacionId], references: [id], onDelete: Cascade)
   productoBase ProductoBase?             @relation(fields: [productoBaseId], references: [id], onDelete: SetNull)
+  puedenSer    ProductoQuePuedeSerDeLaLista[]
 
   /// Una fila física del Excel no puede entrar dos veces en la misma importación.
   /// `name` es el alias de Prisma Client; `map` es el nombre FÍSICO en la base.
@@ -5433,6 +5440,36 @@ model RenglonQueNoEsElProducto {
   @@unique([grupoId, proveedorId, productoBaseId, codigoInterno], name: "renglon_no_es_unico", map: "renglon_no_es_unico")
   @@index([grupoId, proveedorId])
   @@index([productoBaseId])
+}
+
+/// "PUEDEN SER DE DAB": EL PAQUETE 2 DE UNA LISTA, CALCULADO Y GUARDADO (2026-10-24).
+///
+/// Un producto tuyo de otro proveedor, o sin proveedor, que se parece a un
+/// renglón de la lista que no encontró ninguno de los productos del proveedor.
+/// Se calcula al leer la lista, al volver a conciliar y al deshacer una
+/// aceptación (`lib/proveedores/listas/puedenSer.js`), con las reglas de
+/// "¿Es …?": un solo candidato claro, sin los «No», con lo que ve la ubicación.
+///
+/// Esta fila es la PROPUESTA y nada más: aceptarla no la borra —el aceptado es
+/// `ProductoSumadoALaLista`— y «Por confirmar» es la propuesta sin aceptar y con
+/// el renglón todavía libre (`porConfirmarWhere`). «No» la borra.
+model ProductoQuePuedeSerDeLaLista {
+  id             Int   @id @default(autoincrement())
+  grupoId        Int
+  importacionId  Int
+  productoBaseId Int
+  filaId         Int
+  puntaje        Float
+  calculadoEn    DateTime @default(now())
+
+  importacion  ImportacionListaProveedor @relation(fields: [importacionId], references: [id], onDelete: Cascade)
+  productoBase ProductoBase              @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+  fila         ImportacionListaFila      @relation(fields: [filaId], references: [id], onDelete: Cascade)
+
+  @@unique([importacionId, productoBaseId], name: "puede_ser_unico_por_lista_y_producto", map: "puede_ser_unico_por_lista_y_producto")
+  @@index([grupoId])
+  @@index([productoBaseId])
+  @@index([filaId])
 }
 
 /// "SUMADO A DAB": UN PRODUCTO DEL RESTO DEL CATÁLOGO QUE SE ACEPTÓ EN ESTA LISTA.

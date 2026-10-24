@@ -95,7 +95,7 @@ import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCance
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import HojaReporte from "@/components/proveedores/listas/HojaReporte";
-import HojaPosibles from "@/components/proveedores/listas/HojaPosibles";
+import TarjetaPorConfirmar from "@/components/proveedores/listas/TarjetaPorConfirmar";
 import HojaCerrarConPendientes from "@/components/proveedores/listas/HojaCerrarConPendientes";
 import {
   AL_CERRAR,
@@ -122,10 +122,37 @@ export const DURACION_AVISO_HECHO_MS = 6000;
 /** El botón que abre la hoja del reporte. */
 export const TEXTO_REPORTE = "Reporte";
 
-/** El botón de la búsqueda opcional en el resto del catálogo. */
-export const TEXTO_BUSCAR_POSIBLES = "Buscar en el resto de mis productos";
+/**
+ * LOS DOS PAQUETES DE UNA LISTA (Emanuel, 2026-10-24).
+ *
+ *   TUS_PRODUCTOS  "Tus productos de Dab": los que ya tienen a Dab en alguno de
+ *                  sus tres lugares. Es esta pantalla, en `/listas/[id]`.
+ *   PUEDEN_SER     "Pueden ser de Dab": tuyos de otro proveedor o sin
+ *                  proveedor que se parecen a un renglón de la lista, en
+ *                  `/listas/[id]/pueden-ser`.
+ *
+ * Son la MISMA pantalla con otro contenido, no dos: comparten la barra de
+ * «Para aplicar» —que cuenta la lista entera, o sea los dos paquetes—,
+ * «✓ Aplicar», «Usar», «Corregir» y las hojas. Escribir la segunda al lado
+ * sería tener dos barras de aplicar que el día que una cambie dicen distinto.
+ */
+export const PAQUETE = Object.freeze({ TUS_PRODUCTOS: "TUS_PRODUCTOS", PUEDEN_SER: "PUEDEN_SER" });
 
-export default function ResultadoDeListaPage() {
+/** «Por confirmar» y «Confirmados», los chips del paquete 2. */
+export const PESTANA_PUEDEN_SER = Object.freeze({ POR_CONFIRMAR: "POR_CONFIRMAR", CONFIRMADOS: "CONFIRMADOS" });
+
+/** "Pueden ser de Dab". */
+export function tituloPuedenSer(proveedor) {
+  return proveedor ? `Pueden ser de ${proveedor}` : "Pueden ser de este proveedor";
+}
+
+/** La explicación gris de arriba del paquete 2. */
+export function explicacionPuedenSer(proveedor) {
+  return `Productos tuyos que figuran con otro proveedor o sin proveedor, y se parecen a uno de la lista de ${proveedor || "este proveedor"}.`;
+}
+
+export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS } = {}) {
+  const enPuedenSer = paquete === PAQUETE.PUEDEN_SER;
   const router = useRouter();
   const params = useParams();
   const id = Number(params?.id);
@@ -160,8 +187,8 @@ export default function ResultadoDeListaPage() {
   const [cerrandoConPendientes, setCerrandoConPendientes] = useState(null);
   /** La hoja del reporte, abierta. */
   const [viendoReporte, setViendoReporte] = useState(false);
-  /** La hoja "Pueden ser de…", abierta: busca recién al montarse. */
-  const [buscandoPosibles, setBuscandoPosibles] = useState(false);
+  /** El chip del paquete 2; null hasta el primer resultado. */
+  const [pestanaPuedenSer, setPestanaPuedenSer] = useState(null);
   /** Mientras se vuelven a leer las propuestas que quedaron viejas. */
   const [releyendo, setReleyendo] = useState(false);
   // ── LA LISTA DE TUS PRODUCTOS ──────────────────────────────────────────
@@ -204,7 +231,8 @@ export default function ResultadoDeListaPage() {
   //
   // Decía el nombre del proveedor. Ahora el nombre va en negrita en la tarjeta
   // de arriba, como "Transferencia #464", y la barra dice qué pantalla es.
-  useTituloDePagina("Lista de precios");
+  // El paquete 2 se llama por lo que es: "Pueden ser de Dab".
+  useTituloDePagina(enPuedenSer ? tituloPuedenSer(datos?.cabecera?.proveedor?.nombre) : "Lista de precios");
 
   // ── Y EL VOLVER VA EN LA FILA DEL SHELL, NO ADENTRO DEL CONTENIDO ───────
   //
@@ -240,6 +268,13 @@ export default function ResultadoDeListaPage() {
       // El chip con el que arranca: el primero que tenga algo. Solo la primera
       // vez —después manda el que eligió la persona—.
       setFiltro((f) => f ?? filtroInicial(json?.tusProductos?.conteo));
+      setPestanaPuedenSer(
+        (p) =>
+          p ??
+          ((json?.puedenSer?.conteo?.porConfirmar ?? 0) > 0 || (json?.puedenSer?.conteo?.confirmados ?? 0) === 0
+            ? PESTANA_PUEDEN_SER.POR_CONFIRMAR
+            : PESTANA_PUEDEN_SER.CONFIRMADOS)
+      );
       return json;
     } catch {
       const texto = "No se pudo conectar con el servidor. Probá de nuevo.";
@@ -307,6 +342,16 @@ export default function ResultadoDeListaPage() {
   /** Lo que devolvió la hoja de vincular, deshecho: un vínculo o un «No viene». */
   const deshacerDeLaHoja = (j, productoBaseId) =>
     j?.accion === "NO_VIENE" ? deshacerNoViene(productoBaseId) : deshacerVinculo(j?.filaId ?? null);
+
+  /**
+   * Deshacer una aceptación del paquete 2 es «No es de Dab»: saca el vínculo Y
+   * el lugar que se le sumó. Con el «Deshacer» de un vínculo común quedaría con
+   * Dab puesto y anotado como sumado.
+   */
+  const deshacerSumado = (productoBaseId) => ({
+    url: `/api/proveedores/listas/${id}/posibles`,
+    cuerpo: { deshacer: true, productoBaseId },
+  });
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
@@ -458,6 +503,41 @@ export default function ResultadoDeListaPage() {
     }
     window.location.assign(`/modulos/proveedores/listas/${id}`);
   };
+
+  // ── EL PAQUETE 2, "PUEDEN SER DE DAB" (2026-10-24) ─────────────────────
+  //
+  // «✓ Sí» y «Otro» vinculan por la ruta de siempre (`en-la-lista`) con
+  // `sumarProveedor`: el código, el renglón con el motor de la lista y Dab en
+  // un lugar libre, sin quitar el que tenía. «No» y «No es de Dab» van a
+  // `posibles`. Los cuatro dejan el aviso de abajo, como en el paquete 1.
+
+  /** «✓ Sí» sobre el renglón propuesto: pasa a «Confirmados». */
+  const siPuedeSer = (item) =>
+    pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
+      { filaElegidaId: item.renglon.id, sumarProveedor: true },
+      "El servidor no pudo vincularlo y no dijo por qué.",
+      deshacerSumado(item.productoBaseId)
+    );
+
+  /** «No»: ese renglón no es ese producto, y no se vuelve a proponer. */
+  const noPuedeSer = (item) =>
+    pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/posibles`,
+      { productoBaseId: item.productoBaseId, filaId: item.renglon.id },
+      "El servidor no pudo guardar la respuesta y no dijo por qué."
+    );
+
+  /** «No es de Dab», en un confirmado: vuelve a «Por confirmar». */
+  const noEsDe = (item) =>
+    pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/posibles`,
+      { deshacer: true, productoBaseId: item.productoBaseId },
+      "El servidor no pudo deshacerlo y no dijo por qué."
+    );
 
   /** «No viene»: lo mismo que el botón de la hoja de vincular, sin abrirla. */
   const noViene = (item) =>
@@ -880,6 +960,87 @@ export default function ResultadoDeListaPage() {
   // "X de 158 listos": ni «Sin vincular» ni «Para revisar» (`tusProductos.js`).
   const listosDeLaRevision = tusProductos.conteo.listosDeLaRevision ?? 0;
 
+  // ── EL PAQUETE 2 ─────────────────────────────────────────────────────────
+  const puedenSer = datos.puedenSer ?? { porConfirmar: [], confirmados: [], conteo: { porConfirmar: 0, confirmados: 0 } };
+  const pestanaActiva = pestanaPuedenSer ?? PESTANA_PUEDEN_SER.POR_CONFIRMAR;
+  const enConfirmados = pestanaActiva === PESTANA_PUEDEN_SER.CONFIRMADOS;
+
+  // Arriba: qué es esto, y cuántos hay de cada uno ("N confirmados" / "M por
+  // confirmar", lo pendiente en ámbar).
+  const contextoPuedenSer = (
+    <>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="min-w-0 font-semibold sunmi-text-strong break-words">{nombreProveedor}</span>
+        <ChipDeEstado cabecera={cabecera} />
+      </div>
+      <p className="text-sm2 sunmi-text-muted leading-snug">{explicacionPuedenSer(nombreProveedor)}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm2 sunmi-text-muted">
+          <span className="tabular-nums sunmi-text-strong font-semibold">{puedenSer.conteo.confirmados}</span>{" "}
+          {puedenSer.conteo.confirmados === 1 ? "confirmado" : "confirmados"}
+        </span>
+        <span className="text-sm2 sunmi-text-accent">
+          <span className="tabular-nums font-semibold">{puedenSer.conteo.porConfirmar}</span> por confirmar
+        </span>
+      </div>
+    </>
+  );
+
+  const filtrosPuedenSer = (
+    <SunmiFiltroEstado
+      opciones={[
+        { clave: PESTANA_PUEDEN_SER.POR_CONFIRMAR, texto: "Por confirmar", cantidad: puedenSer.conteo.porConfirmar },
+        { clave: PESTANA_PUEDEN_SER.CONFIRMADOS, texto: "Confirmados", cantidad: puedenSer.conteo.confirmados },
+      ]}
+      valor={pestanaActiva}
+      onCambiar={setPestanaPuedenSer}
+      ariaLabel="Por confirmar o confirmados"
+    />
+  );
+
+  const listaPuedenSer = (
+    <>
+      {enConfirmados
+        ? // Los confirmados son tarjetas de la revisión: «✓ Usar», «Corregir»,
+          // la cuenta y el costo nuevo, iguales que en el paquete 1, más
+          // «No es de Dab».
+          puedenSer.confirmados.map((item) => (
+            <TarjetaProductoDeLaLista
+              key={item.productoBaseId}
+              item={item}
+              abierta={abierta}
+              puedeCambiarCostos={puedeCambiarCostos}
+              controlando={controlando}
+              trabajando={tocando === item.productoBaseId}
+              error={errores.get(item.productoBaseId) ?? ""}
+              onUsar={(it) => usar(it)}
+              onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+              onCaja={caja}
+              onKilos={kilos}
+              onNoEsDe={noEsDe}
+              proveedor={nombreProveedor}
+            />
+          ))
+        : puedenSer.porConfirmar.map((item) => (
+            <TarjetaPorConfirmar
+              key={item.productoBaseId}
+              item={item}
+              abierta={abierta}
+              trabajando={tocando === item.productoBaseId}
+              error={errores.get(item.productoBaseId) ?? ""}
+              onSi={siPuedeSer}
+              onNo={noPuedeSer}
+              onOtro={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre, sumarProveedor: true })}
+            />
+          ))}
+      {(enConfirmados ? puedenSer.confirmados : puedenSer.porConfirmar).length === 0 && (
+        <p className="text-center py-6 sunmi-text-muted text-sm2">
+          {enConfirmados ? "Todavía no confirmaste ninguno." : "No hay ninguno por confirmar."}
+        </p>
+      )}
+    </>
+  );
+
   // ── EL AVISO DE ABAJO: "Listo: <producto> · Deshacer" ───────────────────
   // Va en la barra fija, arriba de «Aplicar»; sin barra (un control, o desde
   // una ubicación sin los costos), es la barra él solo.
@@ -1160,7 +1321,7 @@ export default function ResultadoDeListaPage() {
       )}
       <SunmiPantallaDeTrabajo
         contexto={
-          <>
+          enPuedenSer ? contextoPuedenSer : <>
             {/* ── 1 · DE QUIÉN ES ESTA LISTA ──────────────────────────────
                 Como "Transferencia #464": el nombre en negrita y el chip del
                 estado al lado. */}
@@ -1205,7 +1366,7 @@ export default function ResultadoDeListaPage() {
           </>
         }
         buscador={
-          <SunmiCampoBusquedaVoz
+          enPuedenSer ? null : <SunmiCampoBusquedaVoz
             value={buscar}
             onChange={setBuscar}
             onVoz={setBuscar}
@@ -1214,7 +1375,7 @@ export default function ResultadoDeListaPage() {
           />
         }
         filtros={
-          <SunmiFiltroEstado
+          enPuedenSer ? filtrosPuedenSer : <SunmiFiltroEstado
             opciones={ORDEN_FILTROS.map((f) => ({
               clave: f,
               texto: TEXTO_FILTRO[f],
@@ -1225,9 +1386,19 @@ export default function ResultadoDeListaPage() {
             ariaLabel="Filtrar tus productos por estado"
           />
         }
-        antesDeLista={avisos.length > 0 ? <>{avisos}</> : null}
+        // En el paquete 2, solo el aviso de lo que acaba de pasar: los demás
+        // —columna, omisiones, sin tildar— son de la lista y van en el 1.
+        antesDeLista={
+          enPuedenSer
+            ? aviso
+              ? <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>
+              : null
+            : avisos.length > 0
+              ? <>{avisos}</>
+              : null
+        }
         lista={
-          <>
+          enPuedenSer ? listaPuedenSer : <>
             {/* ── UNA TARJETA POR PRODUCTO TUYO ─────────────────────────
                 Los renglones de la lista que no son tuyos no se listan: solo
                 aparecen en el buscador de la hoja de vincular. */}
@@ -1259,7 +1430,7 @@ export default function ResultadoDeListaPage() {
           </>
         }
         despuesDeLista={
-          <>
+          enPuedenSer ? null : <>
             {/* ── LAS DOS ACCIONES DE UN CONTROL ───────────────────────────
                 Ninguna de las dos escribe un costo. "Pasar a actualizar
                 precios" convierte ESTA importación sin volver a subir el
@@ -1334,17 +1505,6 @@ export default function ResultadoDeListaPage() {
                   className="col-span-2 min-h-toque text-sm3 justify-center"
                 >
                   {TEXTO_REPORTE}
-                </SunmiButton>
-                {/* ── LA BÚSQUEDA OPCIONAL EN EL RESTO DEL CATÁLOGO ──────────
-                    Productos tuyos que el proveedor vende pero que no figuran
-                    como suyos. Calcula RECIÉN al tocar: la hoja busca al
-                    abrirse, y nada más la abre. */}
-                <SunmiButton
-                  color="slate"
-                  onClick={() => setBuscandoPosibles(true)}
-                  className="col-span-2 min-h-toque text-sm3 justify-center"
-                >
-                  {TEXTO_BUSCAR_POSIBLES}
                 </SunmiButton>
               </div>
             )}
@@ -1499,7 +1659,10 @@ export default function ResultadoDeListaPage() {
                 endpoint={`/api/proveedores/listas/${id}/productos/${vinculando.productoBaseId}/en-la-lista`}
                 nombre={vinculando.nombre}
                 proveedor={nombreProveedor}
-                cuerpoNoViene={{ noViene: true }}
+                // «Otro» del paquete 2: suma Dab como «✓ Sí», y no ofrece «No
+                // viene», porque el producto no es de Dab.
+                cuerpoNoViene={vinculando.sumarProveedor ? null : { noViene: true }}
+                cuerpoVincular={vinculando.sumarProveedor ? { sumarProveedor: true } : null}
                 // VINCULAR EN UN SOLO PASO: vinculado, la misma hoja sigue con
                 // caja entera / una unidad / No lo cambio, y se cierra sola si no
                 // hay nada que decidir. Desde una ubicación sin los costos no
@@ -1515,9 +1678,12 @@ export default function ResultadoDeListaPage() {
                 }}
                 onCerrar={() => setVinculando(null)}
                 onListo={async (j) => {
-                  const { productoBaseId, nombre } = vinculando;
+                  const { productoBaseId, nombre, sumarProveedor } = vinculando;
                   setVinculando(null);
-                  await despuesDeResolver(nombre, deshacerDeLaHoja(j, productoBaseId));
+                  await despuesDeResolver(
+                    nombre,
+                    sumarProveedor ? deshacerSumado(productoBaseId) : deshacerDeLaHoja(j, productoBaseId)
+                  );
                 }}
               />
             )}
@@ -1592,16 +1758,6 @@ export default function ResultadoDeListaPage() {
             {/* ── EL REPORTE, EN UNA HOJA ───────────────────────────────────
                 La misma pieza que la hoja de vincular, con las tres descargas
                 como tarjetas a todo el ancho. */}
-            {buscandoPosibles && (
-              <HojaPosibles
-                importacionId={id}
-                proveedor={cabecera.proveedor?.nombre ?? ""}
-                // «✓ Sí» sumó un producto a la revisión: se relee la lista.
-                onCambio={() => cargar({ silencioso: true })}
-                onCerrar={() => setBuscandoPosibles(false)}
-              />
-            )}
-
             {viendoReporte && (
               <HojaReporte
                 importacionId={id}

@@ -56,6 +56,8 @@ export const COLORES = Object.freeze([
   "cyan",
   "amber",
   "red",
+  // Peligro suave: fondo rojo claro, borde y texto rojos (2026-10-24).
+  "peligro",
   "slate",
   "primary",
   "secondary",

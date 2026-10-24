@@ -9,7 +9,8 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
-import { paginacion } from "@/lib/proveedores/listas/persistencia";
+import { esImportacionAbierta, paginacion } from "@/lib/proveedores/listas/persistencia";
+import { asegurarPuedenSer, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
 import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
@@ -96,6 +97,8 @@ export async function GET(req) {
           aplicadaEn: true,
           // Dónde se subió: los números de la tapa son sobre lo que ve esa ubicación.
           localOperativoId: true,
+          // Si el paquete 2 ya se calculó (`asegurarPuedenSer`).
+          puedenSerCalculadoEn: true,
           parser: true,
           parserVersion: true,
           recargoPct: true,
@@ -144,7 +147,23 @@ export async function GET(req) {
           prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.LISTO_PARA_APLICAR, base) }),
           prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.ACTUALIZADO, base) }),
         ]);
-        return { id: i.id, listos, actualizados };
+        // ── LOS DOS PAQUETES, PARA LOS DOS BOTONES (2026-10-24) ──────────
+        // Solo de una abierta: una cerrada se mira, no se trabaja. El 1 son
+        // los del universo sin lo sumado a esta lista; el 2, lo por confirmar
+        // (`porConfirmarWhere`, el mismo `where` de la pantalla) más lo
+        // confirmado. Una lista de antes que nunca lo calculó, lo calcula acá.
+        if (!esImportacionAbierta(i.estado)) return { id: i.id, listos, actualizados, paquetes: null };
+        await asegurarPuedenSer(prisma, { ...i, grupoId });
+        const [tusProductos, porConfirmar, confirmados] = await Promise.all([
+          prisma.productoBase.count({
+            where: { AND: [universoWhere, { sumadoEnListas: { none: { importacionId: i.id } } }] },
+          }),
+          prisma.productoQuePuedeSerDeLaLista.count({
+            where: porConfirmarWhere({ importacionId: i.id, proveedorId: i.proveedor?.id }),
+          }),
+          prisma.productoSumadoALaLista.count({ where: { importacionId: i.id } }),
+        ]);
+        return { id: i.id, listos, actualizados, paquetes: { tusProductos, puedenSer: porConfirmar + confirmados } };
       })
     );
     const porImportacion = new Map(conteos.map((c) => [c.id, c]));
@@ -157,6 +176,8 @@ export async function GET(req) {
         umbralVariacionPct: Number(i.umbralVariacionPct),
         productosListos: porImportacion.get(i.id)?.listos ?? 0,
         productosActualizados: porImportacion.get(i.id)?.actualizados ?? 0,
+        // `{ tusProductos, puedenSer }` de una abierta; null de una cerrada.
+        paquetes: porImportacion.get(i.id)?.paquetes ?? null,
       })),
       conteo: { aMedias, terminadas, canceladas, todas: aMedias + terminadas + canceladas },
       paginacion: { page, pageSize, total, paginas: Math.ceil(total / pageSize) },

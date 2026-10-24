@@ -66,6 +66,7 @@ import {
   aplicarEleccion,
   respaldoDe,
 } from "@/lib/proveedores/listas/importacionGenerica";
+import { intentarRecalcularPuedenSer } from "@/lib/proveedores/listas/puedenSer";
 
 /**
  * EL CAMINO GENÉRICO: abrir el archivo y saber qué columna es cada cosa.
@@ -870,6 +871,12 @@ export async function POST(req) {
       }
       throw e;
     }
+
+    // ── EL PAQUETE 2, AL LEER LA LISTA ──────────────────────────────────
+    // "Pueden ser de…" se calcula solo y se guarda. Después de la transacción
+    // de las filas, porque las necesita; si falla no frena la importación:
+    // queda para la primera lectura (`intentarRecalcularPuedenSer`).
+    await intentarRecalcularPuedenSer(prisma, { grupoId, importacionId: importacion.id });
 
     return NextResponse.json({
       ok: true,

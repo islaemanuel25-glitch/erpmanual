@@ -49,7 +49,6 @@
 //   GRANIX): "¿Cuántos kilos trae la pieza?", con decimales, y «Listo».
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiPill from "@/components/sunmi/SunmiPill";
 import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
 import {
   CLASE_ACCION_CORREGIR,
@@ -77,6 +76,11 @@ export const TEXTO_NO_ESTA = "no está";
 export const MARCA_VINCULADO = "✓";
 export const TEXTO_SI = "✓ Sí";
 export const TEXTO_OTRO = "Otro";
+
+/** «No es de Dab»: deshace una aceptación del paquete 2. */
+export function textoNoEsDe(proveedor) {
+  return proveedor ? `No es de ${proveedor}` : "No es de este proveedor";
+}
 
 /** "¿Es 101 · BIZCOCHITOS CAMPEON 300G?" */
 export function preguntaDeLaSugerencia(sugerencia) {
@@ -108,6 +112,9 @@ export default function TarjetaProductoDeLaLista({
   onCaja,
   // «Listo» con los kilos de la pieza, para un producto por kilo.
   onKilos,
+  // Solo los confirmados del paquete 2: «No es de <proveedor>».
+  onNoEsDe,
+  proveedor = "",
 }) {
   const { estado } = item;
   const sinRenglon = estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR || estado === ESTADO_TU_PRODUCTO.NO_VIENE;
@@ -120,7 +127,9 @@ export default function TarjetaProductoDeLaLista({
   // ── DEBAJO DEL NOMBRE: QUÉ RENGLÓN LE TOCÓ, Y LA CUENTA ──────────────────
   const debajo = (
     <>
-      <p className="text-xs sunmi-text-muted">{ROTULO_EN_LA_LISTA}</p>
+      {/* Un confirmado del paquete 2 dice de dónde vino en vez del rótulo:
+          "Sumado a Dab · antes de Arcor". */}
+      <p className="text-xs sunmi-text-muted">{item.sumadoA ?? ROTULO_EN_LA_LISTA}</p>
       {sugerencia ? (
         <>
           <p className="text-sm2 sunmi-text-strong break-words">{preguntaDeLaSugerencia(sugerencia)}</p>
@@ -205,6 +214,18 @@ export default function TarjetaProductoDeLaLista({
       </SunmiButton>
     );
   }
+  // Un confirmado del paquete 2 suma «No es de Dab», que deshace la aceptación
+  // y lo devuelve a «Por confirmar». Aplicado no: su costo ya está escrito.
+  if (abierta && item.sumadoA && onNoEsDe && estado !== ESTADO_TU_PRODUCTO.ACTUALIZADO) {
+    accionAbajo = (
+      <span className="flex flex-wrap gap-2">
+        {accionAbajo}
+        <SunmiButton onClick={() => onNoEsDe(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
+          {textoNoEsDe(proveedor)}
+        </SunmiButton>
+      </span>
+    );
+  }
 
   // ── ABAJO A LA DERECHA: EL COSTO NUEVO Y EL PORCENTAJE ───────────────────
   // El color del % dice SOLO para dónde va —verde sube, rojo baja, gris igual—
@@ -250,17 +271,7 @@ export default function TarjetaProductoDeLaLista({
 
   return (
     <TarjetaDeRevision
-      // "Sumado a Dab", chica, junto al nombre: vino de «Buscar en el resto de
-      // mis productos». Sin etiqueta, el nombre va solo, como siempre.
-      nombre={
-        item.sumadoA ? (
-          <>
-            {item.nombre} <SunmiPill color="cyan">{item.sumadoA}</SunmiPill>
-          </>
-        ) : (
-          item.nombre
-        )
-      }
+      nombre={item.nombre}
       // Fuera de rango, el borde de la tarjeta en ámbar: se ve barriendo la lista.
       tono={fueraDeRango ? CLASE_TARJETA_FUERA_DE_RANGO : ""}
       debajo={debajo}

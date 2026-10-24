@@ -42,7 +42,7 @@ import { Paginacion, Vacio, ErrorRecuperable } from "@/components/proveedores/li
 // corrija la otra miente.
 import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
-import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
@@ -91,6 +91,43 @@ export function quedoAMedias(i) {
   return ESTADOS_A_MEDIAS.includes(i?.estado);
 }
 
+/** La línea gris debajo del botón del paquete 2. */
+export function explicacionDelPaquete2(proveedor) {
+  return `Productos tuyos de otros proveedores que pueden ser de ${proveedor || "este proveedor"}.`;
+}
+
+/**
+ * LOS BOTONES DE UNA LISTA ABIERTA: UNO POR PAQUETE (Emanuel, 2026-10-24).
+ *
+ * "Tus productos de Dab · N" siempre, el principal. "Pueden ser de Dab · M"
+ * solo si M > 0: un botón que abre una pantalla vacía es un botón que no hace
+ * lo que dice. Los números son del servidor (`paquetes`, en la ruta del
+ * listado), con los mismos `where` que la pantalla de adentro.
+ */
+export function botonesDeLaLista(item) {
+  const proveedor = item?.proveedor?.nombre ?? "este proveedor";
+  const n = Number(item?.paquetes?.tusProductos ?? 0);
+  const m = Number(item?.paquetes?.puedenSer ?? 0);
+  const botones = [
+    {
+      clave: "TUS_PRODUCTOS",
+      texto: item?.paquetes ? `Tus productos de ${proveedor} · ${n}` : `Tus productos de ${proveedor}`,
+      href: `/modulos/proveedores/listas/${item?.id}`,
+      color: "primary",
+    },
+  ];
+  if (m > 0) {
+    botones.push({
+      clave: "PUEDEN_SER",
+      texto: `Pueden ser de ${proveedor} · ${m}`,
+      href: `/modulos/proveedores/listas/${item?.id}/pueden-ser`,
+      color: "secondary",
+      debajo: explicacionDelPaquete2(proveedor),
+    });
+  }
+  return botones;
+}
+
 const FILTROS = [
   { clave: "A_MEDIAS", texto: "A medias" },
   { clave: "TERMINADAS", texto: "Terminadas" },
@@ -125,14 +162,14 @@ export default function HistorialListasPage() {
   // los proveedores del local.
   const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
-  // ── ACÁ SÍ MANDA EL TÍTULO DEL MENÚ ─────────────────────────────────────
+  // ── EL TÍTULO ES "LISTAS" (2026-10-24) ──────────────────────────────────
   //
-  // Esta pantalla NO registra título: "Listas de proveedores" es correcto y es
-  // el único lugar donde lo es. Adentro de una lista cada pantalla registra el
-  // suyo, que es de lo que se trata el cambio.
+  // El del menú, "Listas de proveedores", chocaba con el botón "← Compras" en
+  // la misma fila. Adentro de una lista cada pantalla registra el suyo.
   //
-  // La salida sí va al slot del shell, como en las otras cinco: la misma pieza,
+  // La salida va al slot del shell, como en las otras cinco: la misma pieza,
   // el mismo alto de toque y la misma fila que nunca scrollea.
+  useTituloDePagina("Listas");
   useAccionDePagina(
     () => <SunmiBackButton href="/modulos/compras" texto="Compras" className="min-h-toque" />,
     []
@@ -345,9 +382,9 @@ function Grupo({ titulo, children }) {
 /**
  * Una importación.
  *
- * El botón "Seguir" solo aparece en las que quedaron a medias: en una terminada
- * no hay nada que seguir, y ofrecerlo igual convierte la pantalla en una lista de
- * botones que no hacen lo que dicen. Para verla igual, la tarjeta entera lleva.
+ * Abierta, un botón por paquete (`botonesDeLaLista`): "Tus productos de Dab"
+ * y, si hay alguno, "Pueden ser de Dab". En una terminada no hay nada que
+ * seguir: "Ver", y la tarjeta entera lleva.
  */
 function TarjetaLista({ item, router, onCancelar }) {
   const linea = lineaDeEstado(item);
@@ -366,31 +403,38 @@ function TarjetaLista({ item, router, onCancelar }) {
           </div>
           <div className={`text-sm2 font-semibold ${linea.tono}`}>{linea.texto}</div>
         </div>
-        {aMedias ? (
-          <SunmiButton color="cyan" onClick={ir} className="min-h-toque min-w-toque shrink-0 text-sm2">
-            Seguir
-          </SunmiButton>
-        ) : (
+        {!aMedias && (
           <SunmiButton color="ghost" onClick={ir} className="min-h-toque min-w-toque shrink-0 text-sm2 sunmi-text-link">
             Ver
           </SunmiButton>
         )}
       </div>
 
-      {/* ── CANCELAR, DESDE ACÁ Y SOLO EN LAS QUE QUEDARON A MEDIAS ───────
-          Es la pantalla donde se ve el problema: la sección "Quedaron a medias"
-          junta las listas que nadie cerró, y hasta ahora la única forma de sacar
-          una de ahí era entrar, no encontrar cómo cancelarla, y terminarla —con lo
-          que quedaba en el historial como trabajo terminado.
-          Va en su propio renglón y no al lado de "Seguir": son dos acciones de
-          peso muy distinto y a 360 px un toque de más al costado del pulgar es
-          justamente el que no se quiere. */}
+      {/* ── LOS DOS PAQUETES, A TODO EL ANCHO (2026-10-24) ────────────────
+          El principal en el acento del tema; el segundo con borde. */}
       {aMedias && (
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 space-y-2">
+          {botonesDeLaLista(item).map((b) => (
+            <div key={b.clave} className="space-y-1">
+              <SunmiButton
+                color={b.color}
+                onClick={() => router.push(b.href)}
+                className="w-full min-h-toque text-sm3 font-semibold justify-center"
+              >
+                {b.texto}
+              </SunmiButton>
+              {b.debajo && <p className="text-xs2 sunmi-text-muted leading-snug">{b.debajo}</p>}
+            </div>
+          ))}
+
+          {/* ── CANCELAR, DESDE ACÁ Y SOLO EN LAS QUE QUEDARON A MEDIAS ─────
+              Es la pantalla donde se ve el problema: la sección "Quedaron a
+              medias" junta las listas que nadie cerró. Botón a todo el ancho
+              en el color de peligro del kit, con la confirmación de siempre. */}
           <SunmiButton
-            color="ghost"
+            color="peligro"
             onClick={() => onCancelar(item)}
-            className="min-h-toque text-sm2 sunmi-text-muted"
+            className="w-full min-h-toque text-sm3 justify-center"
           >
             Cancelar esta lista
           </SunmiButton>

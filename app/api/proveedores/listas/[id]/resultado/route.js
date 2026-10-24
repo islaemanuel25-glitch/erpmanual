@@ -63,7 +63,13 @@ import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedore
 import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
-import { sugerenciasDeRenglones } from "@/lib/proveedores/listas/vincularConUnaFila";
+import {
+  proveedoresDeAntes,
+  renglonDeLaHoja,
+  sugerenciasDeRenglones,
+  textoDeProveedoresDeHoy,
+} from "@/lib/proveedores/listas/vincularConUnaFila";
+import { asegurarPuedenSer, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
   lecturaDelPropuesto,
@@ -182,12 +188,15 @@ export async function GET(req, context) {
         modo: true,
         // DÓNDE SE SUBIÓ: el alcance de la lista es lo que ve esa ubicación.
         localOperativoId: true,
+        // Si el paquete 2 ya se calculó: una lista de antes se calcula al abrirla.
+        puedenSerCalculadoEn: true,
         proveedor: { select: { id: true, nombre: true, parserListaId: true } },
       },
     });
     if (!cab) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
     }
+    await asegurarPuedenSer(prisma, { ...cab, grupoId });
 
     // ── Los contadores, sobre TODAS las filas ────────────────────────────
     const paraContar = await prisma.importacionListaFila.findMany({
@@ -280,6 +289,14 @@ export async function GET(req, context) {
         codigo_barra_secundario: true,
         // Quién administra su costo: decide desde dónde se trabaja la lista.
         creadoEnLocalId: true,
+        // Sus tres lugares de proveedor: un confirmado del paquete 2 dice con
+        // qué proveedor estaba antes ("Sumado a Dab · antes de Arcor").
+        proveedor_id: true,
+        proveedor2_id: true,
+        proveedor3_id: true,
+        proveedor: { select: { nombre: true } },
+        proveedor2: { select: { nombre: true } },
+        proveedor3: { select: { nombre: true } },
         filasImportacionLista: {
           where: { importacionId: id },
           orderBy: { filaExcel: "asc" },
@@ -297,11 +314,19 @@ export async function GET(req, context) {
       where: { importacionId: id, grupoId },
       select: { productoBaseId: true },
     });
-    // Los sumados desde "Pueden ser de…": la etiqueta "Sumado a Dab".
+    // ── LOS DOS PAQUETES (Emanuel, 2026-10-24) ───────────────────────────
+    //
+    // Lo sumado a ESTA lista desde "Pueden ser de…" es el paquete 2 aunque ya
+    // tenga a Dab en un lugar: va a «Confirmados», y el paquete 1 no lo
+    // muestra. En la próxima lista ya es de Dab y entra al 1, porque la
+    // anotación es de esta lista.
     const sumados = await prisma.productoSumadoALaLista.findMany({
       where: { importacionId: id, grupoId },
-      select: { productoBaseId: true },
+      select: { productoBaseId: true, lugarDelProveedor: true },
     });
+    const sumadoPorProducto = new Map(sumados.map((s) => [s.productoBaseId, s]));
+    const delPaquete1 = productosDelProveedor.filter((p) => !sumadoPorProducto.has(p.id));
+    const confirmadosDelPaquete2 = productosDelProveedor.filter((p) => sumadoPorProducto.has(p.id));
     // ── DESDE DÓNDE SE TRABAJA ESTA LISTA (Emanuel, 2026-10-24) ──────────
     //
     // La abrió desde un local, vinculó, eligió la lectura, tocó «Usar» y recién
@@ -316,8 +341,10 @@ export async function GET(req, context) {
         ? null
         : await prisma.local.findUnique({ where: { id: dueno }, select: { id: true, nombre: true, es_deposito: true } });
 
-    const tusProductos = tusProductosDeLaLista({
-      productos: productosDelProveedor.map((p) => ({ ...p, filas: p.filasImportacionLista })),
+    // Las dos tarjetas —paquete 1 y confirmados del 2— salen de la MISMA
+    // cuenta (`tusProductosDeLaLista`), con las mismas lecturas y omisiones:
+    // «✓ Usar», la cuenta y el porcentaje no pueden decir distinto en una y otra.
+    const comunes = {
       rango: rangoDelProveedor,
       omitidas: revision.ids,
       noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
@@ -336,12 +363,55 @@ export async function GET(req, context) {
       proveedor: cab.proveedor?.nombre ?? null,
       sugerencias: await sugerenciasParaLosSinVincular({
         importacionId: id,
-        productos: productosDelProveedor,
+        productos: delPaquete1,
         noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
         abierta: esImportacionAbierta(cab.estado),
       }),
-      sumados: new Set(sumados.map((s) => s.productoBaseId)),
+    };
+    const tusProductos = tusProductosDeLaLista({
+      ...comunes,
+      productos: delPaquete1.map((p) => ({ ...p, filas: p.filasImportacionLista })),
     });
+    const confirmados = tusProductosDeLaLista({
+      ...comunes,
+      productos: confirmadosDelPaquete2.map((p) => ({ ...p, filas: p.filasImportacionLista })),
+      sumados: new Map(
+        confirmadosDelPaquete2.map((p) => [
+          p.id,
+          { antes: proveedoresDeAntes(p, sumadoPorProducto.get(p.id), cab.proveedor?.id) },
+        ])
+      ),
+    });
+
+    // «POR CONFIRMAR»: las propuestas guardadas, con el `where` único
+    // (`porConfirmarWhere`, el mismo del listado). Con la lista cerrada no se
+    // ofrecen: ya no se le suma nada.
+    const porConfirmar = esImportacionAbierta(cab.estado)
+      ? await prisma.productoQuePuedeSerDeLaLista.findMany({
+          where: porConfirmarWhere({ importacionId: id, proveedorId: cab.proveedor?.id }),
+          orderBy: { productoBase: { nombre: "asc" } },
+          select: {
+            productoBaseId: true,
+            productoBase: {
+              select: {
+                nombre: true,
+                proveedor: { select: { nombre: true } },
+                proveedor2: { select: { nombre: true } },
+                proveedor3: { select: { nombre: true } },
+              },
+            },
+            fila: {
+              select: {
+                id: true,
+                codigoCrudo: true,
+                descripcionProveedor: true,
+                precioConIva: true,
+                unidadesPorBulto: true,
+              },
+            },
+          },
+        })
+      : [];
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
     // `excluidaManual: false` en los dos: una fila que el motor dejó lista y que
@@ -467,7 +537,24 @@ export async function GET(req, context) {
         })),
       },
       variacion: conteo.rangoDeLosListos,
+      // PAQUETE 1, "Tus productos de Dab": sin lo sumado a esta lista.
       tusProductos,
+      // PAQUETE 2, "Pueden ser de Dab". `conteo` de arriba —«Para aplicar», sin
+      // tildar— cuenta las filas de la lista entera: es de los DOS paquetes.
+      puedenSer: {
+        porConfirmar: porConfirmar.map((p) => ({
+          productoBaseId: p.productoBaseId,
+          nombre: p.productoBase?.nombre ?? "",
+          proveedoresDeHoy: textoDeProveedoresDeHoy([
+            p.productoBase?.proveedor?.nombre,
+            p.productoBase?.proveedor2?.nombre,
+            p.productoBase?.proveedor3?.nombre,
+          ]),
+          renglon: renglonDeLaHoja(p.fila),
+        })),
+        confirmados: confirmados.items,
+        conteo: { porConfirmar: porConfirmar.length, confirmados: confirmados.items.length },
+      },
       muestra: muestra.map((f) => ({
         id: f.id,
         nombre: f.productoBase?.nombre || f.descripcionProveedor,
