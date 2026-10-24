@@ -68,6 +68,7 @@ import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincular
 import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
   ACCION_USAR,
+  FILTRO,
   ORDEN_FILTROS,
   TEXTO_FILTRO,
   cantidadDelFiltro,
@@ -79,6 +80,16 @@ import {
   textoTildadosSinAplicarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
+import HojaBajasDePrecio from "@/components/proveedores/listas/HojaBajasDePrecio";
+import {
+  AL_APLICAR,
+  DESPUES_DE_LAS_BAJAS,
+  bajasAlAplicar,
+  ordenarParaRevisar,
+  queAbreAlAplicar,
+  resumenParaRevisar,
+  textoResumenParaRevisar,
+} from "@/lib/proveedores/listas/bajasDeLaLista";
 // Pasar un control a actualizar precios: pide el rango, que controlar no
 // pregunta y actualizar no puede resolver sin él.
 import HojaPasarAActualizar from "@/components/proveedores/listas/HojaPasarAActualizar";
@@ -86,6 +97,7 @@ import HojaCambiarColumna from "@/components/proveedores/listas/HojaCambiarColum
 // El mismo predicado que usa el servidor para decidir si una columna explica
 // poco. Escribir acá una comparación parecida es lo que CLAUDE.md prohíbe.
 import { explicaPoco } from "@/lib/proveedores/listas/importacionGenerica";
+import { nombreDeLaColumnaLeida } from "@/lib/proveedores/listas/nombreDeLaColumna";
 // Cancelar una importación que quedó inservible. Con su propia palabra: no es
 // lo mismo que terminarla.
 import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
@@ -185,6 +197,11 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
    * cuando se quiso cerrar con algo para aplicar; null, cerrada.
    */
   const [cerrandoConPendientes, setCerrandoConPendientes] = useState(null);
+  /**
+   * "Estos productos bajan de precio", abierta antes de escribir: qué hace
+   * «Aplicar igual» (`DESPUES_DE_LAS_BAJAS`); null, cerrada.
+   */
+  const [avisandoBajas, setAvisandoBajas] = useState(null);
   /** La hoja del reporte, abierta. */
   const [viendoReporte, setViendoReporte] = useState(false);
   /** El chip del paquete 2; null hasta el primer resultado. */
@@ -671,7 +688,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       setCambiandoColumna(false);
       setAviso({
         tono: "success",
-        texto: `Listo: se volvió a leer con la columna «${j.titulo}». Todavía no se cambió ningún costo.`,
+        texto: `Listo: se volvió a leer con ${nombreDeLaColumnaLeida({ ...datos?.lectura, ...j, nombreColumna: j.nombreColumna })}. Todavía no se cambió ningún costo.`,
       });
       await cargar();
     } catch {
@@ -965,6 +982,32 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   const pestanaActiva = pestanaPuedenSer ?? PESTANA_PUEDEN_SER.POR_CONFIRMAR;
   const enConfirmados = pestanaActiva === PESTANA_PUEDEN_SER.CONFIRMADOS;
 
+  // ── LAS BAJAS DE LO QUE SE VA A APLICAR (2026-10-24) ─────────────────────
+  // De los DOS paquetes, como «Para aplicar»: «✓ Aplicar» escribe los dos desde
+  // cualquiera de las pantallas. Con alguna, Aplicar y «Aplicar y terminar»
+  // abren "Estos productos bajan de precio" antes de escribir nada.
+  const bajas = bajasAlAplicar([...tusProductos.items, ...puedenSer.confirmados]);
+  const alAplicar = () =>
+    queAbreAlAplicar(bajas) === AL_APLICAR.HOJA_BAJAS
+      ? setAvisandoBajas(DESPUES_DE_LAS_BAJAS.APLICAR)
+      : setConfirmando(true);
+  const alAplicarIgual = async () => {
+    if (avisandoBajas === DESPUES_DE_LAS_BAJAS.APLICAR_Y_TERMINAR) {
+      await aplicarYTerminar({ listos: pendientes.listos, aplicar, terminar });
+    } else {
+      await aplicar();
+    }
+    setAvisandoBajas(null);
+  };
+
+  // «Para revisar»: las que bajan primero, después las que suben de más, con
+  // la cuenta arriba de las tarjetas.
+  const enParaRevisar = filtroActivo === FILTRO.REVISAR && !buscar.trim();
+  const rangoDeLaLista = cabecera.rango ?? null;
+  const resumenRevisar = resumenParaRevisar(visibles, rangoDeLaLista);
+  const textoRevisar = textoResumenParaRevisar(resumenRevisar);
+  const tarjetas = enParaRevisar ? ordenarParaRevisar(visibles, rangoDeLaLista) : visibles;
+
   // Arriba: qué es esto, y cuántos hay de cada uno ("N confirmados" / "M por
   // confirmar", lo pendiente en ámbar).
   const contextoPuedenSer = (
@@ -1126,7 +1169,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
     avisos.push(
       <Aviso key="columna" tono="warning">
         <p className="leading-snug">
-          Los precios salieron de la columna «{lectura.titulo}», que coincide con tus costos en{" "}
+          Los precios salieron de {nombreDeLaColumnaLeida(lectura)}, que coincide con tus costos en{" "}
           {lectura.explicadas} de cada {lectura.comparables} productos. Puede no ser la columna
           del precio que te factura este proveedor.
         </p>
@@ -1147,10 +1190,11 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // CON QUÉ COLUMNA SE LEYÓ. Es la decisión de la que cuelga todo lo demás, así
   // que se dice, y se dice con su respaldo. NO se muestra cuando está el aviso de
   // arriba: dicen lo mismo con denominadores distintos.
-  if (lectura?.titulo && !(explicaPoco(lectura) && abierta)) {
+  // Sin título también se dice (un PDF sin encabezado): con la columna descripta.
+  if ((lectura?.titulo || lectura?.columna != null) && !(explicaPoco(lectura) && abierta)) {
     avisos.push(
       <p key="lectura" className="text-sm2 sunmi-text-muted leading-snug">
-        Los precios salieron de la columna «{lectura.titulo}»
+        Los precios salieron de {nombreDeLaColumnaLeida(lectura)}
         {lectura.conDescuento ? ", con el descuento aplicado" : ""}
         {lectura.comparables
           ? `, que coincide con tus costos en ${Math.round((lectura.explicadas / lectura.comparables) * 100)} de cada 100 productos.`
@@ -1402,7 +1446,15 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
             {/* ── UNA TARJETA POR PRODUCTO TUYO ─────────────────────────
                 Los renglones de la lista que no son tuyos no se listan: solo
                 aparecen en el buscador de la hoja de vincular. */}
-            {visibles.map((item) => (
+            {/* En «Para revisar», la cuenta de lo que más importa mirar, con
+                las que bajan en rojo; las tarjetas vienen en ese orden. */}
+            {enParaRevisar && visibles.length > 0 && (
+              <p className="text-sm2 leading-snug">
+                <span className="font-semibold sunmi-text-danger">{textoRevisar.bajan}</span>
+                <span className="sunmi-text-muted"> · {textoRevisar.subenDeMas}</span>
+              </p>
+            )}
+            {tarjetas.map((item) => (
               <TarjetaProductoDeLaLista
                 key={item.productoBaseId}
                 item={item}
@@ -1528,7 +1580,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
               </span>
               <SunmiButton
                 color="amber"
-                onClick={() => setConfirmando(true)}
+                onClick={alAplicar}
                 disabled={listos === 0 || aplicando}
                 className="shrink-0 justify-center"
               >
@@ -1596,6 +1648,13 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                 // Si no cerró —aplicar falló, o no escribió nada—, la hoja se
                 // va igual: el aviso que lo explica está arriba, debajo de ella.
                 onAplicarYTerminar={async () => {
+                  // Con bajas, primero "Estos productos bajan de precio": no se
+                  // escribe nada hasta «Aplicar igual».
+                  if (queAbreAlAplicar(bajas) === AL_APLICAR.HOJA_BAJAS) {
+                    setCerrandoConPendientes(null);
+                    setAvisandoBajas(DESPUES_DE_LAS_BAJAS.APLICAR_Y_TERMINAR);
+                    return;
+                  }
                   await aplicarYTerminar({ listos: pendientes.listos, aplicar, terminar });
                   setCerrandoConPendientes(null);
                 }}
@@ -1765,6 +1824,15 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                 proveedor={cabecera.proveedor}
                 usuario={perfil}
                 onCerrar={() => setViendoReporte(false)}
+              />
+            )}
+
+            {avisandoBajas && (
+              <HojaBajasDePrecio
+                bajas={bajas}
+                trabajando={aplicando}
+                onAplicarIgual={alAplicarIgual}
+                onVolver={() => setAvisandoBajas(null)}
               />
             )}
 

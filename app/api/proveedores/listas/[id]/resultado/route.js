@@ -70,6 +70,7 @@ import {
   textoDeProveedoresDeHoy,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { asegurarPuedenSer, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
+import { nombreDeLaColumnaDeLaLista } from "@/lib/proveedores/listas/nombreDeLaColumna";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
   lecturaDelPropuesto,
@@ -450,6 +451,9 @@ export async function GET(req, context) {
     if (motivoPedido && Object.values(MOTIVO_REVISION).includes(motivoPedido)) {
       cola = await armarCola({ id, motivo: motivoPedido, url, cabecera: cab });
     }
+    // Cómo se nombra la columna en los avisos: el título, o sin título (un PDF
+    // sin encabezado) dónde está y qué dice en un renglón. Nunca «».
+    const nombreColumna = await nombreDeLaColumnaDeLaLista(prisma, { importacionId: id, lectura: cab.decisionDeLectura });
 
     return NextResponse.json({
       ok: true,
@@ -501,7 +505,7 @@ export async function GET(req, context) {
       // es la misma regla que ya sigue `resumirEstados` —devolver todas las
       // claves para que la pantalla no tenga que preguntar si existen—.
       control: contarControl(paraContar),
-      lectura: cab.decisionDeLectura ?? null,
+      lectura: cab.decisionDeLectura ? { ...cab.decisionDeLectura, nombreColumna } : null,
       conteo: {
         ...conteo,
         cierra: resultadoCierra(conteo),

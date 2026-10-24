@@ -43,6 +43,7 @@ import { resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 import { reconciliarImportacion } from "@/lib/proveedores/listas/reconciliarImportacion";
 import { modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
+import { nombreDeLaColumnaDeLaLista } from "@/lib/proveedores/listas/nombreDeLaColumna";
 
 /** Una corrida grande vuelve a escribir cientos de filas. */
 const TX = { maxWait: 20000, timeout: 300000 };
@@ -233,6 +234,11 @@ export async function POST(req, context) {
       importacionId: cab.id,
       columna,
       titulo,
+      // Para el aviso de "Listo": sin título, la columna descripta (nunca «»).
+      nombreColumna: await nombreDeLaColumnaDeLaLista(prisma, {
+        importacionId: cab.id,
+        lectura: { ...(cab.decisionDeLectura ?? {}), columna, titulo },
+      }),
       modo,
       resumen: r.resumen,
     });

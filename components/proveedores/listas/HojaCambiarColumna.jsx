@@ -31,6 +31,7 @@ import { useState } from "react";
 
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { nombreDeLaColumnaLeida } from "@/lib/proveedores/listas/nombreDeLaColumna";
 
 /** "coincide en 4 de cada 9" — el respaldo de una columna, si está medido. */
 function respaldo(o) {
@@ -91,7 +92,7 @@ export default function HojaCambiarColumna({
       }
     >
       <p className="text-sm3 sunmi-text-strong leading-snug">
-        Ahora se está leyendo con la columna «{lectura?.titulo}». Elegí cuál es el precio que te
+        Ahora se está leyendo con {nombreDeLaColumnaLeida(lectura)}. Elegí cuál es el precio que te
         factura este proveedor.
       </p>
 

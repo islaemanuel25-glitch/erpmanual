@@ -122,7 +122,12 @@ test("APLICAR DESDE CUALQUIERA DE LAS DOS PANTALLAS APLICA LOS DOS PAQUETES", ()
   // La barra de abajo no depende del paquete: no hay un `enPuedenSer` en ella.
   const pie = p1.slice(p1.indexOf("pieDePantalla={"), p1.indexOf("despuesDelPie={"));
   assert.doesNotMatch(pie, /enPuedenSer|puedenSer/);
-  assert.match(pie, /onClick=\{\(\) => setConfirmando\(true\)\}/);
+  // «✓ Aplicar» pasa por `alAplicar` (las bajas, 2026-10-24), que tampoco mira
+  // el paquete: las bajas son de los dos.
+  assert.match(pie, /onClick=\{alAplicar\}/);
+  const alAplicar = p1.match(/const alAplicar = \(\) =>([\s\S]*?);\n/)[1];
+  assert.doesNotMatch(alAplicar, /enPuedenSer/);
+  assert.match(alAplicar, /: setConfirmando\(true\)/);
   // «Para aplicar» es `conteo.listos`, y `conteo` se cuenta sobre TODAS las filas.
   assert.match(p1, /const listos = conteo\.listos;/);
   const ruta = codigoDe(RESULTADO);

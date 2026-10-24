@@ -68,6 +68,13 @@ export default function SunmiHojaDeConfirmacion({
   // confirmación tenía que ser la misma pieza. Sin `forma`, centrada como
   // siempre.
   forma = "centrado",
+  // ── LO QUE NO ES UN RENGLÓN, OPCIONAL ──────────────────────────────────
+  //
+  // Lo pidió aplicar una lista con bajas de precio (2026-10-24): "Estos
+  // productos bajan de precio" muestra una tarjeta por producto, no viñetas.
+  // Va debajo de los renglones; sin renglones, en su lugar. Sin `children`, la
+  // hoja es la de siempre, letra por letra.
+  children = null,
 }) {
   return (
     <SunmiModalLayout
@@ -112,14 +119,17 @@ export default function SunmiHojaDeConfirmacion({
         </div>
       }
     >
-      <ul className="space-y-2">
-        {puntos.map((p, i) => (
-          <li key={i} className="flex gap-2 text-sm3 sunmi-text-strong leading-snug">
-            <span aria-hidden="true" className="sunmi-text-muted">•</span>
-            <span>{p}</span>
-          </li>
-        ))}
-      </ul>
+      {puntos.length > 0 || !children ? (
+        <ul className="space-y-2">
+          {puntos.map((p, i) => (
+            <li key={i} className="flex gap-2 text-sm3 sunmi-text-strong leading-snug">
+              <span aria-hidden="true" className="sunmi-text-muted">•</span>
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {children}
     </SunmiModalLayout>
   );
 }

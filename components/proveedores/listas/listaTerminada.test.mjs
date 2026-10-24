@@ -91,7 +91,10 @@ test("CERRADA, LA BARRA DE ABAJO DICE CUÁNTOS SE ACTUALIZARON Y TIENE EL «REPO
   assert.match(cerrada, /<SunmiButton color="amber" onClick=\{\(\) => setViendoReporte\(true\)\}/);
   assert.match(cerrada, /\{TEXTO_REPORTE\}/);
   // «✓ Aplicar» es el mismo color: es "el estilo del botón principal".
-  assert.match(pie, /color="amber"\s+onClick=\{\(\) => setConfirmando\(true\)\}/);
+  // Desde el 2026-10-24 «✓ Aplicar» pasa por `alAplicar`: la confirmación de
+  // siempre, o antes "Estos productos bajan de precio" si alguno baja.
+  assert.match(pie, /color="amber"\s+onClick=\{alAplicar\}/);
+  assert.match(p, /const alAplicar = \(\) =>[\s\S]*?: setConfirmando\(true\);/);
   // Abierta, el reporte va con Terminar y Cancelar, y nada de eso cerrada.
   assert.match(p, /\{abierta && \(\s*<div className="grid grid-cols-2 gap-2">[\s\S]*?Terminar lista[\s\S]*?Cancelar esta lista[\s\S]*?setViendoReporte\(true\)/);
   // Y los dos botones abren la misma hoja.
