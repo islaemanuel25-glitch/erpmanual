@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 22:24
+**Fecha:** 2026-10-24 23:27
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: listas — una lista con todo aplicado se cancela o se termina; solo Terminada y Cancelada cierran — SIN VERIFICAR EN PANTALLA, feat: listas — cancelar una lista aplicada deshace lo aplicado; terminar la deja como está — SIN VERIFICAR EN PANTALLA, refactor: listas — la escritura de «Deshacer» sale de su ruta a revertirEnLaBase.js
+- feat: listas — "Te quedan precios sin aplicar" muestra cada producto con su «✓ Usar» y aplica esos N — SIN VERIFICAR EN PANTALLA, feat: listas — una lista con todo aplicado se cancela o se termina; solo Terminada y Cancelada cierran — SIN VERIFICAR EN PANTALLA, feat: listas — cancelar una lista aplicada deshace lo aplicado; terminar la deja como está — SIN VERIFICAR EN PANTALLA
 - Archivos: 4 nuevos, 30 modificados (34 total)
 
 ### transferencias
