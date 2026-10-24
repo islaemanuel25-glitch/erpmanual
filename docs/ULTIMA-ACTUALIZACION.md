@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 14:15
+**Fecha:** 2026-10-24 14:40
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA), feat: revisión de una lista — elegido visible, % por dirección, «¿Es este?», caja, progreso y deshacer (SIN VERIFICAR EN PANTALLA), fix(listas): chip de vinculados y nunca comparar la unidad contra la caja
+- feat: listas — la hoja de «Corregir» deja contestar los kilos o la caja, precargados del nombre (SIN VERIFICAR EN PANTALLA), feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA), feat: revisión de una lista — elegido visible, % por dirección, «¿Es este?», caja, progreso y deshacer (SIN VERIFICAR EN PANTALLA)
 - Archivos: 2 nuevos, 18 modificados (20 total)
 
 ### transferencias
