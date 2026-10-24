@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 21:44
+**Última actualización:** 2026-10-24 22:10
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,8 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: feat: listas — cancelar una lista aplicada deshace lo aplicado; terminar la deja como está — SIN VERIFICAR EN PANTALLA
+- 2026-10-24: refactor: listas — la escritura de «Deshacer» sale de su ruta a revertirEnLaBase.js
 - 2026-10-24: feat: listas — aviso de bajas antes de aplicar, «Para revisar» con las bajas primero y la columna sin «» — SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas de proveedor en dos paquetes, "Tus productos de X" y "Pueden ser de X" — SIN VERIFICAR EN PANTALLA
 - 2026-10-24: fix: listas — el alcance de una lista es lo que ve la ubicación donde se subió, activo, en una sola función (SIN VERIFICAR EN PANTALLA)
