@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 19:12
+**Última actualización:** 2026-10-24 19:40
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-24: fix: listas — los «✓ Sí» de antes de la tabla de sumados se reconstruyen, y el universo queda atado a los tres lugares (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: listas — «Pueden ser de…» con «Aceptados» aparte, «Deshacer» y «Otro» (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: fix: listas — terminar o cancelar con precios sin aplicar abre una hoja en vez de cerrar directo (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA

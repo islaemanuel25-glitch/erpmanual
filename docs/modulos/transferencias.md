@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-24 19:12
+**Última actualización:** 2026-10-24 19:40
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-24: fix: listas — los «✓ Sí» de antes de la tabla de sumados se reconstruyen, y el universo queda atado a los tres lugares (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: listas — «Pueden ser de…» con «Aceptados» aparte, «Deshacer» y «Otro» (SIN VERIFICAR EN PANTALLA)
 - 2026-10-24: feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA)
