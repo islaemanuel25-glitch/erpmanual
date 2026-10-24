@@ -10,8 +10,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
-import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
-import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
+import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
@@ -95,6 +94,8 @@ export async function GET(req) {
           createdAt: true,
           conciliadaEn: true,
           aplicadaEn: true,
+          // Dónde se subió: los números de la tapa son sobre lo que ve esa ubicación.
+          localOperativoId: true,
           parser: true,
           parserVersion: true,
           recargoPct: true,
@@ -133,11 +134,11 @@ export async function GET(req) {
     // regla, cambian los dos.
     const conteos = await Promise.all(
       items.map(async (i) => {
-        const universoWhere = {
+        const universoWhere = alcanceDeLaListaWhere({
           grupoId,
-          ...productoDelProveedorWhere(i.proveedor?.id),
-          ...productoActivoWhere(),
-        };
+          localId: i.localOperativoId,
+          proveedorId: i.proveedor?.id,
+        });
         const base = { universoWhere, importacionId: i.id, proveedorId: i.proveedor?.id, filtroCola: filtroDeLaCola() };
         const [listos, actualizados] = await Promise.all([
           prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.LISTO_PARA_APLICAR, base) }),

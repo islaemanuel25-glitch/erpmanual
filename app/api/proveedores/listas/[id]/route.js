@@ -40,11 +40,8 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { motivoDePendiente, pendienteEnAlerta } from "@/lib/proveedores/listas/detalleSistema";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
-import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
-import {
-  productoActivoWhere,
-  filaConProductoDeBajaWhere,
-} from "@/lib/proveedores/listas/productoDeBaja";
+import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
+import { filaConProductoDeBajaWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
@@ -289,9 +286,14 @@ export async function GET(req, context) {
     // El universo del ERP: productos con este proveedor asociado en alguna de
     // sus tres relaciones. Es un número del CATÁLOGO, no del archivo, y por eso
     // se informa aparte.
-    const productosDelProveedor = await prisma.productoBase.count({
-      where: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id), ...productoActivoWhere() },
+    // Con el alcance de la lista (`alcanceDeLaListaWhere`): lo que ve la
+    // ubicación donde se subió, activo y del proveedor.
+    const universoWhere = alcanceDeLaListaWhere({
+      grupoId,
+      localId: cabecera.localOperativoId,
+      proveedorId: cabecera.proveedor.id,
     });
+    const productosDelProveedor = await prisma.productoBase.count({ where: universoWhere });
 
     const macheo = resumirMacheo(filasParaMacheo, { productosDelProveedor });
 
@@ -304,11 +306,10 @@ export async function GET(req, context) {
     //
     // Son tres `count` con EXISTS sobre un índice ya existente
     // `(importacionId, productoBaseId)`; no recorren filas en memoria.
-    const universoWhere = {
-      grupoId,
-      ...productoDelProveedorWhere(cabecera.proveedor.id),
-      ...productoActivoWhere(),
-    };
+    //
+    // Cada situación se combina con el universo por `AND`: esparcidos en el
+    // mismo objeto, el `NOT` de una situación pisaba el de "activo" del
+    // universo (2026-10-24).
     const conFilaAplicada = {
       filasImportacionLista: { some: { importacionId, aplicada: true } },
     };
@@ -317,17 +318,16 @@ export async function GET(req, context) {
     };
 
     const [actualizados, pendientes, ausentes, sinCodigoDelProveedor, filasAplicadas] = await Promise.all([
-      prisma.productoBase.count({ where: { ...universoWhere, ...conFilaAplicada } }),
+      prisma.productoBase.count({ where: { AND: [universoWhere, conFilaAplicada] } }),
       prisma.productoBase.count({
-        where: { ...universoWhere, NOT: conFilaAplicada, ...conFilaSinAplicar },
+        where: { AND: [universoWhere, { NOT: conFilaAplicada }, conFilaSinAplicar] },
       }),
       prisma.productoBase.count({
-        where: { ...universoWhere, filasImportacionLista: { none: { importacionId } } },
+        where: { AND: [universoWhere, { filasImportacionLista: { none: { importacionId } } }] },
       }),
       prisma.productoBase.count({
         where: {
-          ...universoWhere,
-          codigosProveedor: { none: { proveedorId: cabecera.proveedor.id, activo: true } },
+          AND: [universoWhere, { codigosProveedor: { none: { proveedorId: cabecera.proveedor.id, activo: true } } }],
         },
       }),
       // Las FILAS aplicadas. Se informa junto a los productos porque no son el
@@ -353,13 +353,10 @@ export async function GET(req, context) {
       where: {
         importacionId,
         aplicada: false,
+        // Con `AND`: esparcido, este `NOT` pisaba el de "activo en algún
+        // local" del universo, y la alerta contaba productos inactivos.
         productoBase: {
-          is: {
-            grupoId,
-            ...productoDelProveedorWhere(cabecera.proveedor.id),
-            ...productoActivoWhere(),
-            NOT: conFilaAplicada,
-          },
+          is: { AND: [universoWhere, { NOT: conFilaAplicada }] },
         },
       },
       include: {

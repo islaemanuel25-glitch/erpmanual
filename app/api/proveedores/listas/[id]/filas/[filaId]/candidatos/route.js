@@ -15,8 +15,8 @@
 // `sugerirPorNombre` es pura y se podría importar en el cliente, pero el dato
 // que necesita no: el universo de productos del proveedor sale de una consulta.
 // Mandarle al navegador 2.509 productos para que elija uno sería mover mucho
-// para traer poco, y además ese universo depende de `localId` —la ubicación
-// define qué se ve—, así que viajaría ya filtrado y quedaría viejo apenas
+// para traer poco, y además ese universo depende de la ubicación donde se subió
+// la lista —define qué se ve—, así que viajaría ya filtrado y quedaría viejo apenas
 // alguien vincule algo.
 //
 // Calculando acá, cada apertura de panel relee. No hay copia en memoria del
@@ -73,7 +73,7 @@ export async function GET(req, context) {
     // La importación ancla el alcance: de otro grupo, no existe.
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
-      select: { id: true, proveedorId: true },
+      select: { id: true, proveedorId: true, localOperativoId: true },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -95,8 +95,10 @@ export async function GET(req, context) {
       return NextResponse.json({ ok: false, error: "Fila no encontrada." }, { status: 404 });
     }
 
+    // Con el alcance de la LISTA —lo que ve la ubicación donde se subió—, el
+    // mismo con que la concilió el motor.
     const { productos } = await cargarDatosDeConciliacion(
-      { grupoId, proveedorId: importacion.proveedorId, localId },
+      { grupoId, proveedorId: importacion.proveedorId, localId: importacion.localOperativoId },
       prisma
     );
 

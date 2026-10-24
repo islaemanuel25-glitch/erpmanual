@@ -125,6 +125,8 @@ export async function POST(req, context) {
         recargoPct: true,
         impuestoAdicionalPct: true,
         parser: true,
+        // Dónde se subió: el motor concilia sobre lo que ve esa ubicación.
+        localOperativoId: true,
         proveedor: { select: { id: true, nombre: true } },
       },
     });

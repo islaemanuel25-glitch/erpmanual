@@ -87,6 +87,8 @@ export async function POST(req, context) {
         aumentoEsperadoMinPct: true,
         aumentoEsperadoMaxPct: true,
         parser: true,
+        // Dónde se subió: el motor concilia sobre lo que ve esa ubicación.
+        localOperativoId: true,
       },
     });
     if (!cab) {

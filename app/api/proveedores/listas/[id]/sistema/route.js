@@ -21,8 +21,7 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
-import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
-import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
+import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { SITUACION_DETALLE } from "@/lib/proveedores/listas/detalleSistema";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
@@ -106,29 +105,33 @@ export async function GET(req, context) {
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
-      select: { id: true, proveedorId: true, recargoPct: true, aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true },
+      select: {
+        id: true, proveedorId: true, recargoPct: true, aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
+        // Dónde se subió: el alcance de la lista es lo que ve esa ubicación.
+        localOperativoId: true,
+      },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
     }
 
-    const universo = {
+    const universo = alcanceDeLaListaWhere({
       grupoId,
-      ...productoDelProveedorWhere(importacion.proveedorId),
-      ...productoActivoWhere(),
-    };
+      localId: importacion.localOperativoId,
+      proveedorId: importacion.proveedorId,
+    });
     const conAplicada = { filasImportacionLista: { some: { importacionId, aplicada: true } } };
     const conFila = { filasImportacionLista: { some: { importacionId } } };
 
     // El where de cada situación. Son excluyentes por construcción: el mismo
-    // criterio que usa el resumen, para que los números coincidan siempre.
+    // criterio que usa el resumen, para que los números coincidan siempre. Con
+    // `AND`: esparcido, el `NOT` de PENDIENTES pisaba el de "activo" del universo.
     const wherePorSituacion = {
-      ACTUALIZADOS: { ...universo, ...conAplicada },
-      PENDIENTES: { ...universo, NOT: conAplicada, ...conFila },
-      AUSENTES: { ...universo, filasImportacionLista: { none: { importacionId } } },
+      ACTUALIZADOS: { AND: [universo, conAplicada] },
+      PENDIENTES: { AND: [universo, { NOT: conAplicada }, conFila] },
+      AUSENTES: { AND: [universo, { filasImportacionLista: { none: { importacionId } } }] },
       SIN_CODIGO: {
-        ...universo,
-        codigosProveedor: { none: { proveedorId: importacion.proveedorId, activo: true } },
+        AND: [universo, { codigosProveedor: { none: { proveedorId: importacion.proveedorId, activo: true } } }],
       },
     };
     const where = wherePorSituacion[situacion];

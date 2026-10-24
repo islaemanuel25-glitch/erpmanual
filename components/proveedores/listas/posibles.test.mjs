@@ -160,12 +160,16 @@ test("UN PRODUCTO DE OTRO PROVEEDOR CON NOMBRE CASI IGUAL APARECE, CON SU PROVEE
 
 test("LA RUTA SACA SOLO LOS QUE YA TIENEN VÍNCULO CON ESTE PROVEEDOR: LOS DE OTRO Y LOS SIN PROVEEDOR ENTRAN", () => {
   const ruta = codigoDe(RUTA);
-  // El catálogo no filtra por proveedor: solo deja afuera los vinculados.
+  // El catálogo no filtra por proveedor: solo deja afuera los vinculados. Es el
+  // alcance de la lista SIN proveedor (desde el 2026-10-24: lo que ve la
+  // ubicación de la lista, activo; antes, todo el grupo).
   const catalogo = ruta.slice(ruta.indexOf("const catalogo"), ruta.indexOf("const posibles"));
   assert.match(catalogo, /id: \{ notIn: \[\.\.\.conVinculo\] \}/);
-  assert.doesNotMatch(catalogo, /proveedor_id|proveedor2_id|proveedor3_id/);
-  // Vinculados = sus tres lugares (el universo de la revisión) y los códigos activos.
-  assert.match(ruta, /productoDelProveedorWhere\(proveedorId\)/);
+  assert.doesNotMatch(catalogo, /proveedor_id|proveedor2_id|proveedor3_id|proveedorId/);
+  assert.match(catalogo, /alcanceDeLaListaWhere\(\{ grupoId, localId: cab\.localOperativoId \}\)/);
+  // Vinculados = sus tres lugares (el universo de la revisión, con el mismo
+  // alcance) y los códigos activos.
+  assert.match(ruta, /alcanceDeLaListaWhere\(\{ grupoId, localId: cab\.localOperativoId, proveedorId \}\)/);
   assert.match(ruta, /productoCodigoProveedor\.findMany\(\{\s*where: \{ grupoId, proveedorId, activo: true \}/);
   assert.match(ruta, /conVinculo = new Set\(\[\.\.\.delProveedor\.map\(\(p\) => p\.id\), \.\.\.porCodigo\.map\(\(c\) => c\.productoBaseId\)\]\)/);
 });

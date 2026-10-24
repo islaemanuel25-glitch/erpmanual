@@ -98,6 +98,8 @@ export async function POST(req, context) {
         aumentoEsperadoMaxPct: true,
         parser: true,
         decisionDeLectura: true,
+        // Dónde se subió: el motor concilia sobre lo que ve esa ubicación.
+        localOperativoId: true,
         proveedor: { select: { id: true, nombre: true } },
       },
     });

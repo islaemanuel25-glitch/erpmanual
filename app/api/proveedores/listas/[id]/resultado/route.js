@@ -60,7 +60,7 @@ import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/v
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
-import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { sugerenciasDeRenglones } from "@/lib/proveedores/listas/vincularConUnaFila";
@@ -70,7 +70,6 @@ import {
   lecturaElegida,
   lecturasDeLaFila,
 } from "@/lib/proveedores/listas/lecturasDeLaFila";
-import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO, GRUPOS_PRECIO_VIEJO } from "@/lib/proveedores/listas/gruposProducto";
 
@@ -181,6 +180,8 @@ export async function GET(req, context) {
         // ACTUALIZAR y una lista de control se vería como una que va a escribir
         // costos — con su botón de aplicar incluido.
         modo: true,
+        // DÓNDE SE SUBIÓ: el alcance de la lista es lo que ve esa ubicación.
+        localOperativoId: true,
         proveedor: { select: { id: true, nombre: true, parserListaId: true } },
       },
     });
@@ -219,11 +220,13 @@ export async function GET(req, context) {
     // del catálogo —`whereDelGrupo`— que es el que ya usa el historial. Contar
     // filas daría de más: dos filas del archivo pueden terminar en el mismo
     // producto, y el número de la tapa y el del detalle dirían cosas distintas.
-    const universoWhere = {
+    // El alcance de la lista: lo que ve la ubicación donde se subió, activo y
+    // del proveedor (`alcanceDeLaListaWhere`, la misma del motor).
+    const universoWhere = alcanceDeLaListaWhere({
       grupoId,
-      ...productoDelProveedorWhere(cab.proveedor?.id),
-      ...productoActivoWhere(),
-    };
+      localId: cab.localOperativoId,
+      proveedorId: cab.proveedor?.id,
+    });
     const productosActualizados = await prisma.productoBase.count({
       where: whereDelGrupo(GRUPO_PRODUCTO.ACTUALIZADO, {
         universoWhere,

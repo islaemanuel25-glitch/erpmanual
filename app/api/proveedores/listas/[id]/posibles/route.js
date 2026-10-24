@@ -12,8 +12,9 @@
 // ── QUÉ SE CRUZA CON QUÉ ──────────────────────────────────────────────────
 //
 // Los renglones de ESTA lista que quedaron sin vincular, con código, contra
-// los productos activos del grupo que NO tienen ningún vínculo con este
-// proveedor: ni en sus tres lugares de proveedor, ni por un código activo.
+// los productos activos que VE la ubicación donde se subió la lista
+// (`alcanceDeLaListaWhere`: un exclusivo de otro local nunca) y que NO tienen
+// ningún vínculo con este proveedor: ni en sus tres lugares, ni por un código.
 // Se dejan afuera además los combos —no tienen costo propio— y los renglones
 // que ya son la sugerencia "¿Es …?" de un producto del proveedor: esa pregunta
 // ya está hecha en su tarjeta. El parecido y el umbral son los de esa misma
@@ -46,8 +47,7 @@ import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { esImportacionAbierta, OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
-import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
-import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
+import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { clavesDeCodigo } from "@/lib/proveedores/listas/normalizarCodigo";
 import {
   LUGARES_DE_PROVEEDOR,
@@ -72,7 +72,8 @@ async function contexto(req, context) {
   if (!Number.isInteger(importacionId)) return { error: { ok: false, error: "Identificador inválido." }, status: 400 };
   const cab = await prisma.importacionListaProveedor.findFirst({
     where: { id: importacionId, grupoId: scope.grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
-    select: { id: true, estado: true, proveedorId: true, proveedor: { select: { nombre: true } } },
+    // `localOperativoId`: la búsqueda es sobre lo que ve la ubicación donde se subió.
+    select: { id: true, estado: true, proveedorId: true, localOperativoId: true, proveedor: { select: { nombre: true } } },
   });
   if (!cab) return { error: { ok: false, error: "Importación no encontrada." }, status: 404 };
   if (!esImportacionAbierta(cab.estado)) {
@@ -110,7 +111,7 @@ export async function GET(req, context) {
         orderBy: { filaExcel: "asc" },
       }),
       prisma.productoBase.findMany({
-        where: { grupoId, ...productoDelProveedorWhere(proveedorId), ...productoActivoWhere() },
+        where: alcanceDeLaListaWhere({ grupoId, localId: cab.localOperativoId, proveedorId }),
         select: { id: true, nombre: true },
       }),
       prisma.productoCodigoProveedor.findMany({
@@ -145,7 +146,14 @@ export async function GET(req, context) {
     const renglones = libres.filter((f) => !sugeridos.has(f.id) && clavesDeCodigo(f.codigoNormalizado ?? f.codigoCrudo).normalizado);
 
     const catalogo = await prisma.productoBase.findMany({
-      where: { grupoId, ...productoActivoWhere(), es_combo: false, id: { notIn: [...conVinculo] } },
+      // El resto de lo que VE la ubicación de la lista: un exclusivo de otro
+      // local no se propone nunca (2026-10-24).
+      where: {
+        AND: [
+          alcanceDeLaListaWhere({ grupoId, localId: cab.localOperativoId }),
+          { es_combo: false, id: { notIn: [...conVinculo] } },
+        ],
+      },
       select: {
         id: true,
         nombre: true,
