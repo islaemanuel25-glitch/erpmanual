@@ -1,15 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-24 18:15
+**Fecha:** 2026-10-24 19:12
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: listas — terminar o cancelar con precios sin aplicar abre una hoja en vez de cerrar directo (SIN VERIFICAR EN PANTALLA), feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — una lista terminada tiene el reporte en la barra y en una hoja, y cuenta en pasado lo que no se aplicó (SIN VERIFICAR EN PANTALLA)
+- feat: listas — «Pueden ser de…» con «Aceptados» aparte, «Deshacer» y «Otro» (SIN VERIFICAR EN PANTALLA), fix: listas — terminar o cancelar con precios sin aplicar abre una hoja en vez de cerrar directo (SIN VERIFICAR EN PANTALLA), feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA
 - Archivos: 3 nuevos, 18 modificados (21 total)
 
 ### transferencias
-- feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA), feat(turnos): Turnos y cierres, nueva y anterior, solo para dueño y admin — SIN VERIFICAR en pantalla
+- feat: listas — «Pueden ser de…» con «Aceptados» aparte, «Deshacer» y «Otro» (SIN VERIFICAR EN PANTALLA), feat: listas — «Buscar en el resto de mis productos» (Pueden ser de…) SIN VERIFICAR EN PANTALLA, feat: listas — un producto por kilo se compara por kilo en vez de quedar bloqueado (SIN VERIFICAR EN PANTALLA)
 - Archivos: 1 modificados (1 total)
 
 ### pos-ventas
