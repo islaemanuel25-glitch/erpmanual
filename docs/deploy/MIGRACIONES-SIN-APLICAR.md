@@ -112,6 +112,13 @@ Si la lista está vacía, el despliegue es solo de código.
   ANTES de levantar la imagen nueva: `detalle/editar` la escribe y `enviar`,
   `solicitados` y el criterio de "empezado" la leen. La imagen vieja con esto
   puesto sigue andando: no la conoce. El clasificador sale en 0.
+- `20261024000040_lista_producto_que_no_viene` — **Aditiva, sin datos.** La
+  tabla nueva `ProductoQueNoVieneEnLaLista`: el "No viene en esta lista" de la
+  hoja de vincular en la revisión de una lista, por lista y producto. No toca
+  ninguna fila ni ninguna columna existente. Va ANTES de levantar la imagen
+  nueva: el resultado de una lista la lee y `en-la-lista` la escribe; sin
+  ella, abrir una lista da error. La imagen vieja con esto puesto sigue
+  andando: no la conoce.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

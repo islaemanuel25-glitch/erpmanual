@@ -122,13 +122,19 @@ test("la pantalla tiene rama para el error, no solo para el caso bueno", () => {
   // INC-0006: `app/modulos/proveedores/page.jsx` preguntaba por el caso bueno y
   // no tenía rama para el malo, así que un 500 se veía igual que un botón que no
   // hace nada. Las tres pantallas nuevas de este módulo tienen que mostrarlo.
+  //
+  // Desde el 2026-10-23 la tercera ya no es una pantalla: revisar de a uno se
+  // fue y su decisión es la hoja `HojaRevisarPrecio`; con ella entra la hoja de
+  // vincular, que también pide datos al servidor. Las dos dibujan el error
+  // adentro de la hoja, donde se tocó.
   for (const p of [
     "app/modulos/proveedores/listas/page.jsx",
     "app/modulos/proveedores/listas/[id]/page.jsx",
-    "app/modulos/proveedores/listas/[id]/revisar/page.jsx",
+    "components/proveedores/listas/HojaRevisarPrecio.jsx",
+    "components/proveedores/listas/HojaVincularConLaLista.jsx",
   ]) {
     const fuente = leer(p);
     assert.match(fuente, /setError\(/, `${p} no guarda el error`);
-    assert.match(fuente, /ErrorRecuperable|\{error &&|if \(error\)/, `${p} no dibuja el error`);
+    assert.match(fuente, /ErrorRecuperable|\{error &&|if \(error\)|\) : error \? \(/, `${p} no dibuja el error`);
   }
 });

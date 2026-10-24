@@ -138,15 +138,19 @@ export async function GET(req, context) {
     const url = new URL(req.url);
     const buscar = String(url.searchParams.get("buscar") ?? "").trim();
 
+    // Cualquiera de las palabras, no la frase entera: la hoja de vincular
+    // arranca con las primeras palabras del nombre ya escritas, y es la misma
+    // hoja por las dos puertas (`en-la-lista` lo explica largo).
+    const palabras = buscar.split(/\s+/).filter((p) => p.length >= 2);
     const candidatas = await prisma.importacionListaFila.findMany({
       where: {
         importacionId,
-        ...(buscar
+        ...(palabras.length
           ? {
-              OR: [
-                { descripcionProveedor: { contains: buscar, mode: "insensitive" } },
-                { codigoCrudo: { contains: buscar, mode: "insensitive" } },
-              ],
+              OR: palabras.flatMap((p) => [
+                { descripcionProveedor: { contains: p, mode: "insensitive" } },
+                { codigoCrudo: { contains: p, mode: "insensitive" } },
+              ]),
             }
           : {}),
       },

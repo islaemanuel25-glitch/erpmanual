@@ -74,7 +74,12 @@ async function contexto(req) {
     };
   }
   // Sin el comodín, solo las listas de un proveedor del local de la sesión.
-  return { ...scope, propia: importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) };
+  return {
+    ...scope,
+    // Quién decide "No viene en esta lista": se guarda con la decisión.
+    session: acceso.session,
+    propia: importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin),
+  };
 }
 
 /** Los campos de fila que la pantalla muestra y el puntaje necesita. */
@@ -119,15 +124,23 @@ export async function GET(req, context) {
     const url = new URL(req.url);
     const buscar = String(url.searchParams.get("buscar") ?? "").trim();
 
+    // ── CUALQUIERA DE LAS PALABRAS, NO LA FRASE ENTERA ────────────────────
+    //
+    // La hoja de vincular arranca con las primeras palabras del nombre del
+    // producto ya escritas (2026-10-23). Exigir la frase entera dejaba afuera
+    // el renglón que el proveedor escribe en otro orden o abreviado —"SOLITAS
+    // ANIMACION" contra "GALL SOLITAS ANIM"—, que es justo el que se busca. Con
+    // cualquier palabra entran más, y el orden lo pone el parecido al nombre.
+    const palabras = buscar.split(/\s+/).filter((p) => p.length >= 2);
     const filas = await prisma.importacionListaFila.findMany({
       where: {
         importacionId,
-        ...(buscar
+        ...(palabras.length
           ? {
-              OR: [
-                { descripcionProveedor: { contains: buscar, mode: "insensitive" } },
-                { codigoCrudo: { contains: buscar, mode: "insensitive" } },
-              ],
+              OR: palabras.flatMap((p) => [
+                { descripcionProveedor: { contains: p, mode: "insensitive" } },
+                { codigoCrudo: { contains: p, mode: "insensitive" } },
+              ]),
             }
           : {}),
       },
@@ -172,6 +185,48 @@ export async function POST(req, context) {
     }
 
     const body = await req.json().catch(() => ({}));
+
+    // ── "NO VIENE EN ESTA LISTA" AHORA SE GUARDA ─────────────────────────
+    //
+    // Hasta el 2026-10-23 no escribía nada: el producto ya estaba fuera de la
+    // lista y la pantalla de "No vinieron" lo seguía mostrando ahí. Con la
+    // revisión que arranca de tus productos, no guardarlo dejaba la tarjeta
+    // "Sin vincular" para siempre, como si nadie la hubiera mirado. Es un hecho
+    // de ESTA lista (`ProductoQueNoVieneEnLaLista`): no toca vínculos ni costos.
+    if (body?.noViene === true) {
+      const cabNo = await prisma.importacionListaProveedor.findFirst({
+        where: { id: importacionId, grupoId, ...ctx.propia },
+        select: { id: true, estado: true },
+      });
+      if (!cabNo) {
+        return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
+      }
+      if (!esImportacionAbierta(cabNo.estado)) {
+        return NextResponse.json(
+          { ok: false, error: "Esta lista está cerrada: ya no se puede marcar nada en ella.", codigo: "CERRADA" },
+          { status: 409 }
+        );
+      }
+      const productoNo = await prisma.productoBase.findFirst({
+        where: { id: productoBaseId, grupoId },
+        select: { id: true, nombre: true },
+      });
+      if (!productoNo) {
+        return NextResponse.json({ ok: false, error: "El producto ya no existe." }, { status: 404 });
+      }
+      await prisma.productoQueNoVieneEnLaLista.upsert({
+        where: { no_viene_unico_por_lista_y_producto: { importacionId, productoBaseId } },
+        create: { grupoId, importacionId, productoBaseId, decididoPorUsuarioId: ctx.session?.id ?? null },
+        update: { decididoPorUsuarioId: ctx.session?.id ?? null, decididoEn: new Date() },
+      });
+      return NextResponse.json({
+        ok: true,
+        accion: "NO_VIENE",
+        productoBaseId,
+        mensaje: `${productoNo.nombre} queda como que no viene en esta lista. No se cambió ningún costo.`,
+      });
+    }
+
     const filaElegidaId = Number(body?.filaElegidaId);
     if (!Number.isInteger(filaElegidaId)) {
       return NextResponse.json(
@@ -291,6 +346,10 @@ export async function POST(req, context) {
         where: { id: filaNueva.id },
         data: { ...filaAPersistir(recalculada), vinculadoEn: ahora },
       });
+
+      // Si antes alguien dijo que no venía, ya vino: la marca sobra, y dejarla
+      // serían dos respuestas a la misma pregunta.
+      await tx.productoQueNoVieneEnLaLista.deleteMany({ where: { importacionId, productoBaseId } });
 
       await recalcularContadores(tx, importacionId);
     }, OPCIONES_TX);

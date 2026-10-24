@@ -61,6 +61,7 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO, GRUPOS_PRECIO_VIEJO } from "@/lib/proveedores/listas/gruposProducto";
@@ -249,6 +250,44 @@ export async function GET(req, context) {
       },
     });
 
+    // ── TUS PRODUCTOS, CON LO QUE LES PASA ───────────────────────────────
+    //
+    // La revisión arranca de acá desde el 2026-10-23 (`tusProductos.js`). El
+    // universo es el MISMO de arriba —`productoDelProveedorWhere` y activos—, y
+    // "cambia" se decide con las mismas omisiones que el número del botón de
+    // aplicar: si salieran de otra consulta, una tarjeta podría decir «Cambia»
+    // sobre algo que aplicar no toca.
+    const productosDelProveedor = await prisma.productoBase.findMany({
+      where: universoWhere,
+      orderBy: { nombre: "asc" },
+      select: {
+        id: true,
+        nombre: true,
+        precio_costo: true,
+        filasImportacionLista: {
+          where: { importacionId: id },
+          orderBy: { filaExcel: "asc" },
+          select: {
+            ...CAMPOS_CONTEO,
+            codigoCrudo: true,
+            descripcionProveedor: true,
+            precioConIva: true,
+            unidadesPorBulto: true,
+          },
+        },
+      },
+    });
+    const noVienen = await prisma.productoQueNoVieneEnLaLista.findMany({
+      where: { importacionId: id, grupoId },
+      select: { productoBaseId: true },
+    });
+    const tusProductos = tusProductosDeLaLista({
+      productos: productosDelProveedor.map((p) => ({ ...p, filas: p.filasImportacionLista })),
+      rango: rangoDelProveedor,
+      omitidas: revision.ids,
+      noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
+    });
+
     // ── La muestra: tres de las que se van a actualizar ──────────────────
     // `excluidaManual: false` en los dos: una fila que el motor dejó lista y que
     // después alguien excluyó a mano NO se va a aplicar, así que no puede
@@ -358,6 +397,7 @@ export async function GET(req, context) {
         })),
       },
       variacion: conteo.rangoDeLosListos,
+      tusProductos,
       muestra: muestra.map((f) => ({
         id: f.id,
         nombre: f.productoBase?.nombre || f.descripcionProveedor,

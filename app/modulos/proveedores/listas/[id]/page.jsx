@@ -36,12 +36,11 @@ import {
   useTituloDePagina,
 } from "@/app/context/AccionDePaginaContext";
 
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
+
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
 import {
-  TarjetaGrande,
-  TarjetaChica,
-  TarjetaAncha,
-  FilaDeCambio,
   Aviso,
   pct,
   // El peso con el formato de siempre. Se reusa el del kit y no se escribe otro
@@ -49,6 +48,24 @@ import {
   // el día que uno cambie de decimales.
   money,
 } from "@/components/proveedores/listas/PiezasPantallas";
+// ── LA REVISIÓN ARRANCA DE TUS PRODUCTOS (diseño de Emanuel, 2026-10-23) ──
+//
+// Las seis tarjetas de números y las tres pantallas sueltas —"Para revisar" de
+// a uno, "Vincular" recorriendo el archivo de a uno, "No cambian"— se fueron:
+// esta pantalla es la revisión entera, y su lista son tus productos del
+// proveedor, cada uno con lo que le pasa. Lo que decide cada estado vive en
+// `tusProductos.js`; vincular y revisar son hojas que no sacan de acá.
+import TarjetaDeTuProducto from "@/components/proveedores/listas/TarjetaDeTuProducto";
+import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincularConLaLista";
+import HojaRevisarPrecio from "@/components/proveedores/listas/HojaRevisarPrecio";
+import {
+  FILTRO,
+  ORDEN_FILTROS,
+  TEXTO_FILTRO,
+  cantidadDelFiltro,
+  filtroInicial,
+  seVe,
+} from "@/lib/proveedores/listas/tusProductos";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
 // Pasar un control a actualizar precios: pide el rango, que controlar no
 // pregunta y actualizar no puede resolver sin él.
@@ -67,11 +84,10 @@ import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
-import { MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
-// PARA QUÉ SE SUBIÓ LA LISTA. Decide si esta pantalla muestra el resultado de
-// siempre o el del control, que son dos cuerpos distintos y no dos textos.
-import { CONTROL, MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
-import { esImportacionAbierta, ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
+// PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
+// dos acciones del control.
+import { MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
+import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 
 export default function ResultadoDeListaPage() {
   const router = useRouter();
@@ -103,6 +119,21 @@ export default function ResultadoDeListaPage() {
   const [cancelando, setCancelando] = useState(false);
   /** Mientras se vuelven a leer las propuestas que quedaron viejas. */
   const [releyendo, setReleyendo] = useState(false);
+  // ── LA LISTA DE TUS PRODUCTOS ──────────────────────────────────────────
+  //
+  // `filtro` arranca en null y se elige con el primer resultado: el primer
+  // chip que tenga algo. `fijados` son los productos que se tocaron con este
+  // chip puesto: siguen a la vista aunque su estado nuevo ya no sea el del chip,
+  // para que la tarjeta cambie EN EL LUGAR y no desaparezca debajo del dedo.
+  const [filtro, setFiltro] = useState(null);
+  const [buscar, setBuscar] = useState("");
+  const [fijados, setFijados] = useState(() => new Set());
+  /** El producto que se está vinculando: `{ productoBaseId, nombre }` o null. */
+  const [vinculando, setVinculando] = useState(null);
+  /** «No es este producto», desde la hoja de revisar: `{ fila, productoBaseId }`. */
+  const [eligiendoOtra, setEligiendoOtra] = useState(null);
+  /** El producto que se está revisando: `{ filaId, productoBaseId }` o null. */
+  const [revisando, setRevisando] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
@@ -134,9 +165,14 @@ export default function ResultadoDeListaPage() {
     []
   );
 
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    setError("");
+  // `silencioso`: después de vincular o revisar, la pantalla NO pasa por el
+  // cargador. Con él, el contenido se reemplazaba por la rueda y al volver se
+  // perdía el lugar de la lista: la tarjeta que se acaba de tocar quedaba
+  // pantallas más arriba. Si la recarga silenciosa falla, se dice en el aviso
+  // y lo que había queda a la vista.
+  const cargar = useCallback(async ({ silencioso = false } = {}) => {
+    if (!silencioso) setCargando(true);
+    if (!silencioso) setError("");
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/resultado`, {
         credentials: "include",
@@ -144,16 +180,35 @@ export default function ResultadoDeListaPage() {
       });
       const json = await r.json();
       if (!r.ok || !json?.ok) {
-        setError(json?.error || "No se pudo cargar el resultado de esta lista.");
+        const texto = json?.error || "No se pudo cargar el resultado de esta lista.";
+        if (silencioso) setAviso({ tono: "danger", texto });
+        else setError(texto);
         return;
       }
       setDatos(json);
+      // El chip con el que arranca: el primero que tenga algo. Solo la primera
+      // vez —después manda el que eligió la persona—.
+      setFiltro((f) => f ?? filtroInicial(json?.tusProductos?.conteo));
     } catch {
-      setError("No se pudo conectar con el servidor. Probá de nuevo.");
+      const texto = "No se pudo conectar con el servidor. Probá de nuevo.";
+      if (silencioso) setAviso({ tono: "danger", texto });
+      else setError(texto);
     } finally {
-      setCargando(false);
+      if (!silencioso) setCargando(false);
     }
   }, [id]);
+
+  /** Cambiar de chip suelta las tarjetas fijadas: ya no hay "en el lugar". */
+  const elegirFiltro = (f) => {
+    setFiltro(f);
+    setFijados(new Set());
+  };
+
+  /** Lo que se tocó en una hoja se queda a la vista, y la lista se relee. */
+  const despuesDeTocar = async (productoBaseId) => {
+    setFijados((prev) => new Set(prev).add(productoBaseId));
+    await cargar({ silencioso: true });
+  };
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
@@ -504,7 +559,7 @@ export default function ResultadoDeListaPage() {
     );
   }
 
-  const { cabecera, conteo, variacion, muestra, lectura, control } = datos;
+  const { cabecera, conteo, lectura } = datos;
   // Lo que el recálculo de HOY va a omitir, con el motivo y los dos números. El
   // default no es `{}` pelado: la tarjeta lee dos listas y con `{}` habría que
   // preguntar por cada una en tres lugares. Una importación vieja de un cliente
@@ -513,15 +568,20 @@ export default function ResultadoDeListaPage() {
   const omitidas = datos.omitidasAlAplicar ?? { total: 0, porMotivo: [], propuestaDiferente: [] };
   const controlando = cabecera.modo === MODO_LISTA.CONTROLAR;
   const abierta = esImportacionAbierta(cabecera.estado);
-  const aMedias = ESTADOS_A_MEDIAS.includes(cabecera.estado);
   const listos = conteo.listos;
   const puedeDeshacer = cabecera.productosActualizados > 0;
 
   const irA = (sub) => router.push(`/modulos/proveedores/listas/${id}${sub}`);
-  // Los tres grupos que esta lista NO va a corregir, juntos. Es el número de la
-  // tarjeta ancha y el total de la pantalla 7: sale de sumar acá y no de una
-  // consulta aparte para que las dos no puedan decir cosas distintas.
-  const noCambian = conteo.paraRevisar + conteo.dejadas + (cabecera.tuyosQueNoAparecen ?? 0);
+
+  // ── TUS PRODUCTOS, FILTRADOS ─────────────────────────────────────────────
+  //
+  // Una respuesta de un servidor viejo puede no traer la lista: se dibuja vacía
+  // en vez de romper la pantalla.
+  const tusProductos = datos.tusProductos ?? { items: [], conteo: { total: 0, traeLaLista: 0, porEstado: {} } };
+  const nombreProveedor = cabecera.proveedor?.nombre ?? "este proveedor";
+  const sinVincular = tusProductos.conteo.porEstado?.SIN_VINCULAR ?? 0;
+  const filtroActivo = filtro ?? FILTRO.TODOS;
+  const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar, fijados }));
 
   return (
     <Marco>
@@ -542,11 +602,12 @@ export default function ResultadoDeListaPage() {
           primera pregunta que se hace alguien que abre esta pantalla —"¿esto ya
           me tocó los costos?"— y la respuesta tiene que estar antes que los
           números, no después de recorrerlos. */}
+      {/* Archivo · fecha y hora de lectura · qué pasó con los precios. El
+          nombre del proveedor lo dice la barra del shell, en grande, con
+          «← Listas» a la derecha. */}
       <p className="text-sm2 sunmi-text-muted leading-snug">
-        {cabecera.archivoNombre} ·{" "}
-        {controlando
-          ? "no se cambió ningún precio"
-          : `leída ${fechaHora(cabecera.leidaEn)} · ${estadoEnCastellano(cabecera)}`}
+        {cabecera.archivoNombre} · {fechaHora(cabecera.leidaEn)} ·{" "}
+        {controlando ? "no se cambió ningún precio" : estadoEnCastellano(cabecera)}
       </p>
 
       {/* EL AVISO DEL 0 A 0. Se deduce de lo guardado, así que sigue estando la
@@ -651,143 +712,10 @@ export default function ResultadoDeListaPage() {
         </p>
       )}
 
-      {controlando ? (
-        <>
-          {/* ── LOS TRES GRUPOS DEL CONTROL ────────────────────────────────
-              El verde arriba y solo, porque es la respuesta a la pregunta que
-              trajo a alguien acá: "¿la lista coincide con lo que tengo?". Los
-              dos desacuerdos van abajo y en pareja, porque son la misma
-              pregunta mirada de los dos lados. */}
-          <TarjetaGrande
-            numero={control?.coinciden ?? 0}
-            titulo="coinciden con tu costo"
-            detalle={
-              (control?.coinciden ?? 0) > 0
-                ? "El precio de la lista es el que ya tenías, salvo redondeo."
-                : "Ningún producto de la lista coincide con tu costo de hoy."
-            }
-            ariaLabel={
-              (control?.coinciden ?? 0) > 0
-                ? `Ver los ${control.coinciden} que coinciden con tu costo`
-                : undefined
-            }
-            onClick={
-              (control?.coinciden ?? 0) > 0
-                ? () => irA(`/actualizan?control=${CONTROL.COINCIDE}`)
-                : undefined
-            }
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <TarjetaChica
-              numero={control?.tuCostoMasBajo ?? 0}
-              titulo="tu costo es más bajo"
-              detalle="La lista dice más"
-              tono="warning"
-              ariaLabel={
-                (control?.tuCostoMasBajo ?? 0) > 0
-                  ? `Ver los ${control.tuCostoMasBajo} donde la lista dice más que tu costo`
-                  : undefined
-              }
-              onClick={
-                (control?.tuCostoMasBajo ?? 0) > 0
-                  ? () => irA(`/actualizan?control=${CONTROL.TU_COSTO_MAS_BAJO}`)
-                  : undefined
-              }
-            />
-            <TarjetaChica
-              numero={control?.tuCostoMasAlto ?? 0}
-              titulo="tu costo es más alto"
-              detalle="La lista dice menos"
-              tono="warning"
-              ariaLabel={
-                (control?.tuCostoMasAlto ?? 0) > 0
-                  ? `Ver los ${control.tuCostoMasAlto} donde la lista dice menos que tu costo`
-                  : undefined
-              }
-              onClick={
-                (control?.tuCostoMasAlto ?? 0) > 0
-                  ? () => irA(`/actualizan?control=${CONTROL.TU_COSTO_MAS_ALTO}`)
-                  : undefined
-              }
-            />
-          </div>
-
-          {/* Los dos que no son una diferencia de precio sino una diferencia de
-              catálogo. Son los MISMOS dos que muestra el modo de actualizar, con
-              las mismas pantallas detrás: controlar no inventa grupos nuevos
-              para lo que ya tenía nombre. */}
-          <div className="grid grid-cols-2 gap-3">
-            <TarjetaChica
-              numero={cabecera.tuyosQueNoAparecen ?? 0}
-              titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo que no vino" : "tuyos que no vinieron"}
-              detalle="No están en esta lista"
-              ariaLabel={
-                (cabecera.tuyosQueNoAparecen ?? 0) > 0
-                  ? `Ver los ${cabecera.tuyosQueNoAparecen} tuyos que no vinieron en esta lista`
-                  : undefined
-              }
-              onClick={
-                (cabecera.tuyosQueNoAparecen ?? 0) > 0
-                  ? () => irA("/no-cambian?filtro=NO_VINO")
-                  : undefined
-              }
-            />
-            <TarjetaChica
-              numero={conteo.sinProducto}
-              titulo={conteo.sinProducto === 1 ? "de la lista que no tenés" : "de la lista que no tenés"}
-              detalle={abierta ? "Ver y vincular" : "Sin vincular"}
-              ariaLabel={
-                abierta && conteo.sinProducto > 0
-                  ? `Ver y vincular los ${conteo.sinProducto} de la lista que no tenés`
-                  : undefined
-              }
-              onClick={
-                abierta && conteo.sinProducto > 0
-                  ? () => irA(`/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`)
-                  : undefined
-              }
-            />
-          </div>
-        </>
-      ) : aMedias ? (
-        <TarjetaGrande
-          numero={listos}
-          titulo={listos === 1 ? "se actualiza" : "se actualizan"}
-          detalle={textoDeVariacion(
-            variacion,
-            cabecera.rango,
-            conteo.listosElegidosFueraDeRango ?? 0,
-            conteo.rangoDeLosElegidos ?? null
-          )}
-          // LA TARJETA VERDE TAMBIÉN SE TOCA, y es la que más falta hacía: es el
-          // número que Emanuel viene a mirar, y era la única de la pantalla que
-          // no llevaba a ningún lado. El "Ver los N" que hacía ese trabajo era
-          // un texto suelto quince centímetros más abajo.
-          ariaLabel={listos > 0 ? `Ver los ${listos} que se actualizan` : undefined}
-          onClick={listos > 0 ? () => irA("/actualizan") : undefined}
-        />
-      ) : (
-        <TarjetaGrande
-          tono="warning"
-          numero={cabecera.productosActualizados}
-          titulo={
-            cabecera.estado === "CANCELADA"
-              ? "Cancelada: no se actualizó nada"
-              : cabecera.productosActualizados === 1
-                ? "producto actualizado"
-                : "productos actualizados"
-          }
-          detalle={cabecera.estado === "TERMINADA" ? "Esta lista está terminada." : null}
-        />
-      )}
-
-      {/* ── LAS TARJETAS DEL MODO DE ACTUALIZAR NO SE DIBUJAN CONTROLANDO ──
-          No es cosmética: "para revisar" y "los dejaste igual" ofrecen trabajo
-          que en un control no existe —confirmar una lectura para poder aplicar,
-          excluir una fila de una aplicación que no va a pasar—. Y "se actualizan"
-          sería directamente falso. Los cuatro se reemplazan por los tres grupos
-          del control, que son la pregunta que este modo vino a contestar. */}
+      {/* ── LAS SEIS TARJETAS DE NÚMEROS SE FUERON ─────────────────────────
+          Las del control y las del resultado: cada una llevaba a otra pantalla
+          con otro pedazo de la misma pregunta. Ahora la pregunta se contesta
+          producto por producto, más abajo. */}
       {/* ── LAS QUE ESTÁN LISTAS Y NO SE VAN A ESCRIBIR ──────────────────
           Hasta esta tanda estas filas se contaban entre las que "se actualizan",
           y aplicar las salteaba porque consulta por `seleccionada`. Sacarlas del
@@ -919,129 +847,71 @@ export default function ResultadoDeListaPage() {
         </SunmiCard>
       )}
 
-      {!controlando && (
-      <div className="grid grid-cols-2 gap-3">
-        <TarjetaChica
-          numero={conteo.paraRevisar}
-          titulo="para revisar"
-          // UNA LISTA CERRADA NO INVITA A TRABAJAR. "De a uno" sobre una
-          // terminada ofrece un trabajo que ya no se puede hacer: confirmar o
-          // excluir una fila necesita la importación abierta y el servidor lo
-          // rechaza. El número sigue estando —es información de lo que quedó—
-          // pero sin la invitación y sin el toque.
-          detalle={aMedias ? "De a uno" : "Quedaron sin resolver"}
-          tono="warning"
-          ariaLabel={aMedias ? `Revisar los ${conteo.paraRevisar} de a uno` : undefined}
-          onClick={aMedias && conteo.paraRevisar > 0 ? () => irA("/revisar") : undefined}
-        />
-        {/* ── "LOS DEJASTE IGUAL" YA NO SE MEZCLA CON "YA VALÍAN LO MISMO" ──
-            Eran un solo número —"que no se tocan"— y son dos cosas distintas:
-            una es una decisión de Emanuel, que se puede deshacer y que él quiere
-            poder revisar; la otra es que el proveedor mandó el mismo precio, que
-            no es trabajo de nadie. Sumarlas daba una tarjeta que no llevaba a
-            ningún lado porque no se podía: la mitad de su número no tenía
-            pantalla. Separadas, ésta lleva a la 7 filtrada en "Los dejaste", y
-            las que ya valían igual dejan de ocupar una tarjeta. */}
-        <TarjetaChica
-          numero={conteo.dejadas}
-          titulo={conteo.dejadas === 1 ? "lo dejaste igual" : "los dejaste igual"}
-          detalle={aMedias ? "Ver cuáles" : "No se tocaron"}
-          ariaLabel={
-            conteo.dejadas > 0 ? `Ver los ${conteo.dejadas} que dejaste igual` : undefined
-          }
-          onClick={conteo.dejadas > 0 ? () => irA("/no-cambian?filtro=DEJADO") : undefined}
-        />
+      {/* ── EL RESUMEN: DE LO TUYO, CUÁNTO TRAE LA LISTA ───────────────────
+          "De tus 158 productos de Dab, la lista trae 14." Es la única cuenta
+          que importa antes de empezar: cuánto de lo tuyo vino. Los números
+          salen del mismo arreglo que se dibuja abajo. */}
+      <SunmiCard className="p-3 space-y-0.5">
+        <p className="text-sm2 sunmi-text-muted">
+          De tus {tusProductos.conteo.total} productos de {nombreProveedor}
+        </p>
+        <p className="text-xl2 font-bold sunmi-text-strong leading-tight">
+          la lista trae {tusProductos.conteo.traeLaLista}
+        </p>
+        {sinVincular > 0 && abierta && (
+          <p className="text-sm2 sunmi-text-muted leading-snug pt-1">
+            Vinculá los que faltan una sola vez: después {nombreProveedor} los trae solos.
+          </p>
+        )}
+      </SunmiCard>
+
+      {/* Los chips, en el orden del diseño y con su número. "Todos" va último:
+          se arma como un chip más y no con el "Todas" de la pieza, que va
+          primero. Arranca en el primero que tenga algo. */}
+      <SunmiChipsFiltro
+        rotulo={null}
+        textoTodas={null}
+        valor={filtroActivo}
+        onCambiar={(f) => elegirFiltro(f ?? FILTRO.TODOS)}
+        opciones={ORDEN_FILTROS.map((f) => ({
+          clave: f,
+          texto: TEXTO_FILTRO[f],
+          cantidad: cantidadDelFiltro(f, tusProductos.conteo),
+        }))}
+      />
+
+      <SunmiInput
+        type="search"
+        value={buscar}
+        onChange={(e) => setBuscar(e.target.value)}
+        placeholder="Buscar en tus productos"
+        aria-label="Buscar en tus productos"
+        className="min-h-toque text-sm3"
+      />
+
+      {/* ── UNA TARJETA POR PRODUCTO TUYO ─────────────────────────────────
+          Los renglones de la lista que no son tuyos no se listan: solo
+          aparecen en el buscador de la hoja de vincular. */}
+      <div className="space-y-2">
+        {visibles.map((item) => (
+          <TarjetaDeTuProducto
+            key={item.productoBaseId}
+            item={item}
+            proveedor={nombreProveedor}
+            abierta={abierta}
+            controlando={controlando}
+            onVincular={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre })}
+            onRevisar={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+          />
+        ))}
+        {visibles.length === 0 && (
+          <p className="text-sm2 sunmi-text-muted text-center py-4">
+            {buscar.trim()
+              ? "Ninguno de tus productos se llama así."
+              : "No hay ninguno en este grupo."}
+          </p>
+        )}
       </div>
-      )}
-
-      {!controlando && (
-      <div className="grid grid-cols-2 gap-3">
-        {/* Los dos que no son trabajo de esta lista y sí hay que poder mirar. */}
-        <TarjetaChica
-          numero={conteo.sinProducto}
-          titulo={conteo.sinProducto === 1 ? "no lo tenés" : "no los tenés"}
-          detalle={abierta ? "De la lista. Ver y vincular" : "De la lista, sin vincular"}
-          ariaLabel={
-            abierta && conteo.sinProducto > 0
-              ? `Ver y vincular los ${conteo.sinProducto} de la lista que no tenés`
-              : undefined
-          }
-          onClick={
-            abierta && conteo.sinProducto > 0
-              ? () => irA(`/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`)
-              : undefined
-          }
-        />
-        <TarjetaChica
-          numero={cabecera.tuyosQueNoAparecen ?? 0}
-          titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo sin precio" : "tuyos sin precio"}
-          detalle="No vinieron. Ver cuáles"
-          ariaLabel={
-            (cabecera.tuyosQueNoAparecen ?? 0) > 0
-              ? `Ver los ${cabecera.tuyosQueNoAparecen} tuyos que no vinieron en esta lista`
-              : undefined
-          }
-          onClick={
-            (cabecera.tuyosQueNoAparecen ?? 0) > 0
-              ? () => irA("/no-cambian?filtro=NO_VINO")
-              : undefined
-          }
-        />
-      </div>
-      )}
-
-      {/* LOS TRES GRUPOS JUNTOS, que es como los mira Emanuel: lo suyo de este
-          proveedor que después de aplicar va a seguir con el costo viejo.
-          Controlando no corresponde: NINGÚN producto cambia, así que "los que no
-          cambian" sería la lista entera y no distinguiría nada. */}
-      {!controlando && noCambian > 0 && (
-        <TarjetaAncha
-          titulo={`Tus productos de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no cambian · ${noCambian}`}
-          detalle={renglonDeLosQueNoCambian(conteo, cabecera.tuyosQueNoAparecen ?? 0)}
-          ariaLabel={`Ver los ${noCambian} productos tuyos que esta lista no va a corregir`}
-          onClick={() => irA("/no-cambian")}
-        />
-      )}
-
-      {/* ── LA MUESTRA SE CALLA CUANDO NO HAY NADA QUE MOSTRAR ──────────────
-          `muestra` son filas en LISTO_PARA_ACTUALIZAR, o sea las que se
-          aplicarían. En una lista cerrada SIN nada aplicado —terminada sin
-          aplicar, o aplicada y después deshecha— esas filas siguen existiendo y
-          el título decía "Algunos de los que se actualizaron" arriba de
-          `$1.342,90 → $1.430,19`. Los costos habían vuelto a los de antes: la
-          pantalla afirmaba un cambio que no ocurrió. */}
-      {/* ── Y CONTROLANDO NO SE MUESTRA NINGUNA, porque no se actualiza nada.
-          `muestra` son filas en LISTO_PARA_ACTUALIZAR, que es un estado que
-          controlando también se escribe —el motor clasifica igual— así que la
-          sección aparecía igual, encabezada "Algunos de los que se actualizan",
-          debajo del renglón que acababa de decir que no se cambió ningún precio.
-          Se vio en la captura a 360; leyendo el código no se notaba, porque la
-          condición `aMedias` es verdadera en los dos modos. */}
-      {!controlando && muestra.length > 0 && (aMedias || cabecera.productosActualizados > 0) && (
-        <section className="space-y-1">
-          <h2 className="text-sm3 font-semibold sunmi-text-strong">
-            {aMedias ? "Algunos de los que se actualizan" : "Algunos de los que se actualizaron"}
-          </h2>
-          <SunmiCard className="p-3 divide-y sunmi-divide">
-            {muestra.map((m) => (
-              <FilaDeCambio
-                key={m.id}
-                nombre={m.nombre}
-                costoAnterior={m.costoAnterior}
-                costoNuevo={m.costoNuevo}
-                variacionPct={m.variacionPct}
-              />
-            ))}
-          </SunmiCard>
-          {/* ── SE FUE EL "Ver los N" ───────────────────────────────────────
-              Era un texto suelto que funcionaba como botón, y era la ÚNICA
-              forma de llegar a la lista de los que se actualizan: la tarjeta
-              verde de arriba, que es el número que se viene a mirar, no llevaba
-              a ningún lado. Emanuel la tocó y no pasó nada.
-              Ahora lleva la tarjeta, que es lo que se toca primero, y acá no
-              queda nada: tres ejemplos para mirar y se terminó. */}
-        </section>
-      )}
 
       {/* ── LAS DOS ACCIONES DE UN CONTROL ─────────────────────────────────
           Ninguna de las dos escribe un costo. "Pasar a actualizar precios"
@@ -1073,42 +943,26 @@ export default function ResultadoDeListaPage() {
         </div>
       )}
 
-      {/* LAS ACCIONES POSIBLES, Y SOLO ESAS. */}
+      {/* ── APLICAR, AL FINAL DE LA LISTA Y NO PEGADO AL PIE ────────────────
+          Va después de la última tarjeta, como un elemento más: un botón
+          pegado abajo tapa la tarjeta que pasa por debajo (Emanuel, recepción,
+          2026-10-22). El número es `conteo.listos`, el mismo que consulta
+          aplicar y que decide qué tarjetas dicen «Cambia». La confirmación y
+          las reglas de rango son las de siempre. */}
       {!controlando && abierta && listos > 0 && (
         <div className="space-y-2">
           <SunmiButton
-            color="cyan"
+            color="primary"
             onClick={() => setConfirmando(true)}
             disabled={aplicando}
             className="w-full min-h-toque text-base font-bold"
           >
             Aplicar los {listos} precios
           </SunmiButton>
-          {conteo.paraRevisar > 0 && (
-            <SunmiButton
-              color="slate"
-              onClick={() => irA("/revisar")}
-              className="w-full min-h-toque text-sm3"
-            >
-              Revisar los {conteo.paraRevisar} de a uno
-            </SunmiButton>
-          )}
           <p className="text-sm2 sunmi-text-muted text-center leading-snug">
-            {conteo.paraRevisar > 0
-              ? `Los ${conteo.paraRevisar} para revisar no se tocan al aplicar. Todo se puede deshacer.`
-              : "Todo se puede deshacer."}
+            Solo cambian los que dicen «Cambia». Los demás quedan como están.
           </p>
         </div>
-      )}
-
-      {!controlando && abierta && listos === 0 && conteo.paraRevisar > 0 && (
-        <SunmiButton
-          color="cyan"
-          onClick={() => irA("/revisar")}
-          className="w-full min-h-toque text-base font-bold"
-        >
-          Revisar los {conteo.paraRevisar} de a uno
-        </SunmiButton>
       )}
 
       {puedeDeshacer && (
@@ -1266,6 +1120,63 @@ export default function ResultadoDeListaPage() {
         />
       )}
 
+      {/* ── VINCULAR CON LA LISTA ─────────────────────────────────────────
+          Al guardar, la hoja se cierra y la tarjeta cambia en el lugar: se
+          relee sin el cargador y queda fijada aunque su estado nuevo ya no sea
+          el del chip puesto. */}
+      {vinculando && (
+        <HojaVincularConLaLista
+          endpoint={`/api/proveedores/listas/${id}/productos/${vinculando.productoBaseId}/en-la-lista`}
+          nombre={vinculando.nombre}
+          proveedor={nombreProveedor}
+          cuerpoNoViene={{ noViene: true }}
+          onCerrar={() => setVinculando(null)}
+          onListo={async () => {
+            const productoBaseId = vinculando.productoBaseId;
+            setVinculando(null);
+            await despuesDeTocar(productoBaseId);
+          }}
+        />
+      )}
+
+      {/* ── «NO ES ESTE PRODUCTO», DESDE LA HOJA DE REVISAR ─────────────────
+          La misma hoja, por la puerta de la fila: mueve el vínculo a otro
+          renglón, o con «No viene en esta lista» lo saca de la lista. */}
+      {eligiendoOtra && (
+        <HojaVincularConLaLista
+          endpoint={`/api/proveedores/listas/${id}/filas/${eligiendoOtra.fila.id}/otra-fila`}
+          nombre={eligiendoOtra.fila.nombre}
+          proveedor={nombreProveedor}
+          cuerpoNoViene={{ noEstaEnLaLista: true }}
+          onCerrar={() => setEligiendoOtra(null)}
+          onListo={async () => {
+            const productoBaseId = eligiendoOtra.productoBaseId;
+            setEligiendoOtra(null);
+            await despuesDeTocar(productoBaseId);
+          }}
+        />
+      )}
+
+      {/* ── REVISAR: LA DECISIÓN DE SIEMPRE, EN UNA HOJA ────────────────────
+          Caja entera, una unidad, o No lo cambio. */}
+      {revisando && (
+        <HojaRevisarPrecio
+          importacionId={id}
+          filaId={revisando.filaId}
+          onCerrar={() => setRevisando(null)}
+          onNoEsEste={(fila) => {
+            const productoBaseId = revisando.productoBaseId;
+            setRevisando(null);
+            setEligiendoOtra({ fila, productoBaseId });
+          }}
+          onListo={async () => {
+            const productoBaseId = revisando.productoBaseId;
+            setRevisando(null);
+            await despuesDeTocar(productoBaseId);
+          }}
+        />
+      )}
+
       {confirmando && (
         <HojaConfirmarAplicar
           cantidad={listos}
@@ -1296,76 +1207,6 @@ function estadoEnCastellano(cabecera) {
       : `${cabecera.productosActualizados} productos ya actualizados`;
   }
   return "todavía no cambió ningún precio";
-}
-
-/**
- * "Todos aumentan entre 5 % y 8 %, como esperabas."
- *
- * Los dos extremos salen del servidor, medidos sobre las filas que SE VAN A
- * aplicar. Decir el rango configurado en vez del real sería prometer algo que no
- * se miró: son los mismos números solo cuando todo salió bien.
- */
-/**
- * El renglón de la tarjeta ancha: de qué está hecho ese número.
- *
- * Se arma nombrando los grupos que EXISTEN y no los tres siempre: con cero
- * dejados, "y el que dejaste" habla de algo que no está, y ese es el tipo de
- * frase que hace dudar del número de al lado.
- */
-function renglonDeLosQueNoCambian(conteo, noVinieron) {
-  const partes = [];
-  if (conteo.paraRevisar > 0) partes.push(`los ${conteo.paraRevisar} para revisar`);
-  if (conteo.dejadas === 1) partes.push("el que dejaste");
-  else if (conteo.dejadas > 1) partes.push(`los ${conteo.dejadas} que dejaste`);
-  if (noVinieron > 0) partes.push(`los ${noVinieron} que no vinieron`);
-  if (partes.length === 0) return null;
-  if (partes.length === 1) return `${partes[0].charAt(0).toUpperCase()}${partes[0].slice(1)}.`;
-  const ultimo = partes.pop();
-  const frase = `${partes.join(", ")} y ${ultimo}, juntos`;
-  return `${frase.charAt(0).toUpperCase()}${frase.slice(1)}.`;
-}
-
-// ── EL RENGLÓN QUE MENTÍA, Y CÓMO DEJA DE MENTIR ──────────────────────────
-//
-// Decía "Todos aumentan entre +2,6 % y +1.008,5 %" sobre un proveedor que
-// aumenta entre 2 y 15. Eso ya está arreglado de raíz —una fila fuera de rango
-// que nadie eligió no se cuenta entre los listos— pero queda un caso legítimo
-// que lo volvería a sacar del rango: una fila que Emanuel eligió A PROPÓSITO
-// sabiendo que estaba afuera. Ésa sí se va a escribir.
-//
-// Mezclarla en el mismo rango daría "entre +5,0 % y +99,5 %", que es otra vez
-// una frase que se sale de lo configurado y que no dice por qué. Así que se
-// cuenta aparte y se nombra: el rango anunciado nunca se sale del configurado,
-// y lo que se sale tiene nombre, número y autor.
-function textoDeVariacion(variacion, rango, elegidos = 0, rangoElegidos = null) {
-  const cola = (() => {
-    if (!elegidos) return "";
-    const min = rangoElegidos?.minPct;
-    const max = rangoElegidos?.maxPct;
-    if (min === null || min === undefined) return ` Más ${elegidos} que elegiste vos.`;
-    const iguales = Math.round(min * 10) === Math.round(max * 10);
-    const cuanto = iguales ? pct(min) : `entre ${pct(min)} y ${pct(max)}`;
-    return elegidos === 1
-      ? ` Más uno que elegiste vos, de ${cuanto}.`
-      : ` Más ${elegidos} que elegiste vos, ${iguales ? `de ${cuanto}` : cuanto}.`;
-  })();
-
-  if (variacion?.minPct === null || variacion?.maxPct === null) {
-    return cola ? cola.trim() : null;
-  }
-  const min = pct(variacion.minPct);
-  const max = pct(variacion.maxPct);
-  const iguales = Math.round(variacion.minPct * 10) === Math.round(variacion.maxPct * 10);
-  const dentro =
-    rango?.minPct !== null &&
-    rango?.maxPct !== null &&
-    variacion.minPct >= rango.minPct - 0.05 &&
-    variacion.maxPct <= rango.maxPct + 0.05;
-  const remate = dentro ? ", como esperabas." : ".";
-  const cuerpo = iguales
-    ? `Todos aumentan ${min}${remate}`
-    : `Todos aumentan entre ${min} y ${max}${remate}`;
-  return `${cuerpo}${cola}`;
 }
 
 function Marco({ children }) {

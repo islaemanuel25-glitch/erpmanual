@@ -36,7 +36,15 @@ import fs from "node:fs";
 import path from "node:path";
 
 const RAIZ = path.resolve(import.meta.dirname, "../../../..");
-const PANTALLA = "app/modulos/proveedores/listas/[id]/revisar/page.jsx";
+// ── LA DECISIÓN SE MUDÓ A UNA HOJA, Y EL CANDADO CON ELLA (2026-10-23) ──────
+//
+// La pantalla de revisar de a uno se fue: la revisión de una lista es una sola
+// pantalla que arranca de tus productos, y la decisión de precio es
+// `HojaRevisarPrecio`, sacada tal cual. Lo que se afirma es lo mismo; cambia
+// dónde se mira. La ruta vieja quedó como redirección: mirarla dejaría estos
+// candados en rojo por un archivo vacío, o —peor— en verde si alguien le
+// escribiera un comentario.
+const PANTALLA = "components/proveedores/listas/HojaRevisarPrecio.jsx";
 
 const sinComentarios = (t) =>
   t

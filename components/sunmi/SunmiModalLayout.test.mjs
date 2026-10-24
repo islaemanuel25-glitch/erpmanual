@@ -850,16 +850,22 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/finanzas/sueldos/HojaAsignarEmpleado.jsx": false,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
-    // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de
+    // Vivía adentro de la pantalla de revisar de a uno y desde el 2026-10-23
+    // vive en `HojaRevisarPrecio`, sacada tal cual con la decisión entera
+    // cuando la revisión pasó a ser una sola pantalla. Mismo caso que la hoja de
     // aplicar y misma respuesta: tres renglones para leer y dos botones, nada
     // escrito adentro que se pueda perder. Cerrar sin querer no cuesta nada —la
     // lectura sigue ahí, en su tarjeta— y lo grave lo sostiene el botón, que
     // dice el porcentaje que se acepta.
     //
-    // Y hay un motivo propio para que el velo cierre: esta hoja se abre tocando
-    // una tarjeta de lectura, que es un blanco grande. Abrirla sin querer va a
-    // pasar, y ahí el toque afuera es la salida que se busca.
-    "app/modulos/proveedores/listas/[id]/revisar/page.jsx": false,
+    // Y la hoja que la contiene, por lo mismo: lecturas para leer y botones que
+    // hay que ir a buscar. Se abre con «Revisar» desde una tarjeta de una lista
+    // larga; abrirla sin querer va a pasar, y el toque afuera es la salida.
+    "components/proveedores/listas/HojaRevisarPrecio.jsx": false,
+    // La hoja de vincular con la lista: lo único escrito es lo que se busca,
+    // que arranca con las primeras palabras del nombre y se vuelve a escribir
+    // en un segundo. Elegir un renglón no guarda nada hasta tocar «Vincular».
+    "components/proveedores/listas/HojaVincularConLaLista.jsx": false,
     // ── LAS DOS HOJAS DE PRODUCTO DEL MÓDULO DE LISTAS ────────────────────
     //
     // La de "Se actualizan" —nombre, cuánto pasa a cuánto, y tres salidas— y la
@@ -876,7 +882,8 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // botones que hay que ir a buscar, y las dos acciones son reversibles desde
     // la otra pantalla.
     "app/modulos/proveedores/listas/[id]/actualizan/page.jsx": false,
-    "app/modulos/proveedores/listas/[id]/no-cambian/page.jsx": false,
+    // La de "No cambian" se fue con su pantalla el 2026-10-23: esos productos
+    // son chips y etiquetas de la revisión, que ya no abre una hoja para ellos.
     // ── EL CARTEL DE FINALIZAR O BORRAR UNA OFERTA ────────────────────────
     //
     // Reemplaza a dos `confirm()` del navegador. No hay nada escrito adentro que

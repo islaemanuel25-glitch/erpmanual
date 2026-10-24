@@ -113,9 +113,17 @@ test("LA QUE TIENE VOLVER LO REGISTRA EN EL SLOT, CON LA PIEZA DEL KIT Y A 44", 
     );
   }
 
+  // ── BAJA DE SEIS A CUATRO, A PROPÓSITO (2026-10-23) ─────────────────────
+  //
+  // La revisión de una lista pasó a ser UNA pantalla que arranca de tus
+  // productos (diseño de Emanuel): "Revisar de a uno", "No cambian" y "Elegir
+  // de la lista" se fueron y sus rutas quedaron como redirecciones del
+  // servidor, que no dibujan nada y por eso no tienen volver. El piso sigue
+  // existiendo para que borrar el volver de una pantalla que queda no pase en
+  // silencio.
   assert.ok(
-    conVolver.length >= 6,
-    `solo ${conVolver.length} pantallas del módulo tienen volver; se esperaban las seis.`
+    conVolver.length >= 4,
+    `solo ${conVolver.length} pantallas del módulo tienen volver; se esperaban cuatro.`
   );
 });
 
