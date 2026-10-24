@@ -137,6 +137,13 @@ Si la lista está vacía, el despliegue es solo de código.
   ANTES de levantar la imagen nueva: el resultado de una lista, revisar,
   confirmar y aplicar las leen o escriben, y sin ellas abrir una lista da
   error. La imagen vieja con esto puesto sigue andando: no las conoce.
+- `20261024164309_lista_renglon_que_no_es_el_producto` — **Aditiva, sin
+  datos.** Una tabla nueva, vacía, `RenglonQueNoEsElProducto`: el «No» de
+  "Pueden ser de…" en una lista de proveedor (este renglón, por su código, no
+  es este producto). No toca ninguna fila existente ni `ProductoBase`. Va ANTES
+  de levantar la imagen nueva: «Buscar en el resto de mis productos» la lee y
+  la escribe, y sin ella esa búsqueda da error (el resto de la lista anda). La
+  imagen vieja con esto puesto sigue andando: no la conoce.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

@@ -95,6 +95,7 @@ import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCance
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import HojaReporte from "@/components/proveedores/listas/HojaReporte";
+import HojaPosibles from "@/components/proveedores/listas/HojaPosibles";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
 // dos acciones del control.
@@ -112,6 +113,9 @@ export const DURACION_AVISO_HECHO_MS = 6000;
 
 /** El botón que abre la hoja del reporte. */
 export const TEXTO_REPORTE = "Reporte";
+
+/** El botón de la búsqueda opcional en el resto del catálogo. */
+export const TEXTO_BUSCAR_POSIBLES = "Buscar en el resto de mis productos";
 
 export default function ResultadoDeListaPage() {
   const router = useRouter();
@@ -143,6 +147,8 @@ export default function ResultadoDeListaPage() {
   const [cancelando, setCancelando] = useState(false);
   /** La hoja del reporte, abierta. */
   const [viendoReporte, setViendoReporte] = useState(false);
+  /** La hoja "Pueden ser de…", abierta: busca recién al montarse. */
+  const [buscandoPosibles, setBuscandoPosibles] = useState(false);
   /** Mientras se vuelven a leer las propuestas que quedaron viejas. */
   const [releyendo, setReleyendo] = useState(false);
   // ── LA LISTA DE TUS PRODUCTOS ──────────────────────────────────────────
@@ -1291,6 +1297,17 @@ export default function ResultadoDeListaPage() {
                 >
                   {TEXTO_REPORTE}
                 </SunmiButton>
+                {/* ── LA BÚSQUEDA OPCIONAL EN EL RESTO DEL CATÁLOGO ──────────
+                    Productos tuyos que el proveedor vende pero que no figuran
+                    como suyos. Calcula RECIÉN al tocar: la hoja busca al
+                    abrirse, y nada más la abre. */}
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setBuscandoPosibles(true)}
+                  className="col-span-2 min-h-toque text-sm3 justify-center"
+                >
+                  {TEXTO_BUSCAR_POSIBLES}
+                </SunmiButton>
               </div>
             )}
           </>
@@ -1518,6 +1535,16 @@ export default function ResultadoDeListaPage() {
             {/* ── EL REPORTE, EN UNA HOJA ───────────────────────────────────
                 La misma pieza que la hoja de vincular, con las tres descargas
                 como tarjetas a todo el ancho. */}
+            {buscandoPosibles && (
+              <HojaPosibles
+                importacionId={id}
+                proveedor={cabecera.proveedor?.nombre ?? ""}
+                // «✓ Sí» sumó un producto a la revisión: se relee la lista.
+                onCambio={() => cargar({ silencioso: true })}
+                onCerrar={() => setBuscandoPosibles(false)}
+              />
+            )}
+
             {viendoReporte && (
               <HojaReporte
                 importacionId={id}

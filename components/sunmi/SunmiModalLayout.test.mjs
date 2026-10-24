@@ -871,6 +871,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // sin querer no pierde nada; mientras arma el PDF no se cierra, y eso lo
     // decide su `onClose`, no el velo.
     "components/proveedores/listas/HojaReporte.jsx": false,
+    // "Pueden ser de…" (2026-10-24): tarjetas con «✓ Sí» y «No», nada escrito
+    // adentro. Cada respuesta se guarda al tocarla, así que cerrar sin querer
+    // no pierde nada; mientras guarda una no se cierra, y eso lo decide su
+    // `onClose`, no el velo.
+    "components/proveedores/listas/HojaPosibles.jsx": false,
     // ── LAS DOS HOJAS DE PRODUCTO DEL MÓDULO DE LISTAS ────────────────────
     //
     // La de "Se actualizan" —nombre, cuánto pasa a cuánto, y tres salidas— y la

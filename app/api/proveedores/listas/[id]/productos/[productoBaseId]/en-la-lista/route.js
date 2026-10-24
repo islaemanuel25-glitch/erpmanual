@@ -55,6 +55,7 @@ import {
   ubicacionQueJuzgaElCosto,
   CAMPOS_PRODUCTO_PARA_EL_MOTOR,
   CAMPOS_CABECERA_PARA_EL_MOTOR,
+  lugarParaSumarProveedor,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 
 /** Los dos ids de la URL, validados. */
@@ -304,6 +305,35 @@ export async function POST(req, context) {
       );
     }
 
+    // ── «✓ SÍ» DESDE "PUEDEN SER DE…": SUMAR ESTE PROVEEDOR (2026-10-24) ────
+    //
+    // El producto venía del resto del catálogo: no tiene a este proveedor en
+    // ninguno de sus tres lugares, y la revisión y las próximas listas salen de
+    // esos lugares (`productoDelProveedorWhere`), no del código. Así que además
+    // del código se suma el proveedor en el primer lugar LIBRE, sin quitar ni
+    // cambiar los que ya tiene (`lugarParaSumarProveedor`). Con los tres
+    // ocupados no se vincula: hacer lugar es cambiar un proveedor, y eso se
+    // decide en la ficha.
+    let lugarDelProveedor = null;
+    if (body?.sumarProveedor === true) {
+      const lugares = await prisma.productoBase.findFirst({
+        where: { id: productoBaseId, grupoId },
+        select: { proveedor_id: true, proveedor2_id: true, proveedor3_id: true },
+      });
+      const r = lugarParaSumarProveedor(lugares, cab.proveedorId);
+      if (r.lleno) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `${producto.nombre} ya tiene tres proveedores. Para sumarle este, sacale uno en su ficha.`,
+            codigo: "SIN_LUGAR_DE_PROVEEDOR",
+          },
+          { status: 409 }
+        );
+      }
+      lugarDelProveedor = r.lugar;
+    }
+
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const ahora = new Date();
     // La config y el contexto salen de la MISMA función que los arma para «No es
@@ -366,6 +396,16 @@ export async function POST(req, context) {
       // Si antes alguien dijo que no venía, ya vino: la marca sobra, y dejarla
       // serían dos respuestas a la misma pregunta.
       await tx.productoQueNoVieneEnLaLista.deleteMany({ where: { importacionId, productoBaseId } });
+
+      // 4. Desde "Pueden ser de…": el proveedor, en su lugar libre. Solo ese
+      //    campo, y solo si estaba vacío —la condición va en el `where`, así
+      //    que si otro lo llenó en el medio no se pisa nada—.
+      if (lugarDelProveedor) {
+        await tx.productoBase.updateMany({
+          where: { id: productoBaseId, grupoId, [lugarDelProveedor]: null },
+          data: { [lugarDelProveedor]: cab.proveedorId },
+        });
+      }
 
       await recalcularContadores(tx, importacionId);
     }, OPCIONES_TX);
