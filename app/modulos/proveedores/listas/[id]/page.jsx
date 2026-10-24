@@ -1431,6 +1431,9 @@ export default function ResultadoDeListaPage() {
                 // Recién vinculado con «✓ Sí»: el paso que sigue a la hoja de
                 // vincular, con la única lectura en rango tomada sola.
                 tomarLaUnica={revisando.tomarLaUnica === true}
+                // Se contestó en la hoja lo que faltaba (kilos o caja): la
+                // tarjeta de abajo se relee aunque la hoja siga abierta.
+                onCambio={() => cargar({ silencioso: true })}
                 onCerrar={() => setRevisando(null)}
                 onNoEsEste={(fila) => {
                   const productoBaseId = revisando.productoBaseId;

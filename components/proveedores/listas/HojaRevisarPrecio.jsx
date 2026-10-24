@@ -43,6 +43,11 @@ import {
 // porque lo que decide es qué significa un 0 a 0.
 import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 import { TEXTO_FALTAN_LOS_KILOS } from "@/lib/proveedores/listas/tusProductos";
+import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
+
+/** El porqué de la hoja cuando faltan las unidades de la caja. */
+export const TEXTO_FALTA_LA_CAJA =
+  "La lista cotiza una unidad y no dice cuántas trae la caja: decímelo y armo la cuenta.";
 
 /**
  * Qué acción rechazó el servidor, cuando no fue una lectura.
@@ -52,6 +57,8 @@ import { TEXTO_FALTAN_LOS_KILOS } from "@/lib/proveedores/listas/tusProductos";
  * podría saber cuál de los botones fue.
  */
 const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
+/** El «Listo» del dato que faltaba, para pegarle su rechazo. */
+const ACCION_LO_QUE_FALTA = "__LO_QUE_FALTA__";
 
 /**
  * LA HOJA DE «CORREGIR»: la decisión adentro de su hoja.
@@ -64,7 +71,15 @@ const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
  * @param tomarLaUnica   recién vinculado con «✓ Sí» en la tarjeta: el mismo paso
  *                       que sigue a la hoja de vincular (`DecisionDeLectura`)
  */
-export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNoEsEste, onCerrar, tomarLaUnica = false }) {
+export default function HojaRevisarPrecio({
+  importacionId,
+  filaId,
+  onListo,
+  onNoEsEste,
+  onCerrar,
+  tomarLaUnica = false,
+  onCambio,
+}) {
   const [titulo, setTitulo] = useState("Revisar");
   const [trabajando, setTrabajando] = useState(false);
   return (
@@ -81,6 +96,7 @@ export default function HojaRevisarPrecio({ importacionId, filaId, onListo, onNo
         importacionId={importacionId}
         filaId={filaId}
         tomarLaUnica={tomarLaUnica}
+        onCambio={onCambio}
         onListo={onListo}
         onNoEsEste={onNoEsEste}
         onTitulo={setTitulo}
@@ -117,6 +133,9 @@ export function DecisionDeLectura({
   onTitulo,
   onTrabajando,
   tomarLaUnica = false,
+  // Algo cambió sin cerrar la hoja (se contestó el dato que faltaba): la
+  // pantalla relee la lista.
+  onCambio,
 }) {
   const id = importacionId;
   const [cargando, setCargando] = useState(true);
@@ -222,6 +241,45 @@ export function DecisionDeLectura({
     } catch {
       setRechazo({
         accion: ACCION_NO_LO_CAMBIO,
+        texto: "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.",
+      });
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
+  /**
+   * «LISTO» CON EL DATO QUE FALTABA (2026-10-24): los kilos de la pieza o las
+   * unidades de la caja, a la misma ruta que la tarjeta (`lectura-recordada`).
+   * Solo se llama desde el «Listo» de `PreguntaQueFalta`: el valor sugerido no
+   * se guarda solo. Después se vuelve a leer la fila, y la MISMA hoja sigue con
+   * las lecturas que ese dato arma —pieza y bulto, con su cuenta—. Y avisa a la
+   * pantalla, para que la tarjeta no quede vieja si se cierra la hoja sin elegir.
+   */
+  const guardarLoQueFalta = async (numero) => {
+    if (!fila?.pregunta || !fila.productoBaseId) return;
+    setTrabajando(true);
+    setRechazo(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/productos/${fila.productoBaseId}/lectura-recordada`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fila.pregunta.porKilo ? { kilos: numero } : { cantidad: numero }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setRechazo({
+          accion: ACCION_LO_QUE_FALTA,
+          texto: j?.error || "El servidor no pudo guardarlo y no dijo por qué.",
+        });
+        return;
+      }
+      onCambio?.();
+      await cargar();
+    } catch {
+      setRechazo({
+        accion: ACCION_LO_QUE_FALTA,
         texto: "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.",
       });
     } finally {
@@ -407,12 +465,32 @@ export function DecisionDeLectura({
             ))}
           </div>
 
-          {fila.lecturas.length === 0 && (
-            <Aviso tono="warning">
-              {fila.porKilo
-                ? TEXTO_FALTAN_LOS_KILOS
-                : "La lista no dice si este precio es de una unidad o de la caja, así que no sé por cuánto multiplicarlo. Dejalo como está y miralo en el papel del proveedor."}
-            </Aviso>
+          {/* ── LO QUE FALTA, CON DÓNDE CONTESTARLO (2026-10-24) ───────────
+              Nunca un cartel que pide algo sin dónde ponerlo: con la pregunta
+              va el campo, la MISMA pieza de la tarjeta, arrancando en lo que
+              dice el nombre ("2KG" → 2). Al tocar «Listo» la hoja se relee y
+              sigue con las lecturas que arma ese dato. */}
+          {fila.pregunta ? (
+            <SunmiCard className="p-3 space-y-2">
+              <p className="text-sm2 sunmi-text-warning leading-snug">
+                {fila.pregunta.porKilo ? TEXTO_FALTAN_LOS_KILOS : TEXTO_FALTA_LA_CAJA}
+              </p>
+              <PreguntaQueFalta
+                key={`${fila.id}-${fila.pregunta.porKilo ? "kilos" : "caja"}`}
+                id={`hoja-pregunta-${fila.id}`}
+                porKilo={fila.pregunta.porKilo}
+                sugerido={fila.pregunta.sugerido}
+                trabajando={trabajando}
+                onListo={guardarLoQueFalta}
+              />
+            </SunmiCard>
+          ) : (
+            fila.lecturas.length === 0 && (
+              <Aviso tono="warning">
+                La lista no dice si este precio es de una unidad o de la caja, así que no sé por cuánto
+                multiplicarlo. Dejalo como está y miralo en el papel del proveedor.
+              </Aviso>
+            )
           )}
 
           <div className="space-y-2">

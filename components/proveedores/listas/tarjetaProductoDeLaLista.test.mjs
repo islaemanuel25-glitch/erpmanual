@@ -20,13 +20,9 @@ import TarjetaProductoDeLaLista, {
   CLASE_TARJETA_FUERA_DE_RANGO,
   ROTULO_EN_LA_LISTA,
   TEXTO_CORREGIR,
-  TEXTO_LISTO,
   TEXTO_NO_ESTA,
   TEXTO_NO_VIENE,
   TEXTO_OTRO,
-  TEXTO_PREGUNTA_CAJA,
-  TEXTO_PREGUNTA_KILOS,
-  numeroDeLaRespuesta,
   TEXTO_SI,
   TEXTO_USAR,
   TEXTO_VINCULAR,
@@ -34,6 +30,12 @@ import TarjetaProductoDeLaLista, {
   cuentaDe,
 } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 import { TEXTO_FUERA_DE_RANGO, tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
+import {
+  TEXTO_LISTO,
+  TEXTO_PREGUNTA_CAJA,
+  TEXTO_PREGUNTA_KILOS,
+  numeroDeLaRespuesta,
+} from "@/components/proveedores/listas/PreguntaQueFalta";
 import { sugerenciaDeRenglon } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
@@ -350,8 +352,11 @@ test("SIN SABER CUÁNTAS TRAE LA CAJA, LA TARJETA LO PREGUNTA AHÍ MISMO, CON UN
   assert.equal(item.costoNuevo, null);
   const html = dibujar({ item, abierta: true });
   assert.ok(html.includes(TEXTO_PREGUNTA_CAJA));
-  assert.match(html, /<input[^>]*type="number"/);
+  assert.match(html, /<input[^>]*inputMode="numeric"/);
   assert.ok(botones(html).some((b) => b.texto === TEXTO_LISTO));
+  // "ALICANTE PIMENTON 25G" no dice cuántas trae la caja: el campo arranca vacío.
+  assert.equal(item.respuestaSugerida, null);
+  assert.match(html, /<input[^>]*value=""/);
   // Desde una ubicación que no administra el costo, no se pregunta.
   assert.equal(pimenton({ puedeCambiarCostos: false }).preguntarCaja, false);
 });
@@ -400,8 +405,12 @@ test("GRANIX SIN KILOS: LA TARJETA PREGUNTA «¿CUÁNTOS KILOS TRAE LA PIEZA?»,
   assert.ok(html.includes(TEXTO_PREGUNTA_KILOS));
   assert.ok(!html.includes(TEXTO_PREGUNTA_CAJA), "a un producto por kilo se le preguntó la caja");
   assert.match(html, /<input[^>]*inputMode="decimal"/);
-  assert.match(html, /<input[^>]*step="0\.001"/);
+  // Texto con teclado decimal, no `type="number"`: ése no muestra "0,5".
+  assert.match(html, /<input[^>]*type="text"/);
   assert.ok(botones(html).some((b) => b.texto === TEXTO_LISTO));
+  // "GRANIX BOCADITOS CHOC BLANCO 2 K": el campo arranca en 2.
+  assert.equal(item.respuestaSugerida, 2);
+  assert.match(html, /<input[^>]*value="2"/);
   // La cuenta de hoy, en kilos.
   assert.equal(conEspacios(cuentaDe(item)), "$ 22.105,73 la pieza · hoy $ 6.405,00 el kilo");
   // "2,5" y "2.5" son la misma respuesta.

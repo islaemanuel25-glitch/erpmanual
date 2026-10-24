@@ -48,10 +48,8 @@
 //   kilo y no se sabe cuántos kilos trae la pieza (`item.preguntarKilos`,
 //   GRANIX): "¿Cuántos kilos trae la pieza?", con decimales, y «Listo».
 
-import { useState } from "react";
-
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
+import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
 import {
   CLASE_ACCION_CORREGIR,
   CLASE_ACCION_RAPIDA,
@@ -68,7 +66,6 @@ import {
 export const CLASE_TARJETA_FUERA_DE_RANGO = "border-1.5 sunmi-border-warning";
 import { ACCION_USAR, ESTADO_TU_PRODUCTO } from "@/lib/proveedores/listas/tusProductos";
 import { cuentaPorKilo } from "@/lib/proveedores/listas/explicarLectura";
-import { kilosValidos } from "@/lib/proveedores/listas/cajaRecordada";
 
 export const TEXTO_USAR = "✓ Usar";
 export const TEXTO_VINCULAR = "Vincular";
@@ -79,15 +76,6 @@ export const TEXTO_NO_ESTA = "no está";
 export const MARCA_VINCULADO = "✓";
 export const TEXTO_SI = "✓ Sí";
 export const TEXTO_OTRO = "Otro";
-export const TEXTO_PREGUNTA_CAJA = "¿Cuántas trae la caja?";
-export const TEXTO_PREGUNTA_KILOS = "¿Cuántos kilos trae la pieza?";
-
-/** Lo que se escribió en la pregunta, como número: "2,5" y "2.5" son lo mismo. */
-export function numeroDeLaRespuesta(texto) {
-  const t = String(texto ?? "").trim().replace(",", ".");
-  return t === "" ? NaN : Number(t);
-}
-export const TEXTO_LISTO = "Listo";
 
 /** "¿Es 101 · BIZCOCHITOS CAMPEON 300G?" */
 export function preguntaDeLaSugerencia(sugerencia) {
@@ -127,9 +115,6 @@ export default function TarjetaProductoDeLaLista({
   const sugerencia = abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR ? item.sugerencia ?? null : null;
   const preguntarCaja = abierta && !controlando && puedeCambiarCostos && item.preguntarCaja === true;
   const preguntarKilos = abierta && !controlando && puedeCambiarCostos && item.preguntarKilos === true;
-  const [respuesta, setRespuesta] = useState("");
-  const n = numeroDeLaRespuesta(respuesta);
-  const respuestaValida = preguntarKilos ? kilosValidos(n) : Number.isInteger(n) && n >= 2;
 
   // ── DEBAJO DEL NOMBRE: QUÉ RENGLÓN LE TOCÓ, Y LA CUENTA ──────────────────
   const debajo = (
@@ -246,34 +231,13 @@ export default function TarjetaProductoDeLaLista({
     <>
       {revisar && item.motivoTexto && <p className="text-sm2 sunmi-text-warning">{item.motivoTexto}</p>}
       {(preguntarCaja || preguntarKilos) && (
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const n = numeroDeLaRespuesta(respuesta);
-            if (preguntarKilos && kilosValidos(n)) onKilos?.(item, n);
-            else if (preguntarCaja && Number.isInteger(n) && n >= 2) onCaja?.(item, n);
-          }}
-        >
-          <label className="text-sm2 sunmi-text-strong flex-1" htmlFor={`pregunta-${item.productoBaseId}`}>
-            {preguntarKilos ? TEXTO_PREGUNTA_KILOS : TEXTO_PREGUNTA_CAJA}
-          </label>
-          {/* Los kilos admiten decimales —una pieza de 2,5 kg—, la caja no. */}
-          <SunmiInput
-            id={`pregunta-${item.productoBaseId}`}
-            type="number"
-            inputMode={preguntarKilos ? "decimal" : "numeric"}
-            min={preguntarKilos ? 0.001 : 2}
-            step={preguntarKilos ? 0.001 : 1}
-            value={respuesta}
-            onChange={(e) => setRespuesta(e.target.value)}
-            disabled={trabajando}
-            className="w-20 text-right tabular-nums"
-          />
-          <SunmiButton type="submit" disabled={trabajando || !respuestaValida} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
-            {TEXTO_LISTO}
-          </SunmiButton>
-        </form>
+        <PreguntaQueFalta
+          id={`pregunta-${item.productoBaseId}`}
+          porKilo={preguntarKilos}
+          sugerido={item.respuestaSugerida ?? null}
+          trabajando={trabajando}
+          onListo={(n) => (preguntarKilos ? onKilos?.(item, n) : onCaja?.(item, n))}
+        />
       )}
       {error && (
         <p className="text-sm2 sunmi-text-danger" aria-live="polite">
