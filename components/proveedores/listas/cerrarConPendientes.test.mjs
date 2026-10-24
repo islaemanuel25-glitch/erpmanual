@@ -9,7 +9,7 @@
 //
 // El conteo tiene la forma de `datos.conteo` de la ruta del resultado
 // (`resultadoDeLaLista.js`): `listos` es el número de la barra «Para aplicar»
-// y `listosSinTildar` el del aviso "están listos pero sin tildar".
+// y `listosSinTildar` el de los que tienen precio nuevo y nadie marcó.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -99,12 +99,14 @@ test("CON PRECIOS PENDIENTES, TERMINAR ABRE LA HOJA Y NO TERMINA", () => {
   // Ningún otro lugar abre el modal de terminar.
   assert.equal((pantalla.match(/setTerminando\(true\)/g) ?? []).length, 1);
 
-  // La hoja: título, el texto con los dos números y los tres botones a lo ancho.
+  // La hoja SIN tarjetas (las cuentas nombran filas que no son de ninguna
+  // tarjeta): título, el texto con los dos números y los tres botones a lo
+  // ancho. Con tarjetas, `hojaDePendientes.test.mjs` (2026-10-24).
   const h = html({ accion: CIERRE.TERMINAR, pendientes: p });
   assert.ok(h.includes(TITULO_PENDIENTES) && TITULO_PENDIENTES === "Te quedan precios sin aplicar");
   assert.ok(
     h.includes(
-      "56 precios están listos para aplicar y 9 listos sin tildar. Si terminás ahora, siguen con el costo anterior."
+      "56 precios están listos para aplicar y 9 con precio nuevo que no marcaste. Si terminás ahora, siguen con el costo anterior."
     )
   );
   assert.deepEqual(botones(h).slice(-3), [TEXTO_APLICAR_Y_TERMINAR, TEXTO_TERMINAR_SIN_APLICAR, "Volver"]);
@@ -153,9 +155,13 @@ test("«APLICAR Y TERMINAR» ESCRIBE LOS COSTOS Y DESPUÉS TERMINA", async () =>
   assert.equal(sinTerminar.length, 0);
 
   // En la pantalla: es el MISMO `aplicar` del botón «✓ Aplicar» —alcance
-  // SELECCIONADAS, los tildados— y el mismo `terminar`.
+  // SELECCIONADAS, los marcados— y el mismo `terminar`. Desde el 2026-10-24
+  // pasa por `aplicarLosPendientesYTerminar`, que antes marca los sin marcar.
   const pantalla = codigoDe(PANTALLA);
-  assert.match(pantalla, /aplicarYTerminar\(\{ listos: pendientes\.listos, aplicar, terminar \}\)/);
+  assert.match(
+    pantalla,
+    /aplicarLosPendientesYTerminar\(\{\s*sinMarcar: pendientesPorProducto\.sinMarcar,\s*listos: pendientes\.listos,\s*marcar: marcarFilas,\s*aplicar,\s*terminar,\s*\}\)/
+  );
   assert.match(pantalla, /<HojaConfirmarAplicar[\s\S]{0,300}onAplicar=\{aplicar\}/);
   const aplicarFn = funcion(pantalla, "aplicar");
   assert.match(aplicarFn, /\/aplicar`/);
@@ -198,10 +204,12 @@ test("CANCELAR CON PENDIENTES: LA HOJA AVISA QUE SE PIERDEN Y PIDE CONFIRMAR, SI
   assert.ok(!h.includes(TEXTO_APLICAR_Y_TERMINAR));
 });
 
-test("SOLO LISTOS SIN TILDAR: NO SE OFRECE «APLICAR Y TERMINAR», QUE NO LOS TOCARÍA", () => {
+test("SIN TARJETAS Y SOLO SIN MARCAR: NO SE OFRECE «APLICAR Y TERMINAR», QUE NO LOS TOCARÍA", () => {
+  // Sin tarjetas no hay a quién marcar, y aplicar solo escribe lo marcado.
+  // Con tarjetas sí se ofrece: marca y aplica (`hojaDePendientes.test.mjs`).
   const p = pendientesAlCerrar({ listos: 0, listosSinTildar: 1 });
   const h = html({ accion: CIERRE.TERMINAR, pendientes: p });
-  assert.ok(h.includes("1 listo sin tildar. Si terminás ahora, sigue con el costo anterior."));
+  assert.ok(h.includes("1 con precio nuevo que no marcaste. Si terminás ahora, sigue con el costo anterior."));
   assert.ok(!h.includes(TEXTO_APLICAR_Y_TERMINAR));
   assert.deepEqual(botones(h).slice(-2), [TEXTO_TERMINAR_SIN_APLICAR, "Volver"]);
   assert.equal(textoDePendientes({ listos: 1, sinTildar: 0 }), "1 precio está listo para aplicar. Si terminás ahora, sigue con el costo anterior.");

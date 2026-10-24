@@ -32,8 +32,8 @@ import {
   filtroParaMostrar,
   motivoEnCriollo,
   resumenDeLaCerrada,
-  textoSinTildarEnUnaCerrada,
-  textoTildadosSinAplicarEnUnaCerrada,
+  textoMarcadosSinAplicarEnUnaCerrada,
+  textoSinMarcarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -114,20 +114,24 @@ test("CERRADA, LA BARRA DE ABAJO DICE CUÁNTOS SE ACTUALIZARON Y TIENE EL «REPO
 test("SE FUE EL CARTEL «LISTA TERMINADA.», Y LO QUE NO SE APLICÓ SE DICE EN PASADO", () => {
   const p = codigoDe(PANTALLA);
   assert.ok(!p.includes("Lista terminada."), "volvió el cartel que repite la píldora");
+  // Sin "tildar" desde el 2026-10-24: la palabra es "marcar", la de «✓ Usar».
   assert.equal(
-    textoSinTildarEnUnaCerrada(65),
-    "65 quedaron sin aplicar: estaban listos pero sin tildar. Siguen con su costo anterior."
+    textoSinMarcarEnUnaCerrada(65),
+    "65 quedaron sin aplicar: tenían precio nuevo y no los marcaste. Siguen con su costo anterior."
   );
-  assert.equal(textoSinTildarEnUnaCerrada(1), "1 quedó sin aplicar: estaba listo pero sin tildar. Sigue con su costo anterior.");
-  // Cerrada, los dos carteles son avisos en pasado; los de aplicar, solo abierta.
-  assert.match(p, /if \(!abierta && [^)]*listosSinTildar[^{]*\{\s*avisos\.push\(\s*<Aviso key="sinTildar" tono="warning">\s*\{textoSinTildarEnUnaCerrada\(/);
-  assert.match(p, /if \(!abierta && [^)]*omitidasAlAplicar[^{]*\{\s*avisos\.push\(\s*<Aviso key="omitidas" tono="warning">\s*\{textoTildadosSinAplicarEnUnaCerrada\(/);
-  assert.match(p, /if \(abierta && [^)]*listosSinTildar[\s\S]*?aplicar no/);
+  assert.equal(
+    textoSinMarcarEnUnaCerrada(1),
+    "1 quedó sin aplicar: tenía precio nuevo y no lo marcaste. Sigue con su costo anterior."
+  );
+  // Cerrada, los dos carteles son avisos en pasado; el de marcar, solo abierta.
+  assert.match(p, /if \(!abierta && [^)]*listosSinTildar[^{]*\{\s*avisos\.push\(\s*<Aviso key="sinMarcar" tono="warning">\s*\{textoSinMarcarEnUnaCerrada\(/);
+  assert.match(p, /if \(!abierta && [^)]*omitidasAlAplicar[^{]*\{\s*avisos\.push\(\s*<Aviso key="omitidas" tono="warning">\s*\{textoMarcadosSinAplicarEnUnaCerrada\(/);
+  assert.match(p, /if \(abierta && [^)]*sinMarcarDelPaquete1\.length > 0\) \{[\s\S]*?textoSinMarcar\(sinMarcarDelPaquete1\.length\)/);
   // Ningún texto de una cerrada habla de aplicar en futuro.
   const enFuturo = /va a tocar|van a actualizar|va a actualizar|no se aplica hasta|con los datos de hoy/i;
   for (const t of [
-    textoSinTildarEnUnaCerrada(65),
-    textoTildadosSinAplicarEnUnaCerrada(3),
+    textoSinMarcarEnUnaCerrada(65),
+    textoMarcadosSinAplicarEnUnaCerrada(3),
     motivoEnCriollo({ motivo: MOTIVO_OMITIDA, abierta: false }),
   ]) {
     assert.ok(!enFuturo.test(t), `habla de aplicar en futuro: ${t}`);

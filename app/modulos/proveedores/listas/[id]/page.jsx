@@ -68,6 +68,7 @@ import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincular
 import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
   ACCION_USAR,
+  ESTADO_TU_PRODUCTO,
   FILTRO,
   ORDEN_FILTROS,
   TEXTO_FILTRO,
@@ -76,8 +77,8 @@ import {
   filtroParaMostrar,
   resumenDeLaCerrada,
   seVe,
-  textoSinTildarEnUnaCerrada,
-  textoTildadosSinAplicarEnUnaCerrada,
+  textoMarcadosSinAplicarEnUnaCerrada,
+  textoSinMarcarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
 import HojaBajasDePrecio from "@/components/proveedores/listas/HojaBajasDePrecio";
@@ -113,10 +114,13 @@ import HojaCerrarConPendientes from "@/components/proveedores/listas/HojaCerrarC
 import {
   AL_CERRAR,
   CIERRE,
-  aplicarYTerminar,
+  aplicarLosPendientesYTerminar,
+  esSinMarcar,
   pendientesDeLaLista,
+  productosPendientes,
   queAbreAlCerrar,
   textoDeLaCancelada,
+  textoSinMarcar,
 } from "@/lib/proveedores/listas/cerrarConPendientes";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Controlando no se ofrece aplicar: se ofrecen las
@@ -223,6 +227,8 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // 2026-10-24): lo que la reemplaza a la vista es el aviso de abajo, `hecho`
   // —"Listo: <producto> · Deshacer"—, con el pedido que vuelve atrás.
   const [filtro, setFiltro] = useState(null);
+  /** «Ver cuáles»: la lista muestra solo los que tienen precio nuevo y nadie marcó. */
+  const [soloSinMarcar, setSoloSinMarcar] = useState(false);
   const [buscar, setBuscar] = useState("");
   /** `{ nombre, deshacer: { url, cuerpo } | null, vez }` o null. */
   const [hecho, setHecho] = useState(null);
@@ -396,11 +402,27 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       : setTerminando(true);
   useEffect(() => {
     try {
-      if (new URLSearchParams(window.location.search).get("terminar") === "1") setTerminarAlEntrar(true);
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("terminar") === "1") setTerminarAlEntrar(true);
+      // «Ver» de "Te quedan precios sin aplicar" abierta desde el paquete 2:
+      // llega al paquete 1 con el chip pedido (2026-10-24).
+      if (Object.values(FILTRO).includes(q.get("ver"))) setFiltro(q.get("ver"));
     } catch {
       // Sin la dirección, se entra como siempre.
     }
   }, []);
+
+  /** «Ver» de la hoja de pendientes: la cierra y abre «Para revisar». */
+  const verParaRevisar = () => {
+    setCerrandoConPendientes(null);
+    if (enPuedenSer) {
+      router.push(`/modulos/proveedores/listas/${id}?ver=${FILTRO.REVISAR}`);
+      return;
+    }
+    setSoloSinMarcar(false);
+    setBuscar("");
+    setFiltro(FILTRO.REVISAR);
+  };
   useEffect(() => {
     if (!terminarAlEntrar || !datos?.cabecera) return;
     setTerminarAlEntrar(false);
@@ -1005,8 +1027,6 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         ? setCerrandoConPendientes(CIERRE.CANCELAR)
         : setCancelando(true);
 
-  const irA = (sub) => router.push(`/modulos/proveedores/listas/${id}${sub}`);
-
   // ── TUS PRODUCTOS, FILTRADOS ─────────────────────────────────────────────
   //
   // Una respuesta de un servidor viejo puede no traer la lista: se dibuja vacía
@@ -1020,7 +1040,13 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // algo (Emanuel, 2026-10-24: arrancaba en "Cambian 0" y "No hay ninguno").
   // Abierta sí, porque vaciar un chip es lo que pasa al ir resolviendo.
   const filtroActivo = filtroParaMostrar(filtro, tusProductos.conteo, { abierta });
-  const visibles = tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar }));
+  // «Ver cuáles» del cartel de los que no se marcaron: la lista son ésos, hasta
+  // que se toque un chip o no quede ninguno. El buscador le gana, como al chip.
+  const sinMarcarDelPaquete1 = tusProductos.items.filter(esSinMarcar);
+  const viendoSinMarcar = soloSinMarcar && sinMarcarDelPaquete1.length > 0 && !buscar.trim();
+  const visibles = viendoSinMarcar
+    ? sinMarcarDelPaquete1
+    : tusProductos.items.filter((it) => seVe(it, { filtro: filtroActivo, buscar }));
   // "X de 158 listos": ni «Sin vincular» ni «Para revisar» (`tusProductos.js`).
   const listosDeLaRevision = tusProductos.conteo.listosDeLaRevision ?? 0;
 
@@ -1038,9 +1064,53 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
     queAbreAlAplicar(bajas) === AL_APLICAR.HOJA_BAJAS
       ? setAvisandoBajas(DESPUES_DE_LAS_BAJAS.APLICAR)
       : setConfirmando(true);
+  // ── LOS PENDIENTES, PRODUCTO POR PRODUCTO (Emanuel, 2026-10-24, Dab) ─────
+  // "Te quedan precios sin aplicar" muestra cada producto con precio nuevo sin
+  // aplicar, de los dos paquetes. «✓ Aplicar estos N y terminar» marca los que
+  // nadie marcó, aplica y termina; las bajas se miran sobre todo eso junto, así
+  // que el aviso de bajas incluye a los que todavía no estaban marcados.
+  const delosDosPaquetes = [...tusProductos.items, ...puedenSer.confirmados];
+  const pendientesPorProducto = productosPendientes(delosDosPaquetes);
+  const bajasAlTerminar = bajasAlAplicar([
+    ...delosDosPaquetes,
+    ...pendientesPorProducto.sinMarcar.map((it) => ({ ...it, estado: ESTADO_TU_PRODUCTO.CAMBIA })),
+  ]);
+  // Los de «Para revisar» que no están en la hoja: la línea gris de abajo.
+  const paraRevisarFueraDeLaHoja = delosDosPaquetes.filter(
+    (it) => it.estado === ESTADO_TU_PRODUCTO.REVISAR && !esSinMarcar(it)
+  ).length;
+  /** Marca con la misma ruta de «✓ Usar». Devuelve si salió. */
+  const marcarFilas = async (ids) => {
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: ACCION_USAR.MARCAR, ids }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: `${j?.error || "No se pudieron marcar."} No se aplicó nada.` });
+        return false;
+      }
+      return true;
+    } catch {
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. No se aplicó nada." });
+      return false;
+    }
+  };
+  const aplicarLosPendientes = () =>
+    aplicarLosPendientesYTerminar({
+      sinMarcar: pendientesPorProducto.sinMarcar,
+      listos: pendientes.listos,
+      marcar: marcarFilas,
+      aplicar,
+      terminar,
+    });
+
   const alAplicarIgual = async () => {
     if (avisandoBajas === DESPUES_DE_LAS_BAJAS.APLICAR_Y_TERMINAR) {
-      await aplicarYTerminar({ listos: pendientes.listos, aplicar, terminar });
+      await aplicarLosPendientes();
     } else {
       await aplicar();
     }
@@ -1268,36 +1338,37 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   //
   // Decía "65 están listos pero sin tildar, así que aplicar no los va a tocar"
   // en una lista terminada: aplicar en futuro, cuando ya no se puede. Cerrada,
-  // es un aviso de lo que quedó (`textoSinTildarEnUnaCerrada`), sin botón.
+  // es un aviso de lo que quedó (`textoSinMarcarEnUnaCerrada`), sin botón.
   if (!abierta && puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
     avisos.push(
-      <Aviso key="sinTildar" tono="warning">
-        {textoSinTildarEnUnaCerrada(conteo.listosSinTildar)}
+      <Aviso key="sinMarcar" tono="warning">
+        {textoSinMarcarEnUnaCerrada(conteo.listosSinTildar)}
       </Aviso>
     );
   }
   if (!abierta && puedeCambiarCostos && !controlando && (conteo.omitidasAlAplicar ?? 0) > 0) {
     avisos.push(
       <Aviso key="omitidas" tono="warning">
-        {textoTildadosSinAplicarEnUnaCerrada(conteo.omitidasAlAplicar)}
+        {textoMarcadosSinAplicarEnUnaCerrada(conteo.omitidasAlAplicar)}
       </Aviso>
     );
   }
 
-  if (abierta && puedeCambiarCostos && !controlando && (conteo.listosSinTildar ?? 0) > 0) {
+  // ── LOS QUE TIENEN PRECIO NUEVO Y NADIE MARCÓ (2026-10-24) ──────────────
+  // Decía "3 están listos pero sin tildar" y mandaba a otra pantalla. Ahora
+  // dice cuántos en criollo, y «Ver cuáles» deja en la lista solo ésos, con su
+  // «✓ Usar». Se cuentan sobre las tarjetas (`esSinMarcar`), no sobre las filas:
+  // el número es el de tarjetas que se van a ver.
+  if (abierta && puedeCambiarCostos && !controlando && sinMarcarDelPaquete1.length > 0) {
     avisos.push(
-      <SunmiCard key="sinTildar" className="p-3">
-        <p className="text-sm2 sunmi-text-warning leading-snug">
-          <span className="font-bold sunmi-text-strong">{conteo.listosSinTildar}</span>{" "}
-          {conteo.listosSinTildar === 1 ? "está listo" : "están listos"} pero sin tildar, así que
-          aplicar no {conteo.listosSinTildar === 1 ? "lo" : "los"} va a tocar.
-        </p>
+      <SunmiCard key="sinMarcar" className="p-3">
+        <p className="text-sm2 sunmi-text-warning leading-snug">{textoSinMarcar(sinMarcarDelPaquete1.length)}.</p>
         <SunmiButton
           color="ghost"
-          onClick={() => irA("/actualizan")}
+          onClick={() => setSoloSinMarcar(!viendoSinMarcar)}
           className="mt-2 w-full min-h-toque text-sm3"
         >
-          Abrirlos para tildarlos
+          {viendoSinMarcar ? "Ver todos" : "Ver cuáles"}
         </SunmiButton>
       </SunmiCard>
     );
@@ -1473,12 +1544,15 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
               cantidad: cantidadDelFiltro(f, tusProductos.conteo),
             }))}
             valor={filtroActivo}
-            onCambiar={setFiltro}
+            onCambiar={(f) => {
+              setSoloSinMarcar(false);
+              setFiltro(f);
+            }}
             ariaLabel="Filtrar tus productos por estado"
           />
         }
         // En el paquete 2, solo el aviso de lo que acaba de pasar: los demás
-        // —columna, omisiones, sin tildar— son de la lista y van en el 1.
+        // —columna, omisiones, sin marcar— son de la lista y van en el 1.
         antesDeLista={
           enPuedenSer
             ? aviso
@@ -1694,18 +1768,23 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
               <HojaCerrarConPendientes
                 accion={cerrandoConPendientes}
                 pendientes={pendientes}
+                productos={pendientesPorProducto}
+                paraRevisar={paraRevisarFueraDeLaHoja}
+                tocando={tocando}
                 trabajando={aplicando || pasando}
+                onUsar={(it) => usar(it)}
+                onVerParaRevisar={verParaRevisar}
                 // Si no cerró —aplicar falló, o no escribió nada—, la hoja se
                 // va igual: el aviso que lo explica está arriba, debajo de ella.
                 onAplicarYTerminar={async () => {
                   // Con bajas, primero "Estos productos bajan de precio": no se
                   // escribe nada hasta «Aplicar igual».
-                  if (queAbreAlAplicar(bajas) === AL_APLICAR.HOJA_BAJAS) {
+                  if (queAbreAlAplicar(bajasAlTerminar) === AL_APLICAR.HOJA_BAJAS) {
                     setCerrandoConPendientes(null);
                     setAvisandoBajas(DESPUES_DE_LAS_BAJAS.APLICAR_Y_TERMINAR);
                     return;
                   }
-                  await aplicarYTerminar({ listos: pendientes.listos, aplicar, terminar });
+                  await aplicarLosPendientes();
                   setCerrandoConPendientes(null);
                 }}
                 onCerrarSinAplicar={async () => {
@@ -1890,7 +1969,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
 
             {avisandoBajas && (
               <HojaBajasDePrecio
-                bajas={bajas}
+                bajas={avisandoBajas === DESPUES_DE_LAS_BAJAS.APLICAR_Y_TERMINAR ? bajasAlTerminar : bajas}
                 trabajando={aplicando}
                 onAplicarIgual={alAplicarIgual}
                 onVolver={() => setAvisandoBajas(null)}

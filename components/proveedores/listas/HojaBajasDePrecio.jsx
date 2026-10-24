@@ -11,8 +11,7 @@
 // precios sin aplicar": las tarjetas van en su lugar de contenido.
 
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import { money, pct, tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
+import TarjetaPrecioNuevo from "@/components/proveedores/listas/TarjetaPrecioNuevo";
 import { TEXTO_APLICAR_IGUAL, TITULO_BAJAS } from "@/lib/proveedores/listas/bajasDeLaLista";
 
 /**
@@ -34,17 +33,13 @@ export default function HojaBajasDePrecio({ bajas = [], trabajando = false, onAp
     >
       <div className="space-y-2">
         {bajas.map((b) => (
-          <SunmiCard key={b.productoBaseId} className="p-3">
-            <p className="text-sm3 font-semibold sunmi-text-strong break-words">{b.nombre}</p>
-            <div className="mt-1 flex items-baseline justify-between gap-3">
-              <span className="text-sm2 tabular-nums sunmi-text-muted">
-                {money(b.costoHoy)} → {money(b.costoNuevo)}
-              </span>
-              <span className={`shrink-0 text-sm2 font-semibold tabular-nums ${tonoDelPorcentaje(b.variacionPct)}`}>
-                {pct(b.variacionPct)}
-              </span>
-            </div>
-          </SunmiCard>
+          <TarjetaPrecioNuevo
+            key={b.productoBaseId}
+            nombre={b.nombre}
+            costoHoy={b.costoHoy}
+            costoNuevo={b.costoNuevo}
+            variacionPct={b.variacionPct}
+          />
         ))}
       </div>
     </SunmiHojaDeConfirmacion>

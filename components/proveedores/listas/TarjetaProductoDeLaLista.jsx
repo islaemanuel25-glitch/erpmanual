@@ -78,6 +78,26 @@ export const TEXTO_SI = "✓ Sí";
 export const TEXTO_OTRO = "Otro";
 
 /** «No es de Dab»: deshace una aceptación del paquete 2. */
+/**
+ * «✓ USAR», el de la tarjeta. Relleno cuando ya está en uso: es el mismo botón
+ * marcado, como un interruptor, y tocarlo lo desmarca. `primary` es el acento
+ * del tema. Exportado desde el 2026-10-24 para la hoja "Te quedan precios sin
+ * aplicar", que tiene que dibujar el mismo botón y no uno parecido.
+ */
+export function BotonUsar({ enUso = false, trabajando = false, onClick }) {
+  return (
+    <SunmiButton
+      color={enUso ? "primary" : undefined}
+      aria-pressed={enUso}
+      onClick={onClick}
+      disabled={trabajando}
+      className={`shrink-0 ${enUso ? "" : CLASE_ACCION_RAPIDA}`}
+    >
+      {TEXTO_USAR}
+    </SunmiButton>
+  );
+}
+
 export function textoNoEsDe(proveedor) {
   return proveedor ? `No es de ${proveedor}` : "No es de este proveedor";
 }
@@ -169,19 +189,7 @@ export default function TarjetaProductoDeLaLista({
       </SunmiButton>
     );
   } else if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
-    // Relleno cuando ya está en uso: es el mismo botón marcado, como un
-    // interruptor, y tocarlo lo desmarca. `primary` es el acento del tema.
-    accionArriba = (
-      <SunmiButton
-        color={cambia ? "primary" : undefined}
-        aria-pressed={cambia}
-        onClick={() => onUsar?.(item)}
-        disabled={trabajando}
-        className={`shrink-0 ${cambia ? "" : CLASE_ACCION_RAPIDA}`}
-      >
-        {TEXTO_USAR}
-      </SunmiButton>
-    );
+    accionArriba = <BotonUsar enUso={cambia} trabajando={trabajando} onClick={() => onUsar?.(item)} />;
   }
 
   // ── ABAJO A LA IZQUIERDA: LO DEMÁS ──────────────────────────────────────
