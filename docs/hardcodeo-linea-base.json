@@ -2,13 +2,13 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-24 16:00",
-  "commit": "e95726356dda5279be24d06a88545a87e75a8613",
+  "generada": "2026-10-25 15:49",
+  "commit": "f37ff2dd5cc645f6028cd6d06c72aa5fb7535622",
   "total": {
     "color": 273,
-    "medida": 1511,
+    "medida": 1496,
     "modal": 34,
-    "crudo": 264,
+    "crudo": 262,
     "celda": 429,
     "kit-pisado": 0,
     "tema-paralelo": 87
@@ -259,9 +259,9 @@
     },
     "pedidos": {
       "color": 0,
-      "medida": 16,
+      "medida": 1,
       "modal": 0,
-      "crudo": 3,
+      "crudo": 1,
       "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -811,17 +811,6 @@
     "app/modulos/operadores/page.jsx": {
       "celda": {
         "<td>": 3
-      }
-    },
-    "app/modulos/pedidos/historial/page.jsx": {
-      "medida": {
-        "text-[11px]": 6,
-        "text-[12px]": 3,
-        "text-[13px]": 1,
-        "text-[10px]": 5
-      },
-      "crudo": {
-        "<button>": 2
       }
     },
     "app/modulos/pedidos/page.jsx": {
