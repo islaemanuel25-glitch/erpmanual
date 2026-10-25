@@ -124,7 +124,10 @@ export function presentacionDeLinea(d = {}) {
 // El tamaño es `text-xs2`, el token de 10px de `tailwind.config.js`: vale
 // exactamente lo mismo que el `text-[10px]` que había y no le suma una medida
 // mágica al trinquete.
-function BasePildora({ tono, children }) {
+//
+// Se exporta desde que la etiqueta de qué le pasó a una línea —"Faltan 2", "No
+// vino"— va en la misma tarjeta que la presentación: el mismo motivo de arriba.
+export function BasePildora({ tono, children }) {
   return (
     <span className={`px-1.5 py-0.5 rounded-full text-xs2 font-medium whitespace-nowrap ${tono}`}>
       {children}

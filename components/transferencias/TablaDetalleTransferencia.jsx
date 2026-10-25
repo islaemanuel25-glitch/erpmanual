@@ -49,34 +49,18 @@ import {
 // `unidadesFisicasDe` se importaba acá y se llamaba con las columnas CRUDAS. Ver
 // el bloque de la diferencia: eso era el defecto, no un detalle de estilo.
 import { descriptorDeEnvio, nombreDePresentacion } from "@/lib/transferencias/presentacionEnvio";
+import { importeVigenteDeLinea } from "@/lib/transferencias/detalleRecibido";
 
 function num(v) {
   const n = Number(v);
   return Number.isNaN(n) ? 0 : n;
 }
 
-/**
- * EL IMPORTE QUE ESTA TABLA MUESTRA POR LÍNEA.
- *
- * El endpoint manda dos: `subtotal` es el del REMITO —lo que salió del
- * depósito, inmutable mientras alguien cuenta— y `subtotalRecibido` es lo que
- * vale lo que llegó, que sigue a la corrección y es el mismo número que el
- * servidor suma para el total corregido del documento.
- *
- * Esta tabla leía `subtotal` pelado en sus dos vistas, sin ninguna de las dos
- * ramas que el teléfono ya tenía. Eso dejaba vivos los dos defectos:
- *
- *   · la #195 — un producto agregado se dibujaba en $0,00, porque no venía en
- *     el remito y su `subtotal` vale cero por definición;
- *   · la #191 — una línea corregida de 4 a 10 se quedaba en el importe del
- *     documento mientras el total de abajo ya mostraba el corregido.
- *
- * Se lee siempre lo recibido cuando existe. `subtotalRecibido` llega en `null`
- * solo si nadie contó todavía, y ahí lo enviado ES lo que vale la línea.
- */
-function importeDeLinea(d) {
-  return d?.subtotalRecibido == null ? d?.subtotal : d.subtotalRecibido;
-}
+// EL IMPORTE QUE ESTA TABLA MUESTRA POR LÍNEA es `importeVigenteDeLinea`. Vivía
+// acá como función privada —la que cerró la #195 y la #191— y se mudó a
+// `lib/transferencias/detalleRecibido.js` sin cambios cuando el detalle recibido
+// del teléfono necesitó el mismo número. El porqué largo viajó con ella.
+const importeDeLinea = importeVigenteDeLinea;
 
 /**
  * "5 PACK x6 + 5 sueltas". El desglose, no el total.

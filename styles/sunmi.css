@@ -518,6 +518,13 @@
    (warning, 1,5 px) y la fila del corte de semana mientras se edita (accent,
    1,5 px). */
 .sunmi-border-warning { border-color: var(--pos-warning, #f59e0b); }
+/* La tercera hermana: el color del borde NORMAL del tema, sin el grosor.
+   Existe para que un bloque marcado y uno sin marcar tengan el MISMO grosor
+   —1,5 px los dos— y cambie solo el color: con `.sunmi-border` el normal queda
+   en 1 px y la tarjeta mide un píxel menos que su vecina marcada. Primera
+   consumidora: la tarjeta del detalle recibido, que tiene que medir lo mismo
+   corregida o no. */
+.sunmi-border-base    { border-color: var(--app-border); }
 .sunmi-border-accent  { border-color: var(--pos-accent); }
 /* SOLO EL FONDO EN ACCENT, sin color de texto.
    `.sunmi-badge-accent` y `.sunmi-header-accent` ya pintan este mismo fondo,

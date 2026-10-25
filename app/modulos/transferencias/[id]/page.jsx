@@ -21,7 +21,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
+import useEsEscritorio from "@/hooks/useEsEscritorio";
+import DetalleRecibidoMovil from "@/components/transferencias/DetalleRecibidoMovil";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -47,6 +49,8 @@ import {
 } from "@/lib/transferencias/recepcionUI";
 
 const LISTADO = "/modulos/transferencias";
+// El corte `md` de Tailwind: el mismo en que `Header` empieza a dibujar su título.
+const CONSULTA_MD = "(min-width: 768px)";
 const TZ_AR = "America/Argentina/Cordoba";
 
 function num(v) {
@@ -195,6 +199,17 @@ export default function TransferenciaDetallePage() {
     () => <SunmiBackButton href={destinoDeVuelta} />,
     [destinoDeVuelta]
   );
+
+  // ── RECIBIDA, EN EL TELÉFONO: "Transferencia N" EN LA FILA DEL SHELL ─────
+  //
+  // El diseño V45 titula con el número, al lado del mismo Volver. El título
+  // registrado lo leen LOS DOS shells —también el <h1> de escritorio de
+  // `Header`—, así que se registra solo por debajo de `md`, donde ese <h1> no se
+  // dibuja: el escritorio sigue diciendo "Transferencias". Mientras no se sabe
+  // el ancho (`null`) no se registra nada.
+  const desdeMd = useEsEscritorio(CONSULTA_MD);
+  const recibidaEnTelefono = item?.estado === "Recibida" && !puedeRecibir;
+  useTituloDePagina(recibidaEnTelefono && desdeMd === false ? `Transferencia ${item.id}` : null);
 
   /**
    * Imprimir el ticket en la impresora del POS.
@@ -776,6 +791,25 @@ export default function TransferenciaDetallePage() {
                   </SunmiButton>
                 }
               />
+            ) : recibidaEnTelefono ? (
+              <>
+                {/* ── RECIBIDA, EN EL TELÉFONO: EL DETALLE V45 ──────────────
+                    Resumen, filtros y una tarjeta por línea, con las
+                    corregidas separadas. La tabla de siempre sigue siendo la
+                    de escritorio: se la envuelve en `hidden md:block`, que de
+                    768 para arriba no cambia nada. */}
+                <div className="md:hidden">
+                  <DetalleRecibidoMovil item={item} importeTotal={importeTotal} fecha={fechaCabecera} />
+                </div>
+                <div className="hidden md:block">
+                  <TablaDetalleTransferencia
+                    item={item}
+                    editItems={editItems}
+                    setEditItems={setEditItemsDirty}
+                    inputsHabilitados={inputsHabilitados}
+                  />
+                </div>
+              </>
             ) : (
               <TablaDetalleTransferencia
                 item={item}
