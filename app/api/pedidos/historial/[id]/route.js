@@ -14,7 +14,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { alcanceDelHistorial, pedidosDelHistorial, ESTADOS_DEL_HISTORIAL } from "@/lib/pedidos/alcanceDelHistorial";
-import { itemDelPedido } from "@/lib/pedidos/itemDelPedido";
+import { itemDelPedido, BASE_CON_CATEGORIA } from "@/lib/pedidos/itemDelPedido";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
 const NO_ENCONTRADO = { ok: false, error: "No se encontró ese pedido en el historial de este local." };
@@ -36,7 +36,7 @@ export async function GET(req, { params }) {
       where: { ...pedidosDelHistorial(alcance), id: posId, estado: { in: ESTADOS_DEL_HISTORIAL } },
       include: {
         detalles: {
-          include: { producto: { include: { base: true } } },
+          include: { producto: { include: BASE_CON_CATEGORIA } },
           orderBy: { id: "asc" },
         },
         transferencias: {

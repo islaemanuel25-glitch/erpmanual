@@ -2,13 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { itemDelPedido } from "@/lib/pedidos/itemDelPedido";
+import { itemDelPedido, BASE_CON_CATEGORIA } from "@/lib/pedidos/itemDelPedido";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
-
-// La base con el nombre de su categoría: `itemDelPedido` lo manda como
-// `categoriaNombre`, que la computadora muestra en "Lo que pedí".
-const BASE_CON_CATEGORIA = { base: { include: { categoria: { select: { nombre: true } } } } };
 
 export async function GET(req) {
   try {
