@@ -6,6 +6,10 @@ import { itemDelPedido } from "@/lib/pedidos/itemDelPedido";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
+// La base con el nombre de su categoría: `itemDelPedido` lo manda como
+// `categoriaNombre`, que la computadora muestra en "Lo que pedí".
+const BASE_CON_CATEGORIA = { base: { include: { categoria: { select: { nombre: true } } } } };
+
 export async function GET(req) {
   try {
     // Auth + localId + grupoId (soporta admin con contexto activo)
@@ -68,7 +72,7 @@ export async function GET(req) {
         detalles: {
           include: {
             producto: {
-              include: { base: true },
+              include: BASE_CON_CATEGORIA,
             },
           },
         },
@@ -87,7 +91,7 @@ export async function GET(req) {
         detalles: {
           include: {
             producto: {
-              include: { base: true },
+              include: BASE_CON_CATEGORIA,
             },
           },
         },
