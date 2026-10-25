@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-25 23:07
+**Última actualización:** 2026-10-25 23:49
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-25: fix(transferencias): correcciones del detalle recibido en el teléfono tras probarlo con la 504 — SIN VERIFICAR en pantalla
 - 2026-10-25: feat(transferencias): detalle recibido en el teléfono con filtros y tarjeta de alto fijo — SIN VERIFICAR en pantalla
 - 2026-10-24: feat: listas de proveedor en dos paquetes, "Tus productos de X" y "Pueden ser de X" — SIN VERIFICAR EN PANTALLA
 - 2026-10-24: fix: listas — los «✓ Sí» de antes de la tabla de sumados se reconstruyen, y el universo queda atado a los tres lugares (SIN VERIFICAR EN PANTALLA)
