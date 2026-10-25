@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-25] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: feat(transferencias): detalle recibido en el teléfono con filtros y tarjeta de alto fijo — SIN VERIFICAR en pantalla
+
+
 ## [2026-10-24] - Actualización: proveedores, transferencias, turnos-y-cierres
 
 ### Modificado
