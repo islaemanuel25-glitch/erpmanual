@@ -12,27 +12,24 @@
 // archivos que usa el teléfono —`app/modulos/pedidos/page.jsx`, sus piezas,
 // el kit— NO se modifican para servir a esta pantalla: ni por dentro, ni para
 // "compartir" lógica, ni con una prop nueva con valor por defecto. Lo decidió
-// Emanuel el 2026-10-14 para la recepción y lo repitió el 2026-10-22 para
-// ésta. Esta pantalla solo IMPORTA lo que ya está exportado, tal como está;
-// lo que vive adentro de la pantalla del teléfono y no está exportado se COPIA
-// acá, marcado como copia y con el archivo de donde salió. Esa duplicación se
-// acepta a sabiendas: si la regla cambia en el teléfono, hay que cambiarla
-// también acá.
+// Emanuel el 2026-10-14 para la recepción y lo repitió el 2026-10-22 y el
+// 2026-10-25 para ésta. Esta pantalla solo IMPORTA lo que ya está exportado,
+// tal como está —`textoDeUnidad` de `TarjetaPedido`, las claves de
+// `lib/pedidos/verFotos`—; lo que vive adentro de la pantalla del teléfono y
+// no está exportado se COPIA acá, marcado como copia y con el archivo de donde
+// salió. Esa duplicación se acepta a sabiendas: si la regla cambia en el
+// teléfono, hay que cambiarla también acá.
 //
 // ── POR QUÉ TIENE SU PROPIO ESTADO ────────────────────────────────────────
 //
-// En la recepción el estado vive en `WorkspaceRecepcion` y las dos
-// composiciones lo reciben. Acá vive ADENTRO de la pantalla del teléfono, en
-// `page.jsx`, y sacarlo de ahí sería tocar el teléfono. Así que esta pantalla
-// lleva el suyo: los MISMOS fetch a las MISMAS rutas —opciones, carrito,
-// catálogo, set-cantidad, sumar-al-enviado, solicitar y cancelar—, copiados de
-// `page.jsx`. La página monta UNA de las dos según el ancho de la ventana
-// (ver el reparto en `page.jsx`), así que cada lectura sale una vez; si la
-// ventana cruza los 1024 px, esta se desmonta y su estado se pierde.
+// El del teléfono vive ADENTRO de `page.jsx`, y sacarlo de ahí sería tocar el
+// teléfono. Así que esta pantalla lleva el suyo: los MISMOS fetch a las
+// MISMAS rutas —opciones, carrito, catálogo, set-cantidad, sumar-al-enviado,
+// solicitar y cancelar—, copiados de `page.jsx`. La página monta UNA de las
+// dos según el ancho de la ventana (ver el reparto en `page.jsx`).
 //
-//   · las claves guardadas en el celular .... COPIA de `CLAVE_TAMANO_DE_PAGINA`,
-//                                             `CLAVE_VER_FOTOS`, `tamanoGuardado`
-//                                             y `fotosGuardadas` de `page.jsx`;
+//   · el tamaño de página guardado .......... COPIA de `CLAVE_TAMANO_DE_PAGINA`
+//                                             y `tamanoGuardado` de `page.jsx`;
 //   · "hoy 14:05" ........................... `cuandoSeEnvio`, COPIA;
 //   · cargar el carrito ..................... COPIA de `cargarCarrito`;
 //   · set-cantidad (armando) ................ COPIA de `setCantidad`;
@@ -44,33 +41,34 @@
 //   · el número que se tipea ................ COPIA de `escrito`/`confirmar` de
 //                                             `TarjetaPedido`.
 //
-// ── TRES FRANJAS ──────────────────────────────────────────────────────────
+// ── EL DISEÑO DEL 2026-10-25 ──────────────────────────────────────────────
 //
-//   1. El pedido: título, estado, el dato, y las acciones —Pedidos
-//      anteriores, Volver y la acción principal—, en una tarjeta.
-//   2. Las herramientas en una fila: buscar, categoría, Ver fotos y cuántos
-//      por página. No va con el pedido empezado.
-//   3. El cuerpo: el catálogo como tabla a la izquierda y, a la derecha, el
-//      panel "Tu pedido", pegado arriba mientras la lista scrollea.
+//   1. Una barra FIJA arriba —solo la lista scrollea—: el buscador, la
+//      categoría, "Ver fotos" y la acción principal; debajo, las dos pestañas
+//      ("Todos los productos" y "Lo que pedí · N"), de dónde a dónde y
+//      "Pedidos anteriores".
+//   2. La lista de punta a punta, en una tarjeta: PRODUCTO, CATEGORÍA, SE PIDE
+//      POR, CANTIDAD y la columna de "Sacar del pedido", de ancho fijo.
+//   3. El pie: "1 a 50 de N" y "Mostrar 25 / 50 / 100"; en "Lo que pedí",
+//      "N productos en el pedido".
 //
-// No hay página de entrada: el escritorio arranca en el catálogo.
+// Sin el panel "Tu pedido" de la derecha: lo cargado se ve en la pestaña "Lo
+// que pedí". Sin el stock del depósito. No hay página de entrada: el
+// escritorio arranca en la lista.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import { useOperadorContext } from "@/app/context/OperadorContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
-import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
@@ -78,11 +76,13 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
+import { textoDeUnidad } from "@/components/pedidos/TarjetaPedido";
 
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
+import { tamanoDePaginaCatalogo, TAMANOS_DE_PAGINA_CATALOGO } from "@/lib/pedidos/tamanoDePagina";
 import { salePorBulto, juntarPorProducto } from "@/lib/pedidos/lineasDelPedido";
+import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LAS COPIAS. Ver el encabezado: el teléfono no se toca, así que lo que esta
@@ -101,18 +101,6 @@ function tamanoGuardado() {
   }
 }
 
-/** COPIA de `CLAVE_VER_FOTOS` de `page.jsx`. */
-const CLAVE_VER_FOTOS = "pedidos_ver_fotos";
-
-/** COPIA de `fotosGuardadas` de `page.jsx`. */
-function fotosGuardadas() {
-  try {
-    return localStorage.getItem(CLAVE_VER_FOTOS) === "1";
-  } catch {
-    return false;
-  }
-}
-
 /** COPIA de `productos` de `page.jsx`. */
 const productos = (n) => (n === 1 ? "producto" : "productos");
 
@@ -125,21 +113,22 @@ function cuandoSeEnvio(solicitadoAt) {
 
 const cambiosTexto = (n) => (n === 1 ? "cambio" : "cambios");
 
-/** "1 bulto", "3 bultos", o el número: lo que el panel dice de una cantidad. */
-function cantidadDelPanel(producto, n) {
-  if (salePorBulto(producto)) return `${n} ${n === 1 ? "bulto" : "bultos"}`;
-  return String(n);
-}
+// Las dos pestañas de la barra.
+const PESTANA = Object.freeze({ TODOS: "todos", PEDIDO: "pedido" });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EL CAMPO DE CANTIDAD DE UNA FILA
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * El − valor + de una fila del catálogo, en tamaño compacto. Lo que se tipea
- * se manda al salir del campo (o con Enter), no tecla por tecla, y si no
- * cambió no se manda nada: COPIA de `escrito`/`cambiar`/`confirmar` de
- * `TarjetaPedido`, en `page.jsx`.
+ * El − valor + de una fila, en tamaño compacto. Lo que se tipea se manda al
+ * salir del campo (o con Enter), no tecla por tecla, y si no cambió no se
+ * manda nada: COPIA de `escrito`/`cambiar`/`confirmar` de `TarjetaPedido`.
+ *
+ * El borde va en el propio campo (`conMarco={false}`) y no en el marco: con
+ * cantidad cargada es el del acento, y `sunmi-border-accent` le gana al borde
+ * de `.sunmi-input` porque está después en la hoja. Sobre el marco no
+ * funcionaría: el marco trae `sunmi-divider`, que está más abajo y le gana.
  */
 function CampoCantidadDeFila({ producto, cantidad, onCantidad }) {
   const { nombre } = producto;
@@ -169,7 +158,8 @@ function CampoCantidadDeFila({ producto, cantidad, onCantidad }) {
       etiqueta={`Cantidad de ${nombre}`}
       minimo={0}
       tamano="compacto"
-      claseMarco="w-14"
+      conMarco={false}
+      claseInput={`w-14 text-center${cantidad > 0 ? " sunmi-border-accent" : ""}`}
       apagaMenosEnMinimo
       minimoComoGuia
       inputRef={campoRef}
@@ -178,31 +168,6 @@ function CampoCantidadDeFila({ producto, cantidad, onCantidad }) {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
     />
-  );
-}
-
-/**
- * La ✕ de una fila o de un renglón del panel. Su LUGAR está siempre —COPIA
- * del criterio de `TarjetaPedido`—: sin el producto en el pedido va
- * invisible, apagada, fuera del foco y oculta al lector de pantalla, y ocupa
- * el mismo lugar. Así la fila no cambia de ancho al cargar el primero.
- */
-function Quitar({ nombre, visible, onQuitar }) {
-  return (
-    <SunmiButton
-      color="ghost"
-      data-lugar-quitar-escritorio=""
-      aria-label={visible ? `Quitar ${nombre} del pedido` : undefined}
-      aria-hidden={visible ? undefined : "true"}
-      tabIndex={visible ? undefined : -1}
-      disabled={!visible}
-      onClick={() => {
-        if (visible) onQuitar();
-      }}
-      className={`shrink-0 min-w-toque min-h-toque inline-flex items-center justify-center${visible ? "" : " invisible"}`}
-    >
-      <X size={16} aria-hidden="true" />
-    </SunmiButton>
   );
 }
 
@@ -221,6 +186,7 @@ export default function PedidosEscritorio() {
 
   const [busqueda, setBusqueda] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
+  const [pestana, setPestana] = useState(PESTANA.TODOS);
 
   const [catalogo, setCatalogo] = useState([]);
   const [page, setPage] = useState(1);
@@ -235,7 +201,7 @@ export default function PedidosEscritorio() {
     try { localStorage.setItem(CLAVE_TAMANO_DE_PAGINA, String(size)); } catch {}
   };
   // Se lee al crear el estado, por lo mismo que en el teléfono: `SunmiToggle`
-  // toma su valor una sola vez al montarse.
+  // toma su valor una sola vez al montarse. Sin nada guardado, apagado.
   const [verFotos, setVerFotosRaw] = useState(fotosGuardadas);
   const setVerFotos = (v) => {
     setVerFotosRaw(v);
@@ -247,9 +213,10 @@ export default function PedidosEscritorio() {
   const [posId, setPosId] = useState(null);
   const [pendiente, setPendiente] = useState(null);
   const [enviando, setEnviando] = useState(false);
-  // Lo que el panel necesita saber de cada producto —nombre y cómo se pide—,
-  // de lo que traen el carrito y el catálogo. El carrito solo trae lo pedido, y
-  // un producto recién cargado desde el catálogo no está ahí todavía.
+  // Lo que "Lo que pedí" necesita saber de cada producto —nombre, categoría,
+  // cómo se pide, la foto—, de lo que traen el carrito y el catálogo. El
+  // carrito solo trae lo pedido, y un producto recién cargado desde el
+  // catálogo no está ahí todavía.
   const [fichas, setFichas] = useState({});
   const conocer = (lista) =>
     setFichas((prev) => {
@@ -257,13 +224,13 @@ export default function PedidosEscritorio() {
       for (const p of lista || []) if (p?.productoLocalId != null) next[p.productoLocalId] = { ...next[p.productoLocalId], ...p };
       return next;
     });
-  // El orden del panel: el del pedido, y lo nuevo al final.
+  // El orden de "Lo que pedí": el del pedido, y lo nuevo al final.
   const [orden, setOrden] = useState([]);
 
   // El modo sumar: COPIA de `page.jsx`.
   const [cambios, setCambios] = useState({});
   const [agregando, setAgregando] = useState(false);
-  const [confirmandoDescartar, setConfirmandoDescartar] = useState(null); // null | "volver" | "historial"
+  const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
 
   const [cancelando, setCancelando] = useState(false);
   const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
@@ -277,7 +244,7 @@ export default function PedidosEscritorio() {
 
   // ── CARGAR ──────────────────────────────────────────────────────────────
 
-  /** COPIA de `cargarCarrito` de `page.jsx`, más las fichas y el orden del panel. */
+  /** COPIA de `cargarCarrito` de `page.jsx`, más las fichas y el orden de "Lo que pedí". */
   const cargarCarrito = async () => {
     try {
       const res = await fetch("/api/pedidos/carrito", { cache: "no-store" });
@@ -368,7 +335,8 @@ export default function PedidosEscritorio() {
 
   /**
    * Armando: COPIA de `setCantidad` de `page.jsx`, va por set-cantidad al
-   * instante. Enviado: el modo sumar, se anota en la pantalla y nada viaja.
+   * instante —el pedido se guarda solo—. Enviado: el modo sumar, se anota en
+   * la pantalla y nada viaja hasta "Agregar al pedido".
    */
   const setCantidad = async (productoLocalId, cantidad, unidad = "UNIDAD") => {
     if (empezado) return;
@@ -380,6 +348,7 @@ export default function PedidosEscritorio() {
         else next[productoLocalId] = { cantidad, unidad };
         return next;
       });
+      if (cantidad > 0) setOrden((prev) => (prev.includes(productoLocalId) ? prev : [...prev, productoLocalId]));
       return;
     }
 
@@ -413,7 +382,11 @@ export default function PedidosEscritorio() {
 
   // ── ENVIAR, SUMAR, CANCELAR ─────────────────────────────────────────────
 
-  /** COPIA de `enviarPedido` de `page.jsx`. Sin entrada: se queda acá, en "Enviado". */
+  /**
+   * COPIA de `enviarPedido` de `page.jsx`: al primer toque, sin segundo paso.
+   * Sin entrada en la computadora, se queda acá, en "Enviado", y vuelve a
+   * "Todos los productos" para seguir sumando.
+   */
   const enviarPedido = async () => {
     if (!posId) {
       setError("No hay pedido para enviar");
@@ -432,6 +405,7 @@ export default function PedidosEscritorio() {
         setCarrito({});
         setPosId(null);
         setCambios({});
+        setPestana(PESTANA.TODOS);
         await cargarCarrito();
         showSuccess("Pedido enviado al depósito correctamente");
       } else if (json.needsOperador) {
@@ -512,23 +486,18 @@ export default function PedidosEscritorio() {
     setCancelando(false);
   };
 
-  // ── IRSE ────────────────────────────────────────────────────────────────
+  // ── IRSE: "PEDIDOS ANTERIORES" ──────────────────────────────────────────
 
-  // Volver va a donde va hoy el Volver de la entrada del teléfono; "Pedidos
-  // anteriores", al historial. Con cambios sin confirmar, antes la hoja.
-  const irA = (destino) => {
-    if (destino === "historial") router.push("/modulos/pedidos/historial");
-    else router.back();
-  };
-  const salir = (destino) => {
-    if (enviado && cambiosSinConfirmar > 0) setConfirmandoDescartar(destino);
-    else irA(destino);
+  // Al historial. Con cambios sin confirmar del modo sumar, antes la hoja.
+  const irAlHistorial = () => router.push("/modulos/pedidos/historial");
+  const salir = () => {
+    if (enviado && cambiosSinConfirmar > 0) setConfirmandoDescartar(true);
+    else irAlHistorial();
   };
   const descartarYSalir = () => {
-    const destino = confirmandoDescartar;
-    setConfirmandoDescartar(null);
+    setConfirmandoDescartar(false);
     setCambios({});
-    irA(destino);
+    irAlHistorial();
   };
 
   // ── PERMISOS Y CARGA: COPIA de `page.jsx` ───────────────────────────────
@@ -559,17 +528,19 @@ export default function PedidosEscritorio() {
   const cantidadEnPantalla = (id) => (enviado && cambios[id] ? cambios[id].cantidad : carrito[id] ?? 0);
   const enviadoCuando = pendiente ? cuandoSeEnvio(pendiente.solicitadoAt) : null;
 
-  const PILL = { armando: ["slate", "Borrador"], enviado: ["cyan", "Enviado"], preparando: ["amber", "Preparando"] };
-  const subtitulo = {
+  // "Lo que pedí": lo que tiene cantidad en pantalla —en el modo sumar, con lo
+  // nuevo sin confirmar—, en el orden del pedido. Con el pedido empezado es la
+  // única pestaña: no hay catálogo que mirar.
+  const loQuePedi = orden.filter((id) => cantidadEnPantalla(id) > 0).map((id) => fichas[id] || { productoLocalId: id, nombre: `Producto #${id}` });
+  const viendoPedido = empezado || pestana === PESTANA.PEDIDO;
+
+  const deDondeADonde = {
     armando: `${opciones.local.nombre} → ${opciones.deposito.nombre} · se guarda solo`,
     enviado: `Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · podés sumar hasta que el depósito lo empiece`,
-    preparando: "El depósito lo está preparando",
+    preparando: "El depósito lo está preparando · ya no se puede cambiar",
   }[estado];
-  const dato = enviado
-    ? { rotulo: "Cambios sin confirmar", valor: cambiosSinConfirmar }
-    : { rotulo: "Productos en el pedido", valor: enPedido };
 
-  // La marca de abajo del nombre, en el modo sumar.
+  // La marca de abajo del nombre, en el modo sumar: lo que cambia al confirmar.
   const marcaDelCambio = (id) => {
     const c = enviado ? cambios[id] : null;
     if (!c) return null;
@@ -583,12 +554,14 @@ export default function PedidosEscritorio() {
       titulo: "Producto",
       render: (p) => {
         const marca = marcaDelCambio(p.productoLocalId);
+        const cargado = cantidadEnPantalla(p.productoLocalId) > 0;
         return (
           <div className="flex items-center gap-3">
             {verFotos ? <MiniaturaProductoTarjeta url={p.imagenUrl} conservaLugar nombre={p.nombre} /> : null}
             <div className="min-w-0">
-              <span className="block font-semibold sunmi-text-strong break-words">{p.nombre}</span>
-              {p.categoriaNombre ? <span className="block text-sm2 sunmi-text-muted">{p.categoriaNombre}</span> : null}
+              <span data-nombre-producto="" className={`block break-words sunmi-text-strong ${cargado ? "font-bold" : "font-normal"}`}>
+                {p.nombre}
+              </span>
               {marca ? <span data-marca-cambio="" className="block text-sm2 sunmi-text-accent">{marca}</span> : null}
             </div>
           </div>
@@ -596,88 +569,57 @@ export default function PedidosEscritorio() {
       },
     },
     {
+      clave: "categoria",
+      titulo: "Categoría",
+      render: (p) => <span className="sunmi-text-muted">{p.categoriaNombre ?? ""}</span>,
+    },
+    {
       clave: "unidad",
-      titulo: "Unidad",
+      titulo: "Se pide por",
+      // La misma frase que la tarjeta del teléfono, en la etiqueta chica del kit.
       render: (p) => (
-        <span className="whitespace-nowrap sunmi-text-muted">{salePorBulto(p) ? `Por BULTO de ${p.factorPack} u` : "UNIDAD"}</span>
+        <span data-se-pide-por="">
+          <SunmiPill color="slate">{textoDeUnidad(p)}</SunmiPill>
+        </span>
       ),
     },
     {
       clave: "cantidad",
       titulo: "Cantidad",
-      render: (p) => (
-        <CampoCantidadDeFila
-          producto={p}
-          cantidad={cantidadEnPantalla(p.productoLocalId)}
-          onCantidad={(cant, uni) => setCantidad(p.productoLocalId, cant, uni)}
-        />
-      ),
+      render: (p) =>
+        empezado ? (
+          <span data-cantidad-pedido="" className="font-bold tabular-nums sunmi-text-strong">
+            {cantidadEnPantalla(p.productoLocalId)}
+          </span>
+        ) : (
+          <CampoCantidadDeFila
+            producto={p}
+            cantidad={cantidadEnPantalla(p.productoLocalId)}
+            onCantidad={(cant, uni) => setCantidad(p.productoLocalId, cant, uni)}
+          />
+        ),
     },
     {
-      clave: "quitar",
+      // El ancho está reservado siempre, haya botón o no: así el campo de
+      // cantidad no salta al cargar el primero ni al sacar el último.
+      clave: "sacar",
       titulo: "",
       align: "der",
-      render: (p) => (
-        <Quitar
-          nombre={p.nombre}
-          visible={cantidadEnPantalla(p.productoLocalId) > 0}
-          onQuitar={() => setCantidad(p.productoLocalId, 0, "UNIDAD")}
-        />
-      ),
+      thClassName: "w-36",
+      render: (p) =>
+        !empezado && cantidadEnPantalla(p.productoLocalId) > 0 ? (
+          <SunmiButton
+            color="ghost"
+            className="whitespace-nowrap border sunmi-border sunmi-bg-card sunmi-text-danger"
+            onClick={() => setCantidad(p.productoLocalId, 0, "UNIDAD")}
+          >
+            Sacar del pedido
+          </SunmiButton>
+        ) : null,
     },
-  ].map((c) => ({ ...c, thClassName: "text-xs2 uppercase tracking-wider sunmi-text-muted" }));
+  ].map((c) => ({ ...c, thClassName: `sunmi-surface text-xs2 uppercase tracking-wider sunmi-text-muted ${c.thClassName ?? ""}`.trim() }));
 
-  // El panel: lo pedido, y en el modo sumar lo nuevo o cambiado sin confirmar.
-  const idsDelPanel = [...orden.filter((id) => carrito[id] != null), ...Object.keys(cambios).map(Number).filter((id) => carrito[id] == null)];
-  const renglones = idsDelPanel.map((id) => {
-    const ficha = fichas[id] || { productoLocalId: id, nombre: `Producto #${id}` };
-    const c = enviado ? cambios[id] : null;
-    return { id, ficha, cantidad: c ? c.cantidad : carrito[id], pendiente: c ? (carrito[id] == null ? "nuevo" : "cambiado") : null };
-  });
-  const subtituloPanel = {
-    armando: `${enPedido} ${productos(enPedido)} · se guarda solo`,
-    enviado: `${enPedido} en el pedido · ${cambiosSinConfirmar} ${cambiosTexto(cambiosSinConfirmar)} sin confirmar`,
-    preparando: `${enPedido} ${productos(enPedido)}`,
-  }[estado];
-
-  const panel = (
-    <SunmiCard className="p-5 space-y-3" data-panel-pedido="">
-      <div>
-        <h2 className="text-lg2 font-bold sunmi-text-strong">Tu pedido</h2>
-        <p className="text-sm2 sunmi-text-muted">{subtituloPanel}</p>
-      </div>
-      {renglones.length === 0 ? (
-        <p className="text-sm2 sunmi-text-muted">Todavía no cargaste productos.</p>
-      ) : (
-        <div className="divide-y sunmi-divider">
-          {renglones.map((r) => (
-            <div key={r.id} data-renglon-pedido={r.ficha.nombre} className="flex items-center gap-2 py-1.5">
-              <span className="min-w-0 flex-1 text-sm3 sunmi-text-strong break-words">{r.ficha.nombre}</span>
-              <span className={`whitespace-nowrap text-sm3 tabular-nums ${r.pendiente ? "sunmi-text-accent" : "sunmi-text-muted"}`}>
-                {cantidadDelPanel(r.ficha, r.cantidad)}
-                {r.pendiente === "nuevo" ? " · nuevo" : r.pendiente === "cambiado" ? (r.cantidad === 0 ? " · se saca" : " · cambiado") : ""}
-              </span>
-              {empezado ? null : (
-                <Quitar nombre={r.ficha.nombre} visible={r.cantidad > 0} onQuitar={() => setCantidad(r.id, 0, "UNIDAD")} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {enviado ? (
-        <SunmiButton
-          color="red"
-          className="w-full min-h-toque"
-          disabled={cancelando}
-          onClick={() => setConfirmandoCancelar(true)}
-        >
-          {cancelando ? "Cancelando..." : "Cancelar pedido"}
-        </SunmiButton>
-      ) : null}
-    </SunmiCard>
-  );
-
-  // La acción principal de la franja.
+  // La acción principal de la barra.
   let principal = null;
   if (estado === "armando") {
     principal = (
@@ -693,122 +635,134 @@ export default function PedidosEscritorio() {
     );
   }
 
-  return (
-    <div className="sunmi-bg w-full min-h-full p-2 lg:p-3 space-y-3" data-pedidos-escritorio-pantalla="">
-      {error ? (
-        <SunmiAviso tono="danger" className="flex items-center justify-between gap-3">
-          <span data-aviso-escritorio="">{error}</span>
-          <SunmiLinkButton onClick={() => setError("")}>cerrar</SunmiLinkButton>
-        </SunmiAviso>
-      ) : null}
+  const pestanaBoton = (clave, texto) => (
+    <SunmiButton
+      color={(clave === PESTANA.PEDIDO) === viendoPedido ? "amber" : "slate"}
+      aria-pressed={(clave === PESTANA.PEDIDO) === viendoPedido}
+      onClick={() => setPestana(clave)}
+      className="shrink-0"
+    >
+      {texto}
+    </SunmiButton>
+  );
 
-      {/* ── 1 · EL PEDIDO ───────────────────────────────────────────────── */}
-      <SunmiCard className="px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-3" data-franja-pedido="">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg3 font-bold sunmi-text-strong">Pedido al depósito</h1>
-            <SunmiPill color={PILL[estado][0]}>{PILL[estado][1]}</SunmiPill>
-          </div>
-          <p className="text-sm2 sunmi-text-muted">{subtitulo}</p>
-        </div>
-
-        {/* En "Preparando" el dato es lo pedido, que el panel ya dice; va igual. */}
-        <div data-dato-pedido="">
-          <div className="text-sm2 sunmi-text-muted">{dato.rotulo}</div>
-          <div className="text-xl2 font-bold tabular-nums sunmi-text-strong">{dato.valor}</div>
-        </div>
-
-        <div className="ml-auto flex items-center gap-3">
-          <SunmiLinkButton onClick={() => salir("historial")}>Pedidos anteriores ›</SunmiLinkButton>
-          <SunmiButton color="slate" onClick={() => salir("volver")} className="shrink-0">
-            ← Volver
+  // El pie de la lista.
+  const desde = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const hasta = Math.min(page * pageSize, total);
+  const pie = viendoPedido ? (
+    <span className="text-sm2 sunmi-text-muted">{`${loQuePedi.length} ${productos(loQuePedi.length)} en el pedido`}</span>
+  ) : (
+    <>
+      <div className="flex items-center gap-2">
+        {totalPages > 1 ? (
+          <SunmiButton color="slate" aria-label="Página anterior" disabled={page <= 1} onClick={() => cargarCatalogo(Math.max(1, page - 1))}>
+            <ChevronLeft size={14} aria-hidden="true" />
           </SunmiButton>
-          {principal}
-        </div>
-      </SunmiCard>
+        ) : null}
+        <span className="text-sm2 sunmi-text-muted tabular-nums">{`${desde} a ${hasta} de ${total}`}</span>
+        {totalPages > 1 ? (
+          <SunmiButton color="slate" aria-label="Página siguiente" disabled={page >= totalPages} onClick={() => cargarCatalogo(Math.min(totalPages, page + 1))}>
+            <ChevronRight size={14} aria-hidden="true" />
+          </SunmiButton>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-1.5" data-mostrar="">
+        <span className="text-sm2 sunmi-text-muted">Mostrar</span>
+        {TAMANOS_DE_PAGINA_CATALOGO.map((n) => (
+          <SunmiButton key={n} color={n === pageSize ? "primary" : "slate"} aria-pressed={n === pageSize} onClick={() => setPageSize(n)}>
+            {n}
+          </SunmiButton>
+        ))}
+      </div>
+    </>
+  );
 
-      {/* ── 2 · LAS HERRAMIENTAS ─────────────────────────────────────────── */}
-      {empezado ? null : (
-        <div className="flex flex-wrap items-center gap-4" data-herramientas-pedido="">
-          {/* ~450 px a 1366: `max-w-lg` (32rem con el rem de 14 px). El diseño
-              pide unos 470; un ancho exacto sería una medida a mano. */}
-          <div className="w-full max-w-lg">
-            <SunmiCampoBusquedaVoz
-              value={busqueda}
-              onChange={setBusqueda}
-              placeholder="Buscar producto o código"
-              ariaLabel="Buscar producto o código"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm2 sunmi-text-muted">Categoría</span>
-            <SunmiSelectAdv
-              id="categoria-pedido-escritorio"
-              value={categoriaId}
-              onChange={(v) => setCategoriaId(v)}
-              aria-label="Categoría"
-              className="w-56 shrink-0"
-            >
-              <SunmiSelectOption value="">{`Todas · ${totalCatalogo ?? total}`}</SunmiSelectOption>
-              {(opciones.categorias || []).map((c) => (
-                <SunmiSelectOption key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-          </div>
-          <div data-ver-fotos-escritorio="">
-            <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
-          </div>
-          <div className="ml-auto">
-            <SunmiPageSizer value={pageSize} onChange={setPageSize} />
-          </div>
-        </div>
-      )}
+  return (
+    <div className="sunmi-bg w-full min-h-full" data-pedidos-escritorio-pantalla="">
+      {/* ── 1 · LA BARRA FIJA ───────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 sunmi-bg-card border-b sunmi-divider px-3 py-2 space-y-2" data-barra-pedido="">
+        {error ? (
+          <SunmiAviso tono="danger" className="flex items-center justify-between gap-3">
+            <span data-aviso-escritorio="">{error}</span>
+            <SunmiLinkButton onClick={() => setError("")}>cerrar</SunmiLinkButton>
+          </SunmiAviso>
+        ) : null}
 
-      {/* ── 3 · EL CATÁLOGO Y TU PEDIDO ──────────────────────────────────── */}
-      {empezado ? (
-        // Preparando: solo el panel, más ancho, y nada se toca.
-        <div className="max-w-2xl">{panel}</div>
-      ) : (
-        // Cinco séptimos el catálogo y dos el panel: ~370 px a 1366, donde el
-        // diseño pide 380. Un ancho fijo pediría un token nuevo en
-        // `tailwind.config.js`, y esta pantalla no toca archivos compartidos.
-        <div className="grid grid-cols-7 items-start gap-4">
-          <div className="col-span-5 min-w-0 space-y-2">
-            <div className="overflow-hidden rounded-xl2 border sunmi-border sunmi-bg-card">
-              <SunmiTable
-                columnas={columnas}
-                filas={catalogo}
-                claveFila={(p) => p.productoLocalId}
-                densidad="normal"
-                cargando={loadingCat}
-                vacio="No se encontraron productos."
-                // La fila con un cambio sin confirmar, en el tono de fila
-                // destacada del kit.
-                tonoFila={(p) => (enviado && cambios[p.productoLocalId] ? "atencion" : null)}
-                className="text-sm3"
+        {empezado ? null : (
+          <div className="flex items-center gap-3" data-herramientas-pedido="">
+            <div className="flex-1 min-w-0">
+              <SunmiCampoBusquedaVoz
+                value={busqueda}
+                onChange={(v) => {
+                  setBusqueda(v);
+                  setPestana(PESTANA.TODOS);
+                }}
+                placeholder="Buscar producto o código"
+                ariaLabel="Buscar producto o código"
               />
             </div>
-            {total > 0 ? (
-              <SunmiPaginador
-                page={page}
-                pageSize={pageSize}
-                totalPages={totalPages}
-                totalItems={total}
-                onPrev={() => cargarCatalogo(Math.max(1, page - 1))}
-                onNext={() => cargarCatalogo(Math.min(totalPages, page + 1))}
-                onGoToPage={(p) => cargarCatalogo(p)}
-                // "‹ Página 1 de 44 ›" y al lado "viendo 1–50 de 2156", como
-                // pide el diseño: la disposición del celular del kit. El
-                // "Mostrar" va arriba, en las herramientas.
-                formaDelCelular
-              />
-            ) : null}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-sm2 sunmi-text-muted">Categoría</span>
+              <SunmiSelectAdv
+                id="categoria-pedido-escritorio"
+                value={categoriaId}
+                onChange={(v) => {
+                  setCategoriaId(v);
+                  setPestana(PESTANA.TODOS);
+                }}
+                aria-label="Categoría"
+                className="w-56 shrink-0"
+              >
+                <SunmiSelectOption value="">{`Todas · ${totalCatalogo ?? total}`}</SunmiSelectOption>
+                {(opciones.categorias || []).map((c) => (
+                  <SunmiSelectOption key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+            </div>
+            <div className="shrink-0" data-ver-fotos-escritorio="">
+              <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
+            </div>
+            {principal}
           </div>
-          <div className="col-span-2 sticky top-3 min-w-0">{panel}</div>
+        )}
+
+        <div className="flex items-center gap-2" data-pestanas-pedido="">
+          {empezado ? null : pestanaBoton(PESTANA.TODOS, "Todos los productos")}
+          {pestanaBoton(PESTANA.PEDIDO, `Lo que pedí · ${loQuePedi.length}`)}
+          <span className="ml-auto min-w-0 text-sm2 sunmi-text-muted">{deDondeADonde}</span>
+          {enviado ? (
+            <SunmiButton color="red" disabled={cancelando} onClick={() => setConfirmandoCancelar(true)} className="shrink-0">
+              {cancelando ? "Cancelando..." : "Cancelar pedido"}
+            </SunmiButton>
+          ) : null}
+          <SunmiButton color="slate" onClick={salir} className="shrink-0">
+            Pedidos anteriores
+          </SunmiButton>
         </div>
-      )}
+      </div>
+
+      {/* ── 2 · LA LISTA ────────────────────────────────────────────────── */}
+      <div className="p-3">
+        <div className="overflow-hidden rounded-xl2 border sunmi-border sunmi-bg-card" data-lista-pedido={viendoPedido ? "pedido" : "todos"}>
+          <SunmiTable
+            columnas={columnas}
+            filas={viendoPedido ? loQuePedi : catalogo}
+            claveFila={(p) => p.productoLocalId}
+            densidad="normal"
+            cargando={!viendoPedido && loadingCat}
+            vacio={viendoPedido ? "Todavía no cargaste productos." : "No se encontraron productos."}
+            // El renglón con cantidad, en el fondo de la app.
+            claseFila={(p) => (cantidadEnPantalla(p.productoLocalId) > 0 ? "sunmi-surface" : "")}
+            className="text-sm3"
+          />
+          {/* ── 3 · EL PIE ─────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between gap-3 px-3 py-2 border-t sunmi-divider" data-pie-lista="">
+            {pie}
+          </div>
+        </div>
+      </div>
 
       {/* COPIA de la hoja de cancelar de `page.jsx`. */}
       <SunmiModalLayout
@@ -834,15 +788,15 @@ export default function PedidosEscritorio() {
 
       {/* COPIA de la hoja de descartar de `page.jsx`. */}
       <SunmiModalLayout
-        open={confirmandoDescartar != null}
+        open={confirmandoDescartar}
         title="Cambios sin confirmar"
-        onClose={() => setConfirmandoDescartar(null)}
+        onClose={() => setConfirmandoDescartar(false)}
         forma="centrado"
         espacioCuerpo="mt-2 gap-3"
         z={9999}
         footer={
           <>
-            <SunmiButton color="slate" onClick={() => setConfirmandoDescartar(null)}>
+            <SunmiButton color="slate" onClick={() => setConfirmandoDescartar(false)}>
               Seguir cargando
             </SunmiButton>
             <SunmiButton color="red" onClick={descartarYSalir}>
