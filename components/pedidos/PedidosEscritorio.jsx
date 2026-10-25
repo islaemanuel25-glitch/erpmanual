@@ -540,6 +540,19 @@ export default function PedidosEscritorio() {
     preparando: "El depósito lo está preparando · ya no se puede cambiar",
   }[estado];
 
+  // ── NADA SE MUEVE AL CARGAR (Emanuel, 2026-10-25) ───────────────────────
+  //
+  // Con el ancho de las columnas decidido por el contenido, el primer "Sacar
+  // del pedido" corría la columna CANTIDAD entera a la izquierda. Ahora la
+  // tabla es `table-fixed` y cada columna, menos PRODUCTO, que toma el resto,
+  // declara su ancho en el encabezado, que es el que manda en todos los
+  // renglones. Y lo que aparece o cambia con la cantidad tiene su lugar
+  // reservado: el botón de sacar está siempre (invisible sin cantidad), el
+  // nombre ocupa lo de su versión en negrita, la marca del modo sumar tiene su
+  // renglón, y el borde del campo es el mismo de 1 px con otro color.
+  // Lo prueba `escritorioNadaSeMueve.test.mjs`.
+  const ANCHO = { categoria: "w-48", unidad: "w-36", cantidad: "w-36", sacar: "w-48" };
+
   // La marca de abajo del nombre, en el modo sumar: lo que cambia al confirmar.
   const marcaDelCambio = (id) => {
     const c = enviado ? cambios[id] : null;
@@ -558,11 +571,30 @@ export default function PedidosEscritorio() {
         return (
           <div className="flex items-center gap-3">
             {verFotos ? <MiniaturaProductoTarjeta url={p.imagenUrl} conservaLugar nombre={p.nombre} /> : null}
-            <div className="min-w-0">
-              <span data-nombre-producto="" className={`block break-words sunmi-text-strong ${cargado ? "font-bold" : "font-normal"}`}>
-                {p.nombre}
+            <div className="min-w-0 flex-1">
+              {/* El nombre ocupa siempre lo que ocupa EN NEGRITA: una copia
+                  invisible en negrita en la misma celda de la grilla. Sin
+                  esto, un nombre al borde del renglón pasaba a dos al
+                  cargarlo, y el renglón crecía. */}
+              <span className="grid">
+                <span aria-hidden="true" className="col-start-1 row-start-1 break-words font-bold invisible">
+                  {p.nombre}
+                </span>
+                <span
+                  data-nombre-producto=""
+                  className={`col-start-1 row-start-1 break-words sunmi-text-strong ${cargado ? "font-bold" : "font-normal"}`}
+                >
+                  {p.nombre}
+                </span>
               </span>
-              {marca ? <span data-marca-cambio="" className="block text-sm2 sunmi-text-accent">{marca}</span> : null}
+              {/* En el modo sumar el renglón de la marca está siempre, vacío
+                  si no hay cambio, y en una línea: el renglón no crece al
+                  tocar un − / +. */}
+              {enviado ? (
+                <span data-marca-cambio={marca ? "" : undefined} className={`block truncate text-sm2 sunmi-text-accent${marca ? "" : " invisible"}`}>
+                  {marca ?? "sin cambios"}
+                </span>
+              ) : null}
             </div>
           </div>
         );
@@ -571,11 +603,13 @@ export default function PedidosEscritorio() {
     {
       clave: "categoria",
       titulo: "Categoría",
-      render: (p) => <span className="sunmi-text-muted">{p.categoriaNombre ?? ""}</span>,
+      thClassName: ANCHO.categoria,
+      render: (p) => <span className="break-words sunmi-text-muted">{p.categoriaNombre ?? ""}</span>,
     },
     {
       clave: "unidad",
       titulo: "Se pide por",
+      thClassName: ANCHO.unidad,
       // La misma frase que la tarjeta del teléfono, en la etiqueta chica del kit.
       render: (p) => (
         <span data-se-pide-por="">
@@ -586,6 +620,7 @@ export default function PedidosEscritorio() {
     {
       clave: "cantidad",
       titulo: "Cantidad",
+      thClassName: ANCHO.cantidad,
       render: (p) =>
         empezado ? (
           <span data-cantidad-pedido="" className="font-bold tabular-nums sunmi-text-strong">
@@ -600,22 +635,33 @@ export default function PedidosEscritorio() {
         ),
     },
     {
-      // El ancho está reservado siempre, haya botón o no: así el campo de
-      // cantidad no salta al cargar el primero ni al sacar el último.
+      // El ancho está declarado siempre, haya botón o no. Y el botón también
+      // está siempre: sin cantidad va invisible, apagado, fuera del foco y
+      // oculto al lector de pantalla —el criterio de la ✕ de `TarjetaPedido`—,
+      // así aparecer no le cambia el alto al renglón.
       clave: "sacar",
       titulo: "",
       align: "der",
-      thClassName: "w-36",
-      render: (p) =>
-        !empezado && cantidadEnPantalla(p.productoLocalId) > 0 ? (
+      thClassName: ANCHO.sacar,
+      render: (p) => {
+        if (empezado) return null;
+        const visible = cantidadEnPantalla(p.productoLocalId) > 0;
+        return (
           <SunmiButton
             color="ghost"
-            className="whitespace-nowrap border sunmi-border sunmi-bg-card sunmi-text-danger"
-            onClick={() => setCantidad(p.productoLocalId, 0, "UNIDAD")}
+            data-lugar-sacar=""
+            aria-hidden={visible ? undefined : "true"}
+            tabIndex={visible ? undefined : -1}
+            disabled={!visible}
+            className={`whitespace-nowrap border sunmi-border sunmi-bg-card sunmi-text-danger${visible ? "" : " invisible"}`}
+            onClick={() => {
+              if (visible) setCantidad(p.productoLocalId, 0, "UNIDAD");
+            }}
           >
             Sacar del pedido
           </SunmiButton>
-        ) : null,
+        );
+      },
     },
   ].map((c) => ({ ...c, thClassName: `sunmi-surface text-xs2 uppercase tracking-wider sunmi-text-muted ${c.thClassName ?? ""}`.trim() }));
 
@@ -755,7 +801,9 @@ export default function PedidosEscritorio() {
             vacio={viendoPedido ? "Todavía no cargaste productos." : "No se encontraron productos."}
             // El renglón con cantidad, en el fondo de la app.
             claseFila={(p) => (cantidadEnPantalla(p.productoLocalId) > 0 ? "sunmi-surface" : "")}
-            className="text-sm3"
+            // `table-fixed`: el ancho de cada columna lo dice su encabezado y
+            // no el contenido. Ver "NADA SE MUEVE AL CARGAR", más arriba.
+            className="text-sm3 table-fixed"
           />
           {/* ── 3 · EL PIE ─────────────────────────────────────────────── */}
           <div className="flex items-center justify-between gap-3 px-3 py-2 border-t sunmi-divider" data-pie-lista="">

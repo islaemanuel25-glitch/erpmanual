@@ -42,7 +42,10 @@ function fila(nombre) {
     nombre: tr.querySelector("[data-nombre-producto]"),
     campo: tr.querySelector(`input[aria-label="Cantidad de ${nombre}"]`),
     mas: tr.querySelector('button[aria-label^="Sumar uno"]'),
-    sacar: [...tr.querySelectorAll("button")].find((b) => b.textContent.trim() === "Sacar del pedido") ?? null,
+    // El que se puede tocar (con cantidad)…
+    sacar: tr.querySelector("[data-lugar-sacar]:not(.invisible)"),
+    // …y su lugar, que está siempre.
+    lugarSacar: tr.querySelector("[data-lugar-sacar]"),
     sePidePor: tr.querySelector("[data-se-pide-por] span"),
     marca: tr.querySelector("[data-marca-cambio]")?.textContent ?? null,
   };
@@ -168,8 +171,14 @@ test("con cantidad: negrita, fondo de la app y el borde del campo en acento; sin
 test("Sacar del pedido: solo con cantidad, deja 0, y su columna tiene el ancho reservado siempre", async () => {
   const { pedidos } = await montarE({ inicio: real.carritoBorrador });
   const th = [...tabla().querySelectorAll("thead th")].at(-1);
-  assert.match(th.className, /\bw-36\b/, "la columna de Sacar no tiene ancho fijo");
+  assert.match(th.className, /\bw-48\b/, "la columna de Sacar no tiene ancho fijo");
   assert.ok(!fila("Yerba 1kg").sacar, "sin cantidad apareció Sacar");
+  // Su lugar está igual: invisible, apagado, fuera del foco y del lector.
+  const lugar = fila("Yerba 1kg").lugarSacar;
+  assert.ok(lugar, "sin cantidad no está el lugar del botón");
+  assert.equal(lugar.disabled, true);
+  assert.equal(lugar.getAttribute("aria-hidden"), "true");
+  assert.equal(lugar.getAttribute("tabindex"), "-1");
   const sacar = fila("Coca 2L").sacar;
   assert.ok(sacar, "con cantidad no está Sacar");
   for (const c of ["sunmi-text-danger", "sunmi-border", "sunmi-bg-card"]) assert.match(sacar.className, new RegExp(c));
