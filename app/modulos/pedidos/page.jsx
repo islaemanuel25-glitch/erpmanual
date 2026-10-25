@@ -30,6 +30,8 @@ import FilaDePedidoAnterior from "@/components/pedidos/FilaDePedidoAnterior";
 import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
 import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
 import { ESTADO_LOCAL, COLOR_DEL_ESTADO, estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
+import { crearGuardiaDeLecturas } from "@/lib/pedidos/guardiaDeLecturas";
+import { useRefrescoDelPedido } from "@/lib/pedidos/useRefrescoDelPedido";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
 // recordado en el celular con la clave de siempre de esta pantalla. Las
@@ -284,27 +286,34 @@ function PedidosCatalogoPage() {
   // ====================================================
   // CARGAR CARRITO
   // ====================================================
+  const aplicarCarrito = (json) => {
+    setPosId(json.posId || null);
+    // Con un pedido enviado, lo que se arma es ESE pedido: `set-cantidad`
+    // escribe ahí y no abre borrador. Sus líneas son las del carrito.
+    // Una línea por producto, con la cantidad sumada: el pedido puede
+    // tener dos líneas del mismo producto (ver `juntarPorProducto`).
+    const lineas = juntarPorProducto(json.pendiente ? json.pendiente.items : json.items, (it) => it.productoLocalId);
+    setCarritoItems(lineas);
+    setPendiente(json.pendiente || null);
+    // Sin pedido enviado no hay nada que sumar: si alguien lo canceló desde
+    // otro dispositivo, lo anotado para sumarle se va con él.
+    if (!json.pendiente) setCambios({});
+
+    // Reconstruir mapa de cantidades segun la unidad guardada del item.
+    const mapa = {};
+    lineas.forEach((it) => {
+      mapa[it.productoLocalId] = it.cantidad;
+    });
+    setCarrito(mapa);
+    setCarritoCargado(true);
+  };
+
   const cargarCarrito = async () => {
     try {
       const res = await fetch("/api/pedidos/carrito", { cache: "no-store" });
       const json = await res.json();
       if (json.ok) {
-        setPosId(json.posId || null);
-        // Con un pedido enviado, lo que se arma es ESE pedido: `set-cantidad`
-        // escribe ahí y no abre borrador. Sus líneas son las del carrito.
-        // Una línea por producto, con la cantidad sumada: el pedido puede
-        // tener dos líneas del mismo producto (ver `juntarPorProducto`).
-        const lineas = juntarPorProducto(json.pendiente ? json.pendiente.items : json.items, (it) => it.productoLocalId);
-        setCarritoItems(lineas);
-        setPendiente(json.pendiente || null);
-
-        // Reconstruir mapa de cantidades segun la unidad guardada del item.
-        const mapa = {};
-        lineas.forEach((it) => {
-          mapa[it.productoLocalId] = it.cantidad;
-        });
-        setCarrito(mapa);
-        setCarritoCargado(true);
+        aplicarCarrito(json);
         return json;
       }
     } catch (err) {
@@ -312,6 +321,21 @@ function PedidosCatalogoPage() {
     }
     return null;
   };
+
+  // ── LO QUE CARGAN LOS DEMÁS ───────────────────────────────────────────
+  // El pedido es uno por local, compartido entre todos sus dispositivos. La
+  // pantalla lo relee sola cada pocos segundos y al volver a la pestaña
+  // (`lib/pedidos/useRefrescoDelPedido.js`), sin "Cargando...", y descarta
+  // la lectura que vuelva vieja porque la persona tocó algo mientras viajaba
+  // (`lib/pedidos/guardiaDeLecturas.js`).
+  const [guardia] = useState(crearGuardiaDeLecturas);
+  const refrescarCarrito = async () => {
+    const marca = guardia.leyendo();
+    const res = await fetch("/api/pedidos/carrito", { cache: "no-store" });
+    const json = await res.json();
+    if (json.ok && guardia.vigente(marca)) aplicarCarrito(json);
+  };
+  useRefrescoDelPedido(refrescarCarrito, { activo: !!opciones });
 
   // ====================================================
   // PEDIDOS ANTERIORES (página de entrada)
@@ -360,6 +384,9 @@ function PedidosCatalogoPage() {
       return;
     }
 
+    // Mientras viaja, una relectura vieja no la pisa (la guardia).
+    const listo = guardia.escribiendo();
+
     // Optimistic update (siempre en total unidades)
     setCarrito((prev) => {
       const next = { ...prev };
@@ -393,6 +420,8 @@ function PedidosCatalogoPage() {
       console.error(err);
       setError("Error de conexión");
       await releerTrasRechazo();
+    } finally {
+      listo();
     }
   };
 
@@ -407,6 +436,7 @@ function PedidosCatalogoPage() {
 
     setEnviando(true);
     setError("");
+    const listo = guardia.escribiendo();
 
     try {
       const res = await fetch("/api/pos-transferencias/solicitar", {
@@ -432,10 +462,15 @@ function PedidosCatalogoPage() {
         requerirOperador();
       } else {
         setError(json.error || "Error al solicitar pedido");
+        // Otro dispositivo pudo haberlo enviado antes: con el carrito releído,
+        // la pantalla lo muestra como está y lo que se cargue va a sumarse.
+        await cargarCarrito();
       }
     } catch (err) {
       console.error(err);
       setError("Error de conexión al solicitar");
+    } finally {
+      listo();
     }
     setEnviando(false);
   };
@@ -450,6 +485,7 @@ function PedidosCatalogoPage() {
     const lista = Object.entries(cambios).map(([id, c]) => ({ productoLocalId: Number(id), cantidad: c.cantidad, unidad: c.unidad }));
     setError("");
     setAgregando(true);
+    const listo = guardia.escribiendo();
     try {
       const res = await fetch("/api/pedidos/sumar-al-enviado", {
         method: "POST",
@@ -476,6 +512,8 @@ function PedidosCatalogoPage() {
     } catch (err) {
       console.error(err);
       setError("Error de conexión al agregar los cambios");
+    } finally {
+      listo();
     }
     setAgregando(false);
   };
@@ -501,6 +539,7 @@ function PedidosCatalogoPage() {
 
     setError("");
     setCancelandoPendiente(true);
+    const listo = guardia.escribiendo();
     try {
       const res = await fetch("/api/pos-transferencias/cancelar", {
         method: "POST",
@@ -530,6 +569,8 @@ function PedidosCatalogoPage() {
     } catch (err) {
       console.error(err);
       setError("Error de conexión al cancelar");
+    } finally {
+      listo();
     }
     setCancelandoPendiente(false);
   };

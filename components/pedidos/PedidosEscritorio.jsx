@@ -92,6 +92,8 @@ import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina"
 import { tamanoDePaginaCatalogo, TAMANOS_DE_PAGINA_CATALOGO } from "@/lib/pedidos/tamanoDePagina";
 import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
+import { crearGuardiaDeLecturas } from "@/lib/pedidos/guardiaDeLecturas";
+import { useRefrescoDelPedido } from "@/lib/pedidos/useRefrescoDelPedido";
 import {
   COLOR_DEL_ESTADO,
   FILTRO_HISTORIAL,
@@ -434,23 +436,39 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
 
   // ── CARGAR ──────────────────────────────────────────────────────────────
 
-  /** COPIA de `cargarCarrito` de `page.jsx`, más las fichas y el orden de "Lo que pedí". */
+  /**
+   * COPIA de `aplicarCarrito` de `page.jsx`, más las fichas y el orden de "Lo
+   * que pedí". Al RELEER (`conservarOrden`), el orden de lo que ya estaba no
+   * cambia y lo nuevo va al final: lo que cargan los demás aparece sin mover
+   * nada de lo que la persona ya veía.
+   */
+  const aplicarCarrito = (json, { conservarOrden = false } = {}) => {
+    setPosId(json.posId || null);
+    const lineas = juntarPorProducto(json.pendiente ? json.pendiente.items : json.items, (it) => it.productoLocalId);
+    setPendiente(json.pendiente || null);
+    if (!json.pendiente) setCambios({});
+    const mapa = {};
+    lineas.forEach((it) => {
+      mapa[it.productoLocalId] = it.cantidad;
+    });
+    setCarrito(mapa);
+    conocer(lineas);
+    const delServidor = lineas.map((l) => l.productoLocalId);
+    setOrden((prev) => {
+      if (!conservarOrden) return delServidor;
+      const siguen = prev.filter((id) => delServidor.includes(id) || cambiosRef.current[id]);
+      return [...siguen, ...delServidor.filter((id) => !siguen.includes(id))];
+    });
+    setCarritoCargado(true);
+  };
+
+  /** COPIA de `cargarCarrito` de `page.jsx`. */
   const cargarCarrito = async () => {
     try {
       const res = await fetch("/api/pedidos/carrito", { cache: "no-store" });
       const json = await res.json();
       if (json.ok) {
-        setPosId(json.posId || null);
-        const lineas = juntarPorProducto(json.pendiente ? json.pendiente.items : json.items, (it) => it.productoLocalId);
-        setPendiente(json.pendiente || null);
-        const mapa = {};
-        lineas.forEach((it) => {
-          mapa[it.productoLocalId] = it.cantidad;
-        });
-        setCarrito(mapa);
-        conocer(lineas);
-        setOrden(lineas.map((l) => l.productoLocalId));
-        setCarritoCargado(true);
+        aplicarCarrito(json);
         return json;
       }
     } catch (err) {
@@ -458,6 +476,22 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     }
     return null;
   };
+
+  // ── LO QUE CARGAN LOS DEMÁS ───────────────────────────────────────────
+  // Lo mismo que el celular (`page.jsx`): el pedido se relee solo cada pocos
+  // segundos y al volver a la pestaña (`useRefrescoDelPedido`), y la lectura
+  // que vuelve vieja porque la persona tocó algo mientras viajaba se
+  // descarta (`guardiaDeLecturas`).
+  const [guardia] = useState(crearGuardiaDeLecturas);
+  const cambiosRef = useRef(cambios);
+  cambiosRef.current = cambios;
+  const refrescarCarrito = async () => {
+    const marca = guardia.leyendo();
+    const res = await fetch("/api/pedidos/carrito", { cache: "no-store" });
+    const json = await res.json();
+    if (json.ok && guardia.vigente(marca)) aplicarCarrito(json, { conservarOrden: true });
+  };
+  useRefrescoDelPedido(refrescarCarrito, { activo: !!opciones });
 
   /** Los últimos pedidos (de `/api/pedidos/historial`). Si falla, la tarjeta lo dice. */
   const cargarAnteriores = async () => {
@@ -598,6 +632,8 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
       return;
     }
 
+    // Mientras viaja, una relectura vieja no la pisa (la guardia).
+    const listo = guardia.escribiendo();
     setCarrito((prev) => {
       const next = { ...prev };
       if (cantidad === 0) delete next[productoLocalId];
@@ -623,6 +659,8 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
       console.error(err);
       setError("Error de conexión");
       await cargarCarrito();
+    } finally {
+      listo();
     }
   };
 
@@ -650,6 +688,9 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
       estado,
       linea: pendiente.solicitadoAt ? `Enviado ${cuandoSeEnvio(pendiente.solicitadoAt)}` : "",
       items: juntarPorProducto(pendiente.items, claveDeLoEnviado),
+      // El en curso se dibuja del pedido vivo: lo que sumen los demás mientras
+      // se mira, aparece (ver "MIRAR", abajo).
+      enCurso: true,
       volverA: VISTA.ENTRADA,
     });
     setVista(VISTA.MIRAR);
@@ -711,6 +752,7 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     }
     setEnviando(true);
     setError("");
+    const listo = guardia.escribiendo();
     try {
       const res = await fetch("/api/pos-transferencias/solicitar", {
         method: "POST",
@@ -731,10 +773,15 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
         requerirOperador();
       } else {
         setError(json.error || "Error al solicitar pedido");
+        // Otro dispositivo pudo haberlo enviado antes: con el carrito releído,
+        // la pantalla lo muestra como está y lo que se cargue va a sumarse.
+        await cargarCarrito();
       }
     } catch (err) {
       console.error(err);
       setError("Error de conexión al solicitar");
+    } finally {
+      listo();
     }
     setEnviando(false);
   };
@@ -745,6 +792,7 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     const lista = Object.entries(cambios).map(([id, c]) => ({ productoLocalId: Number(id), cantidad: c.cantidad, unidad: c.unidad }));
     setError("");
     setAgregando(true);
+    const listo = guardia.escribiendo();
     try {
       const res = await fetch("/api/pedidos/sumar-al-enviado", {
         method: "POST",
@@ -770,6 +818,8 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     } catch (err) {
       console.error(err);
       setError("Error de conexión al agregar los cambios");
+    } finally {
+      listo();
     }
     setAgregando(false);
   };
@@ -780,6 +830,7 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     if (!pendiente) return;
     setError("");
     setCancelando(true);
+    const listo = guardia.escribiendo();
     try {
       const res = await fetch("/api/pos-transferencias/cancelar", {
         method: "POST",
@@ -803,6 +854,8 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     } catch (err) {
       console.error(err);
       setError("Error de conexión al cancelar");
+    } finally {
+      listo();
     }
     setCancelando(false);
   };
@@ -958,6 +1011,9 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
   // MIRAR: lo pedido, de solo lectura
   // ════════════════════════════════════════════════════════════════════════
   if (vista === VISTA.MIRAR && mirando) {
+    const enVivo = mirando.enCurso && pendiente;
+    const items = enVivo ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : mirando.items;
+    const estadoMirado = enVivo ? estadoParaElLocal({ estado: pendiente.estado, depositoEmpezo: empezado }) : mirando.estado;
     return (
       <div className="sunmi-bg w-full min-h-full p-3 space-y-3" data-pedidos-escritorio-pantalla="" data-vista="mirar">
         {avisoDeError}
@@ -966,7 +1022,7 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <h1 className="text-lg3 font-bold sunmi-text-strong">{mirando.titulo}</h1>
-              {mirando.estado ? <SunmiPill color={COLOR_DEL_ESTADO[mirando.estado] ?? "slate"}>{mirando.estado}</SunmiPill> : null}
+              {estadoMirado ? <SunmiPill color={COLOR_DEL_ESTADO[estadoMirado] ?? "slate"}>{estadoMirado}</SunmiPill> : null}
             </div>
             {mirando.linea ? <p className="text-sm3 sunmi-text-muted">{mirando.linea}</p> : null}
           </div>
@@ -975,9 +1031,9 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
         {mirando.cargando ? <p className="text-sm2 sunmi-text-muted">Cargando...</p> : null}
         {!mirando.cargando && !mirando.error ? (
           <div className="overflow-hidden rounded-xl2 border sunmi-border sunmi-bg-card" data-lista-pedido="mirar">
-            <TablaDeSoloMirar items={mirando.items} verFotos={verFotos} />
+            <TablaDeSoloMirar items={items} verFotos={verFotos} />
             <div className="flex items-center justify-between gap-3 px-3 py-2 border-t sunmi-divider" data-pie-lista="">
-              <span className="text-sm2 sunmi-text-muted">{`${mirando.items.length} ${productos(mirando.items.length)} en el pedido`}</span>
+              <span className="text-sm2 sunmi-text-muted">{`${items.length} ${productos(items.length)} en el pedido`}</span>
             </div>
           </div>
         ) : null}
