@@ -14,8 +14,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import fs from "node:fs";
 
-import DetalleRecibidoMovil from "./DetalleRecibidoMovil.jsx";
+import DetalleRecibidoMovil, { TarjetaLineaRecibida } from "./DetalleRecibidoMovil.jsx";
+import { sucesoDeLinea } from "../../lib/transferencias/detalleRecibido.js";
 
 const linea = (extra = {}) => ({
   id: 1,
@@ -101,9 +103,107 @@ test("todas las tarjetas tienen la misma estructura de alto fijo", () => {
   }
 });
 
+// ═══ CORRECCIONES DEL 2026-10-26, DESPUÉS DE PROBARLO EN LA 504 ═══════════
+
+const noVino = linea({
+  id: 13, nombre: "QUILMES CLÁSICA 1L", cantidadEnviada: 1, cantidadRecibida: 0, devolucionOrigen: 1,
+  subtotal: 1000, subtotalRecibido: 0, motivoPrincipal: "Faltante",
+});
+const sobran = linea({
+  id: 14, cantidadEnviada: 12, cantidadRecibida: 13, subtotal: 12000, subtotalRecibido: 13000,
+  motivoPrincipal: "Sobrante",
+});
+
+const botonDelFiltro = (html, texto) =>
+  html.match(new RegExp(`<button[^>]*>${texto}<span[^>]*>\\d+</span></button>`))?.[0];
+
+test("filtro 'Faltantes': cuenta recibido < enviado, con los que no vinieron", () => {
+  const html = pintar([exacta, faltan, noVino, sobran, agregada]);
+  const boton = botonDelFiltro(html, "Faltantes");
+  assert.ok(boton, "no está el filtro 'Faltantes'");
+  assert.match(boton, />2<\/span>/, "faltan 1 y no vino: son 2; el sobrante y el agregado no cuentan");
+  assert.ok(!html.includes("Devueltos"), "el filtro viejo no vuelve");
+});
+
+test("ninguna tarjeta dice 'Devuelto', aunque la línea traiga devolución", () => {
+  // `faltan` y `noVino` traen `devolucionOrigen: 1`, como los manda el endpoint.
+  // Más una con devolución y sin diferencia física, el caso que antes pintaba
+  // "Devuelto N".
+  //
+  // Cada tarjeta se monta suelta: montada por la pantalla, la de devolución sin
+  // diferencia caía en "Sin diferencia" y no se dibujaba —la contraprueba lo
+  // mostró: este candado quedaba verde con la etiqueta vuelta a poner—.
+  const html = [faltan, noVino, linea({ id: 20, devolucionOrigen: 2 })]
+    .map((d) => renderToStaticMarkup(React.createElement(TarjetaLineaRecibida, { d, s: sucesoDeLinea(d) })))
+    .join("");
+  assert.equal(tarjetas(html).length, 3);
+  assert.ok(!/Devuelto/.test(html), "apareció 'Devuelto' en una tarjeta");
+});
+
+test("chip con recuadro en todas las presentaciones, y 'Por kg' en lugar de 'Fiambre'", () => {
+  const lineas = [
+    linea({ id: 30, presentacionEnvio: "UNIDAD" }),
+    linea({ id: 31, presentacionEnvio: "PACK", factorPresentacion: 6, cantidadPresentada: 1 }),
+    linea({ id: 32, presentacionEnvio: "KG", unidadMedida: "kg" }),
+    linea({ id: 33, esFiambreFijo: true, pesoReferenciaKg: 3.5 }),
+  ];
+  // Se monta cada tarjeta suelta: lo que se mira es el chip, no el filtro.
+  const html = lineas
+    .map((d) => renderToStaticMarkup(React.createElement(TarjetaLineaRecibida, { d, s: sucesoDeLinea(d) })))
+    .join("");
+  const chips = tarjetas(html).map((t) => t.match(/data-chip-presentacion="[^"]*"><span class="([^"]*)">([^<]*)</));
+  assert.equal(chips.length, 4);
+  for (const chip of chips) {
+    assert.ok(chip, "una tarjeta quedó sin chip de presentación");
+    // Las dos clases que dibujan recuadro: `.sunmi-border` y `.sunmi-state-success`
+    // declaran un `border` de 1 px. `sunmi-surface-soft` solo pinta fondo.
+    assert.match(chip[1], /\b(sunmi-border|sunmi-state-success)\b/, `"${chip[2]}" no tiene recuadro`);
+  }
+  assert.deepEqual(chips.map((c) => c[2]), ["Unidad", "Bulto", "Kg", "Por kg"]);
+  assert.ok(!html.includes("Fiambre"), "'Fiambre' no se muestra en esta pantalla");
+});
+
+test("el agregado dice 'Lo agregó el local al recibir'", () => {
+  const html = pintar([agregada]);
+  assert.ok(html.includes("Lo agregó el local al recibir"));
+  assert.ok(!html.includes("No venía en el remito"));
+});
+
+test("el contador del filtro elegido va del color de su etiqueta, no apagado", () => {
+  // `SunmiFiltroEstado` es la pieza del kit: la misma de la Lista de precios de
+  // proveedor, así que esto cubre las dos pantallas.
+  const html = pintar([exacta, faltan]);
+  const elegido = html.match(/<button[^>]*aria-pressed="true"[^>]*>.*?<\/button>/)?.[0];
+  const otro = html.match(/<button[^>]*aria-pressed="false"[^>]*>.*?<\/button>/)?.[0];
+  assert.ok(elegido && otro);
+  assert.ok(elegido.includes("Con diferencia"), "no abrió en 'Con diferencia'");
+  assert.ok(!/sunmi-text-muted/.test(elegido), "el número del elegido sigue apagado: no se lee sobre el fondo");
+  assert.match(otro, /class="sunmi-text-muted"/, "el número de los no elegidos sigue apagado");
+});
+
+test("entre el título y el resumen queda solo la fila del shell", () => {
+  // Lo que se sumaba en la 504: el p-4 del <main>, el p-2 de la página y el
+  // margen del `space-y-3`. Se afirma sobre el código porque un render a string
+  // no tiene layout; el número —10,5 px, igual que entre resumen y filtros— sale
+  // de las tres clases de abajo.
+  const pagina = fs.readFileSync(new URL("../../app/modulos/transferencias/[id]/page.jsx", import.meta.url), "utf8")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\/[^\n]*/g, "");
+  const shell = fs.readFileSync(new URL("../LayoutBase.jsx", import.meta.url), "utf8");
+  // El detalle va ANTES del `space-y-3`, no adentro.
+  const detalle = pagina.indexOf("<DetalleRecibidoMovil");
+  const espaciado = pagina.indexOf('"w-full space-y-3"');
+  assert.ok(detalle > 0 && espaciado > 0 && detalle < espaciado, "el detalle volvió adentro del space-y-3");
+  assert.match(pagina, /<div className="md:hidden -mt-4">\s*<DetalleRecibidoMovil/);
+  assert.match(pagina, /recibidaEnTelefono \? "px-2 md:p-2" : "p-2"/);
+  // Y el -mt-4 devuelve exactamente lo que pone el shell: si el shell cambia su
+  // padding, esto tiene que ponerse rojo.
+  assert.match(shell, /<main\s+className=\{`flex-1 min-h-0 p-4 /);
+  assert.match(shell, /md:hidden px-4 py-3 /);
+});
+
 test("lo que se sacó de la tarjeta vieja no vuelve", () => {
   const html = pintar([exacta, faltan, agregada]);
   assert.ok(!html.includes("font-mono"), "la letra monoespaciada se sacó");
-  assert.ok(!/Diferencia\s*<|Devuelto\s*</.test(html), "la fila Diferencia / Devuelto se sacó");
+  assert.ok(!/Diferencia\s*<|Devuelto/.test(html), "la fila Diferencia / Devuelto se sacó");
   assert.equal(html.split("<button").length - 1, 4, "los únicos botones son los cuatro filtros");
 });

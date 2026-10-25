@@ -38,15 +38,44 @@ import {
   rotuloDelResumen,
   textoDelMotivo,
 } from "@/lib/transferencias/detalleRecibido";
-import { BadgePresentacion, BasePildora, cantidadOGuion, fmtCantidad } from "./detallePresentacion";
+import { BasePildora, cantidadOGuion, fmtCantidad, presentacionDeLinea } from "./detallePresentacion";
 
 function textoDelSuceso({ suceso, cantidad }) {
   if (suceso === SUCESO_LINEA.AGREGADO) return "Agregado";
   if (suceso === SUCESO_LINEA.NO_VINO) return "No vino";
   if (suceso === SUCESO_LINEA.FALTAN) return `Faltan ${fmtCantidad(cantidad)}`;
   if (suceso === SUCESO_LINEA.SOBRAN) return `Sobran ${fmtCantidad(cantidad)}`;
-  if (suceso === SUCESO_LINEA.DEVUELTO) return `Devuelto ${fmtCantidad(cantidad)}`;
   return null;
+}
+
+// ── EL CHIP DE PRESENTACIÓN DE ESTA PANTALLA ─────────────────────────────
+//
+// Usaba `BadgePresentacion`, que pinta "Bulto" con fondo y borde de éxito y el
+// resto con un fondo suave SIN borde. En el celular eso se leyó como "Bulto y
+// Unidad con su recuadro, Fiambre como texto suelto": sin borde, el chip
+// depende de que el fondo suave contraste contra la tarjeta, y no alcanza.
+//
+// Acá todas las presentaciones llevan el MISMO chip con recuadro —1 px del
+// borde del tema, igual que el de "Bulto"— y "Fiambre" se dice "Por kg", que
+// es como lo lee quien recibe. Es solo el texto de esta pantalla: la
+// clasificación sale igual de `presentacionDeLinea` y ninguna otra pantalla
+// cambia. `BadgePresentacion` sigue igual para la tabla de escritorio.
+const TEXTO_DEL_CHIP = Object.freeze({ Fiambre: "Por kg" });
+
+export function textoDelChipDePresentacion(d) {
+  const label = presentacionDeLinea(d);
+  return TEXTO_DEL_CHIP[label] ?? label;
+}
+
+function ChipPresentacion({ d }) {
+  const label = presentacionDeLinea(d);
+  return (
+    <BasePildora
+      tono={label === "Bulto" ? "sunmi-state-success sunmi-text-success" : "sunmi-border sunmi-surface-soft sunmi-text-link"}
+    >
+      {textoDelChipDePresentacion(d)}
+    </BasePildora>
+  );
 }
 
 // El alto de cada renglón, en un solo lugar: es lo que hace que todas las
@@ -72,8 +101,8 @@ export function TarjetaLineaRecibida({ d, s }) {
       </div>
 
       <div className={RENGLON}>
-        <span className="shrink-0">
-          <BadgePresentacion d={d} />
+        <span className="shrink-0" data-chip-presentacion>
+          <ChipPresentacion d={d} />
         </span>
         <span className="flex-1 min-w-0 truncate text-sm2 sunmi-text-muted tabular-nums">
           {d.codigoBarra || "Sin código"}

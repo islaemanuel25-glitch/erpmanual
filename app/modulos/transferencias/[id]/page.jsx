@@ -5,7 +5,9 @@
 // completo, misma franja de encabezado, misma card de acciones arriba y las
 // mismas secciones hermanas debajo (Información general → Productos → Totales).
 //
-//   contenedor  sunmi-bg w-full min-h-full p-2 lg:p-3
+//   contenedor  sunmi-bg w-full min-h-full p-2 lg:p-3 (recibida en el
+//               teléfono: sin el de arriba y abajo por debajo de md, ver el
+//               render)
 //   interior    w-full space-y-3
 //   franja      flex items-start justify-between gap-3 flex-wrap
 //   acciones    SunmiCard p-3 con flex flex-wrap gap-2
@@ -619,7 +621,32 @@ export default function TransferenciaDetallePage() {
     // Mismo contenedor que "Ver venta": ancho útil completo, sin `max-w` y sin
     // centrado. Antes era `p-2 sm:p-4 max-w-6xl mx-auto`, que recortaba la
     // página a ~1120 px y dejaba el resto vacío.
-    <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
+    <div className={`sunmi-bg w-full min-h-full ${recibidaEnTelefono ? "px-2 md:p-2" : "p-2"} lg:p-3`}>
+      {/* ── RECIBIDA, EN EL TELÉFONO: EL DETALLE V45, Y SIN EL HUECO DE ARRIBA ──
+
+          Resumen, filtros y una tarjeta por línea. Va AFUERA del `space-y-3` de
+          abajo y no adentro, y ése era el hueco que Emanuel vio en la 504 entre
+          "Transferencia 504" y el resumen. Se sumaban cuatro separaciones:
+
+            · el `py-3` de la fila del shell (10,5 px), que es la que queda;
+            · el `p-4` del <main> del shell (14 px);
+            · el `p-2` de este contenedor (7 px);
+            · y el `space-y-3` (10,5 px), que le ponía margen arriba porque
+              adelante tenía la franja, las acciones y la información general
+              de escritorio: ocultas con `hidden`, pero montadas, y `space-y`
+              solo saltea el ATRIBUTO `hidden`, no la clase.
+
+          Afuera del `space-y` se va el último; el `p-2` pierde la parte de
+          arriba y abajo solo en este caso y solo por debajo de `md` —los lados
+          quedan, y de ahí para arriba la clase es la misma que antes—; y `-mt-4` devuelve exactamente el `p-4` del <main>,
+          que es del shell y no se toca desde una pantalla. Queda la fila del
+          shell sola: 10,5 px, la misma separación que el `space-y-3` del detalle
+          pone entre el resumen y los filtros. */}
+      {item && recibidaEnTelefono && (
+        <div className="md:hidden -mt-4">
+          <DetalleRecibidoMovil item={item} importeTotal={importeTotal} fecha={fechaCabecera} />
+        </div>
+      )}
       <div className="w-full space-y-3">
         {/* Franja de encabezado: Volver + título + badges a la izquierda, fecha
             a la derecha. Una sola fila en desktop, con wrap en pantallas chicas. */}
@@ -792,24 +819,17 @@ export default function TransferenciaDetallePage() {
                 }
               />
             ) : recibidaEnTelefono ? (
-              <>
-                {/* ── RECIBIDA, EN EL TELÉFONO: EL DETALLE V45 ──────────────
-                    Resumen, filtros y una tarjeta por línea, con las
-                    corregidas separadas. La tabla de siempre sigue siendo la
-                    de escritorio: se la envuelve en `hidden md:block`, que de
-                    768 para arriba no cambia nada. */}
-                <div className="md:hidden">
-                  <DetalleRecibidoMovil item={item} importeTotal={importeTotal} fecha={fechaCabecera} />
-                </div>
-                <div className="hidden md:block">
-                  <TablaDetalleTransferencia
-                    item={item}
-                    editItems={editItems}
-                    setEditItems={setEditItemsDirty}
-                    inputsHabilitados={inputsHabilitados}
-                  />
-                </div>
-              </>
+              // Recibida: la tabla de siempre es la de escritorio, envuelta en
+              // `hidden md:block`, que de 768 para arriba no cambia nada. En el
+              // teléfono va `DetalleRecibidoMovil`, arriba de todo —ver ahí—.
+              <div className="hidden md:block">
+                <TablaDetalleTransferencia
+                  item={item}
+                  editItems={editItems}
+                  setEditItems={setEditItemsDirty}
+                  inputsHabilitados={inputsHabilitados}
+                />
+              </div>
             ) : (
               <TablaDetalleTransferencia
                 item={item}

@@ -111,7 +111,18 @@ export default function SunmiFiltroEstado({
                   espacio al principio de una expresión, así que sin él se
                   dibujaba "Pendientes45" pegado. Se vio en la captura de 390 px,
                   no leyendo el código. */}
-              {o.cantidad != null && <span className="sunmi-text-muted">{o.cantidad}</span>}
+              {/* ── EN EL ELEGIDO, EL NÚMERO VA DEL COLOR DE SU ETIQUETA ──────
+                  Llevaba `sunmi-text-muted` siempre. Sobre el fondo del botón
+                  elegido ese gris quedaba del color del fondo y el número no se
+                  leía —lo vio Emanuel en el detalle de la transferencia 504, y
+                  la Lista de precios usa esta misma pieza—. Elegido, el número
+                  no pide color y hereda el de la etiqueta; sin elegir, sigue
+                  apagado, que es lo que lo distingue del rótulo. */}
+              {o.cantidad != null && (
+                <span data-cantidad className={activa ? undefined : "sunmi-text-muted"}>
+                  {o.cantidad}
+                </span>
+              )}
             </SunmiButton>
           );
         })}
