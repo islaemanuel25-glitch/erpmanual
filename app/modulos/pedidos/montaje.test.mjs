@@ -37,12 +37,13 @@ test("ventana grande: solo la computadora, y cada ruta UNA vez al entrar", async
   const { pedidos } = await montar({ inicio: real.carritoBorrador, ancho: "escritorio" });
   assert.ok(escritorio(), "no está la computadora");
   assert.ok(!telefono(), "se montó también el teléfono");
-  // La computadora no tiene pedidos anteriores en la página: no pide historial.
+  // Desde el 2026-10-25 la computadora entra por su página de entrada: pide
+  // los pedidos anteriores, y el catálogo recién al abrirlo.
   assert.deepEqual(cuantas(pedidos), {
     "/api/pedidos/opciones": 1,
     "/api/pedidos/carrito": 1,
-    "/api/pedidos/catalogo": 1,
-    "/api/pedidos/historial": 0,
+    "/api/pedidos/catalogo": 0,
+    "/api/pedidos/historial": 1,
   });
 });
 

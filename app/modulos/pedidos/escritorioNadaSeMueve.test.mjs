@@ -37,11 +37,17 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const { real, montar, desmontarTodo, tocar, teclear, asentar, act, escritorio } = await import("./montarPantallaPedidos.mjs");
+const { real, montar, desmontarTodo, tocar, teclear, asentar, act, escritorio, abrirCatalogoEscritorio } = await import(
+  "./montarPantallaPedidos.mjs"
+);
 
 afterEach(desmontarTodo);
 
-const montarE = (r) => montar({ ...r, ancho: "escritorio" });
+// El catálogo es un paso adentro de la entrada desde el 2026-10-25.
+const montarE = async (r) => {
+  await montar({ ...r, ancho: "escritorio" });
+  await abrirCatalogoEscritorio();
+};
 const tabla = () => escritorio().querySelector("table");
 const boton = (t) => [...escritorio().querySelectorAll("button")].find((b) => b.textContent.trim().startsWith(t)) ?? null;
 const renglon = (nombre) =>
@@ -102,13 +108,56 @@ function medirCantidad(nombre) {
 // invisible en negrita, que es la que va en la huella.
 const SOLO_COLOR_O_ESTADO = new Set(["font-bold", "font-normal", "invisible", "sunmi-surface", "sunmi-border-accent"]);
 
-/** Qué elementos tiene cada celda y con qué clases de tamaño. */
+/** Si el elemento, o alguno de sus padres dentro de la celda, está fuera del flujo. */
+const fueraDelFlujo = (el, td) => {
+  for (let n = el; n && n !== td; n = n.parentElement) if (n.classList.contains("absolute")) return true;
+  return false;
+};
+
+/**
+ * Qué elementos tiene cada celda y con qué clases de tamaño. Lo que va con
+ * `absolute` no ocupa lugar —la marca del modo sumar cuelga así— y no entra:
+ * si algún día entrara al flujo, la huella cambiaría al aparecer.
+ */
 function huella(tr) {
   return [...tr.querySelectorAll("td")].map((td) =>
     [td, ...td.querySelectorAll("*")]
+      .filter((el) => !fueraDelFlujo(el, td))
       .map((el) => `${el.tagName}.${[...el.classList].filter((c) => !SOLO_COLOR_O_ESTADO.has(c)).sort().join(".")}`)
       .join(" ")
   );
+}
+
+// ── EL CENTRADO ───────────────────────────────────────────────────────────
+//
+// En e6e79d9 la marca del modo sumar tenía un renglón reservado debajo del
+// nombre, invisible: el bloque nombre + renglón vacío se centraba y el nombre
+// quedaba medio renglón más arriba que el resto (Emanuel, en producción). Sin
+// motor de layout, lo que se afirma es lo que lo decide:
+//   · ninguna celda ni el renglón cambian la alineación vertical: las celdas
+//     se centran (el `middle` del navegador);
+//   · cada celda se centra adentro con `items-center` donde es flex;
+//   · en la celda PRODUCTO hay UNA línea en el flujo —el nombre, con su copia
+//     en negrita apilada en la misma celda de grilla—: nada más ocupa lugar
+//     arriba ni abajo.
+const ALINEACION_VERTICAL = /^align-(top|bottom|baseline|text-top|text-bottom|sub|super)$/;
+
+function problemasDeCentrado(tr) {
+  const problemas = [];
+  for (const el of [tr, ...tr.querySelectorAll("td")]) {
+    const c = [...el.classList].find((x) => ALINEACION_VERTICAL.test(x));
+    if (c) problemas.push(`${el.tagName} con ${c}`);
+  }
+  const celda = tr.querySelector("[data-celda-nombre]");
+  if (!celda) return [...problemas, "no está la celda del nombre"];
+  const fila = celda.parentElement;
+  if (!fila.classList.contains("items-center")) problemas.push("la celda PRODUCTO no centra en vertical");
+  const enElFlujo = [...celda.children].filter((h) => !h.classList.contains("absolute"));
+  if (enElFlujo.length !== 1) problemas.push(`la celda del nombre tiene ${enElFlujo.length} cosas en el flujo, no una línea`);
+  const grilla = enElFlujo[0];
+  const apiladas = [...(grilla?.children ?? [])].every((h) => h.classList.contains("col-start-1") && h.classList.contains("row-start-1"));
+  if (!grilla?.classList.contains("grid") || !apiladas) problemas.push("el nombre y su copia en negrita no están apilados en una línea");
+  return problemas;
 }
 
 async function escribir(nombre, texto) {
@@ -180,7 +229,7 @@ test("Lo que pedí: sacar uno no mueve la columna CANTIDAD de los que quedan", a
   assert.deepEqual(huella(renglon("Agua x6")), huellaAntes);
 });
 
-test("con Ver fotos y en el modo sumar, tampoco: la foto va adentro de PRODUCTO y la marca tiene su renglón", async () => {
+test("con Ver fotos y en el modo sumar, tampoco: la foto va adentro de PRODUCTO y la marca cuelga sin ocupar lugar", async () => {
   try { localStorage.setItem("pedidos_ver_fotos", "1"); } catch {}
   await montarE({ inicio: { ...real.carritoPendiente, cuerpo: { ...real.carritoPendiente.cuerpo, pendiente: { ...real.carritoPendiente.cuerpo.pendiente, solicitadoAt: new Date().toISOString() } } } });
   assert.ok(renglon("Yerba 1kg").querySelector("[data-tarjeta-foto], [data-tarjeta-inicial]"), "Ver fotos no está prendido");
@@ -191,6 +240,32 @@ test("con Ver fotos y en el modo sumar, tampoco: la foto va adentro de PRODUCTO 
   assert.equal(renglon("Yerba 1kg").querySelector("[data-marca-cambio]")?.textContent, "nuevo, sin confirmar");
   assert.deepEqual(medirCantidad("Yerba 1kg"), antes);
   assert.deepEqual(huella(renglon("Yerba 1kg")), huellaAntes, "la marca del modo sumar agrandó el renglón");
+});
+
+test("CENTRADO: en cada renglón el nombre está en la misma línea que el resto, armando y en el modo sumar", async () => {
+  await montarE({ inicio: real.carritoBorrador });
+  for (const tr of tabla().querySelectorAll("tbody tr")) assert.deepEqual(problemasDeCentrado(tr), [], tr.textContent);
+  await desmontarTodo();
+
+  // El modo sumar es donde estaba el defecto: sin cambio y con cambio.
+  await montarE({ inicio: { ...real.carritoPendiente, cuerpo: { ...real.carritoPendiente.cuerpo, pendiente: { ...real.carritoPendiente.cuerpo.pendiente, solicitadoAt: new Date().toISOString() } } } });
+  for (const tr of tabla().querySelectorAll("tbody tr")) assert.deepEqual(problemasDeCentrado(tr), [], tr.textContent);
+  await tocar(renglon("Yerba 1kg").querySelector('button[aria-label^="Sumar uno"]'));
+  assert.ok(renglon("Yerba 1kg").querySelector("[data-marca-cambio]"), "el caso tiene que tener la marca a la vista");
+  for (const tr of tabla().querySelectorAll("tbody tr")) assert.deepEqual(problemasDeCentrado(tr), [], tr.textContent);
+});
+
+test("CONTRAPRUEBA del centrado: un renglón reservado debajo del nombre —el de e6e79d9— se detecta", () => {
+  const tr = document.createElement("tr");
+  const celda = (dentro) =>
+    `<td><div class="flex items-center gap-3"><div data-celda-nombre="" class="relative min-w-0 flex-1">` +
+    `<span class="grid"><span class="col-start-1 row-start-1 invisible">X</span><span class="col-start-1 row-start-1">X</span></span>${dentro}</div></div></td>`;
+  tr.innerHTML = celda('<span class="absolute inset-x-0 top-full">marca</span>');
+  assert.deepEqual(problemasDeCentrado(tr), [], "la forma buena dio problemas");
+  tr.innerHTML = celda('<span class="block truncate invisible">sin cambios</span>');
+  assert.equal(problemasDeCentrado(tr).length, 1, "el renglón reservado no se detectó");
+  tr.innerHTML = celda("").replace("<td>", '<td class="align-top">');
+  assert.equal(problemasDeCentrado(tr).length, 1, "una celda pegada arriba no se detectó");
 });
 
 test("CONTRAPRUEBA de la medición: una tabla con ancho automático no se puede medir, y una fija sí", () => {

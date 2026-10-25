@@ -8,14 +8,18 @@
 // composición (`montaje.test.mjs`). Que el teléfono no cambió lo dice
 // `celularIntacto.test.mjs`.
 //
-// El diseño es el del 2026-10-25: la barra fija con el buscador, la categoría,
-// "Ver fotos" y la acción principal; las dos pestañas; la lista de punta a
-// punta con su pie. Sin el panel "Tu pedido" y sin el stock del depósito.
+// Estos son los del CATÁLOGO, que desde el 2026-10-25 es un paso adentro de
+// la página de entrada (la entrada la prueban `entradaEscritorio.test.mjs`):
+// la barra fija con el Volver, el buscador, la categoría, "Ver fotos" y la
+// acción principal; las dos pestañas; la lista de punta a punta con su pie.
+// Sin el panel "Tu pedido" y sin el stock del depósito.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
-const { real, montar, desmontarTodo, tocar, asentar, llamadas, modal, escritorio, navegacion } = await import("./montarPantallaPedidos.mjs");
+const { real, montar, desmontarTodo, tocar, asentar, llamadas, modal, escritorio, navegacion, abrirCatalogoEscritorio } = await import(
+  "./montarPantallaPedidos.mjs"
+);
 
 afterEach(desmontarTodo);
 
@@ -56,9 +60,14 @@ const id = (n) => real.catalogo.cuerpo.items.find((i) => i.nombre === n).product
 const conFecha = (r, fecha) => ({ ...r, cuerpo: { ...r.cuerpo, pendiente: { ...r.cuerpo.pendiente, solicitadoAt: fecha.toISOString() } } });
 const enviadoHoy = () => conFecha(real.carritoPendiente, new Date());
 
-// Con la ventana de computadora, que es la única que lo monta. No tiene
-// página de entrada.
-const montarE = (r) => montar({ ...r, ancho: "escritorio" });
+// Con la ventana de computadora, que es la única que lo monta, y abriendo el
+// catálogo desde la entrada como la persona.
+const montarE = async (r) => {
+  const montado = await montar({ ...r, ancho: "escritorio" });
+  await abrirCatalogoEscritorio();
+  return montado;
+};
+const enLaEntrada = () => !!document.querySelector('[data-vista="entrada"]');
 
 // ── LA BARRA ──────────────────────────────────────────────────────────────
 
@@ -74,10 +83,15 @@ test("la barra es fija, va arriba de la lista, y la lista no está adentro", asy
   assert.doesNotMatch(tabla().parentElement.className, /max-h-|overflow-y-auto/);
 });
 
-test("armando, línea 1: buscador, Categoría, Ver fotos apagado y Enviar pedido (N), en ese orden", async () => {
+test("armando, línea 1: ← Volver, buscador, Categoría, Ver fotos apagado y Enviar pedido (N), en ese orden", async () => {
   await montarE({ inicio: real.carritoBorrador });
   const h = herramientas();
+  const volver = h.querySelector("button");
+  assert.equal(volver?.textContent.trim(), "Volver", "el Volver no es lo primero de la barra");
+  assert.match(volver.className, /sunmi-btn-slate/);
+  assert.ok(volver.querySelector("svg"), "el Volver sin su flecha (SunmiBackButton)");
   const buscador = h.querySelector('input[placeholder="Buscar producto o código"]');
+  assert.ok(volver.compareDocumentPosition(buscador) & 4);
   assert.ok(buscador, "falta el buscador");
   assert.match(buscador.closest(".flex-1")?.className ?? "", /flex-1/, "el buscador no ocupa el ancho disponible");
   assert.match(h.textContent, /Categoría/);
@@ -105,8 +119,18 @@ test("armando, línea 2: las dos pestañas, de dónde a dónde y Pedidos anterio
   assert.equal(texto.textContent, `${local.nombre} → ${deposito.nombre} · se guarda solo`);
   assert.match(texto.className, /sunmi-text-muted/);
   assert.ok(!botonE("Cancelar pedido"), "armando no se cancela");
+  // Pedidos anteriores abre el historial de la computadora, sin navegar al viejo.
   await tocar(botonE("Pedidos anteriores"));
-  assert.deepEqual(navegacion.at(-1), ["push", "/modulos/pedidos/historial"]);
+  assert.ok(document.querySelector('[data-vista="historial"]'), "no abrió el historial");
+  assert.equal(navegacion.length, 0, "navegó a otra pantalla");
+});
+
+test("← Volver vuelve a la entrada, y el pedido sigue guardado", async () => {
+  const { pedidos } = await montarE({ inicio: real.carritoBorrador });
+  await tocar(botonE("Volver"));
+  assert.ok(enLaEntrada(), "no volvió a la entrada");
+  assert.ok(!modal(), "armando, volver preguntó algo");
+  assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 0);
 });
 
 test("sin pedido: Enviar pedido al depósito (0) apagado, y Lo que pedí · 0", async () => {
@@ -251,7 +275,7 @@ test("Lo que pedí: solo lo cargado, la pestaña en amber, y el pie cuenta sin M
 
 // ── ENVIAR ────────────────────────────────────────────────────────────────
 
-test("Enviar pedido al depósito envía al primer toque, sin nada en el medio, y sigue en Enviado", async () => {
+test("Enviar pedido al depósito envía al primer toque, sin nada en el medio, y vuelve a la entrada", async () => {
   const { pedidos } = await montarE({ inicio: real.carritoBorrador, solicitar: [real.solicitado] });
   const antes = pedidos.length;
   await tocar(botonE("Enviar pedido al depósito (2)"));
@@ -260,31 +284,25 @@ test("Enviar pedido al depósito envía al primer toque, sin nada en el medio, y
   assert.equal(pedidos[antes].ruta, "/api/pos-transferencias/solicitar", "algo se pidió antes del envío");
   assert.deepEqual(pedidos[antes].cuerpo, { posId: real.carritoBorrador.cuerpo.posId });
   assert.ok(!modal(), "apareció un segundo paso");
-  assert.ok(botonE("Agregar al pedido (0)"), "después de enviar no quedó en el modo sumar");
-  // La fecha es la real del fixture: "hoy" o la corta, según cuándo corra.
-  assert.match(pestanas().textContent, /Enviado (hoy|\d\d\/\d\d) \d\d:\d\d · podés sumar/);
+  assert.ok(enLaEntrada(), "después de enviar no volvió a la entrada");
+  assert.ok(!document.querySelector('[data-vista="catalogo"]'), "quedó el catálogo");
+  // La entrada, con el carrito releído, lo muestra enviado.
+  assert.match(document.querySelector("[data-etiqueta-en-curso]").textContent, /Enviado · esperando al depósito/);
 });
 
 // ── ENVIADO: EL MODO SUMAR ────────────────────────────────────────────────
 
-test("enviado: cuándo se envió, Agregar al pedido apagado y Cancelar pedido rojo en la línea 2", async () => {
+test("modo sumar: Agregar al pedido arranca apagado, y el catálogo no tiene Cancelar ni el «Enviado hoy…»", async () => {
   await montarE({ inicio: enviadoHoy() });
-  assert.match(pestanas().textContent, /Enviado hoy \d\d:\d\d · podés sumar hasta que el depósito lo empiece/);
   const agregar = botonE("Agregar al pedido (0)");
   assert.ok(agregar && agregar.disabled);
   assert.match(agregar.className, /sunmi-btn-primary/);
   assert.ok(!botonE("Enviar pedido al depósito"));
-  const cancelar = botonE("Cancelar pedido");
-  assert.ok(cancelar && pestanas().contains(cancelar));
-  assert.match(cancelar.className, /sunmi-btn-red/);
+  assert.ok(!botonE("Cancelar pedido"), "Cancelar quedó en el catálogo: vive en la entrada");
+  assert.doesNotMatch(barra().textContent, /Enviado (hoy|\d\d\/\d\d)|podés sumar/, "el texto del enviado quedó en el catálogo");
 });
 
-test("enviado otro día: fecha corta y hora", async () => {
-  await montarE({ inicio: conFecha(real.carritoPendiente, new Date(Date.now() - 3 * 24 * 3600 * 1000)) });
-  assert.match(pestanas().textContent, /Enviado \d\d\/\d\d \d\d:\d\d · podés sumar/);
-});
-
-test("enviado: nada se escribe hasta Agregar al pedido, y la fila marca lo pendiente", async () => {
+test("modo sumar: nada se escribe hasta Agregar al pedido, la fila marca lo pendiente, y Agregar vuelve a la entrada", async () => {
   const { pedidos } = await montarE({ inicio: enviadoHoy(), sumar: [real.mainSumado] });
   await tocar(fila("Yerba 1kg").mas);
   await tocar(fila("Agua x6").mas);
@@ -304,10 +322,11 @@ test("enviado: nada se escribe hasta Agregar al pedido, y la fila marca lo pendi
     [id("Yerba 1kg"), id("Agua x6")].sort()
   );
   assert.match(document.body.textContent, /Se agregaron 2 cambios al pedido/);
-  assert.ok(botonE("Agregar al pedido (0)"));
+  assert.ok(enLaEntrada(), "después de Agregar no volvió a la entrada");
+  assert.ok(!modal(), "Agregar pidió una segunda confirmación");
 });
 
-test("enviado: un 409 al confirmar avisa arriba en la barra, descarta los cambios y pasa a Preparando", async () => {
+test("modo sumar: un 409 al confirmar avisa, descarta los cambios y la entrada lo muestra Preparando", async () => {
   const { estado } = await montarE({ inicio: enviadoHoy(), sumar: [real.sumarEmpezado] });
   await tocar(fila("Yerba 1kg").mas);
   estado.carrito = real.empezadoCarrito;
@@ -315,47 +334,22 @@ test("enviado: un 409 al confirmar avisa arriba en la barra, descarta los cambio
   const aviso = enEscritorio().querySelector("[data-aviso-escritorio]");
   assert.ok(aviso, "el aviso no salió");
   assert.match(aviso.textContent, /El depósito ya está preparando tu pedido\. Ya no se puede cambiar\./);
-  assert.ok(barra().contains(aviso), "el aviso no está en la barra");
-  assert.ok(aviso.compareDocumentPosition(pestanas()) & 4, "el aviso no está arriba");
-  assert.match(pestanas().textContent, /El depósito lo está preparando/);
+  assert.ok(enLaEntrada());
+  assert.match(document.querySelector("[data-etiqueta-en-curso]").textContent, /Preparando en el depósito/);
 });
 
-test("la hoja de descartar: con cambios, Pedidos anteriores pregunta; sin cambios, sale", async () => {
+test("la hoja de descartar: con cambios, Volver y Pedidos anteriores preguntan; sin cambios, salen", async () => {
   await montarE({ inicio: enviadoHoy() });
   await tocar(fila("Yerba 1kg").mas);
-  await tocar(botonE("Pedidos anteriores"));
-  assert.ok(modal(), "con cambios, Pedidos anteriores no preguntó");
+  await tocar(botonE("Volver"));
+  assert.ok(modal(), "con cambios, Volver no preguntó");
   assert.match(modal().textContent, /Tenés 1 cambio sin confirmar\. ¿Descartarlos\?/);
   await tocar([...modal().querySelectorAll("button")].find((b) => b.textContent.trim() === "Seguir cargando"));
   assert.ok(!modal());
   assert.equal(fila("Yerba 1kg").campo.value, "1", "Seguir cargando perdió el cambio");
-  assert.equal(navegacion.length, 0, "Seguir cargando se fue");
   await tocar(botonE("Pedidos anteriores"));
+  assert.ok(modal(), "con cambios, Pedidos anteriores no preguntó");
   await tocar([...modal().querySelectorAll("button")].find((b) => b.textContent.trim() === "Descartar"));
-  assert.deepEqual(navegacion.at(-1), ["push", "/modulos/pedidos/historial"]);
-});
-
-test("cancelar: con la hoja, y después de cancelar vuelve a armar", async () => {
-  const { pedidos } = await montarE({ inicio: enviadoHoy(), cancelar: [real.cancelado] });
-  await tocar(botonE("Cancelar pedido"));
-  assert.ok(modal(), "no abrió la hoja");
-  assert.match(modal().textContent, /¿Cancelar el pedido solicitado\?/);
-  assert.equal(llamadas(pedidos, "/api/pos-transferencias/cancelar").length, 0, "abrir la hoja canceló");
-  await tocar([...modal().querySelectorAll("button")].find((b) => b.textContent.trim() === "Cancelar pedido"));
-  assert.equal(llamadas(pedidos, "/api/pos-transferencias/cancelar").length, 1);
-  assert.ok(botonE("Enviar pedido al depósito"), "después de cancelar no volvió a armar");
-});
-
-// ── PREPARANDO ────────────────────────────────────────────────────────────
-
-test("preparando: solo Lo que pedí, sin herramientas, y nada que tocar en la lista", async () => {
-  await montarE({ inicio: conFecha(real.empezadoCarrito, new Date()) });
-  assert.ok(!herramientas(), "con herramientas");
-  assert.deepEqual([...pestanas().querySelectorAll("button")].map((b) => b.textContent.trim()), ["Lo que pedí · 3", "Pedidos anteriores"]);
-  assert.match(botonE("Lo que pedí").className, /sunmi-btn-amber/);
-  assert.match(pestanas().textContent, /El depósito lo está preparando/);
-  assert.deepEqual(nombres(), ["ACEITE", "ARROZ", "GALLETITAS"]);
-  assert.equal(tabla().querySelectorAll("tbody button, tbody input").length, 0, "en la lista hay algo que tocar");
-  assert.deepEqual([...tabla().querySelectorAll("[data-cantidad-pedido]")].map((c) => c.textContent), ["2", "5", "4"]);
-  assert.equal(pie().textContent, "3 productos en el pedido");
+  assert.ok(document.querySelector('[data-vista="historial"]'), "Descartar no fue al historial");
+  assert.equal(navegacion.length, 0);
 });

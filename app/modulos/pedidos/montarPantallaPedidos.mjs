@@ -252,7 +252,8 @@ export async function montar(respuestas) {
   // candado sea de la entrada (`enLaEntrada`), se pasa por ella como la
   // persona: el botón que abre el catálogo, o "Ver pedido" si el depósito ya lo
   // empezó (ahí no hay catálogo).
-  // En la computadora no hay entrada.
+  // En la computadora la entrada es otra y queda montada: los candados que
+  // quieren el catálogo llaman a `abrirCatalogoEscritorio`.
   if (!respuestas.enLaEntrada && !respuestas.pagina && anchoDeVentana === "telefono") await abrirDesdeLaEntrada();
   return { raiz, ...srv };
 }
@@ -270,6 +271,29 @@ export async function abrirDesdeLaEntrada() {
   assert.ok(seguir, `la entrada no ofrece cómo seguir: ${tarjeta.textContent}`);
   await act(async () => seguir.click());
   await asentar(450);
+}
+
+/**
+ * En la computadora, desde el 2026-10-25, también se entra por una página de
+ * entrada (`components/pedidos/PedidosEscritorio.jsx`). Esto abre el catálogo
+ * como la persona: "Hacer un pedido", "Seguir armando", o "Sumar productos" y
+ * su "Sí, sumar".
+ */
+export async function abrirCatalogoEscritorio() {
+  const tarjeta = document.querySelector("[data-pedido-en-curso]");
+  assert.ok(tarjeta, "la computadora no arrancó en su página de entrada");
+  const de = (t) => [...tarjeta.querySelectorAll("button")].find((b) => b.textContent.trim() === t);
+  const directo = de("Hacer un pedido") ?? de("Seguir armando");
+  if (directo) {
+    await act(async () => directo.click());
+  } else {
+    const sumar = de("Sumar productos");
+    assert.ok(sumar, `la entrada no ofrece cómo abrir el catálogo: ${tarjeta.textContent}`);
+    await act(async () => sumar.click());
+    await act(async () => de("Sí, sumar").click());
+  }
+  await asentar(450);
+  assert.ok(document.querySelector('[data-vista="catalogo"]'), "no se abrió el catálogo");
 }
 
 // ── LA PÁGINA ENTERA ──────────────────────────────────────────────────────

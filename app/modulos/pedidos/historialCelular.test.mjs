@@ -140,9 +140,17 @@ test("un historial largo: lee todas las páginas de la ruta y pagina de a 25 con
   assert.deepEqual(numeros(), todos.slice(25, 50));
 });
 
-test("en la computadora, la pantalla de siempre", async () => {
+// Desde el 2026-10-25 la computadora tiene el suyo: la vista HISTORIAL de
+// `PedidosEscritorio`, con el filtro de estado y el renglón de "Pedidos
+// anteriores". La pantalla vieja —cinta, buscador, "Ver detalle"— se borró.
+test("en la computadora, el historial de la computadora, y Volver va a la entrada de Pedidos", async () => {
   await montarHistorial({ ancho: "escritorio" });
   assert.ok(!document.querySelector("[data-historial-celular]"), "se montó el del celular");
-  assert.match(contenido().textContent, /Historial de Pedidos/, "no está la pantalla de siempre");
-  assert.ok(contenido().querySelector('input[placeholder="Buscar por nombre o código..."]'), "falta el buscador de siempre");
+  assert.ok(document.querySelector('[data-vista="historial"]'), "no está el historial de la computadora");
+  assert.doesNotMatch(contenido().textContent, /Historial de Pedidos/, "quedó la cinta de la pantalla vieja");
+  assert.ok(!contenido().querySelector('input[placeholder="Buscar por nombre o código..."]'), "quedó el buscador de la pantalla vieja");
+  assert.equal(contenido().querySelectorAll("[data-pedido-anterior]").length, real.historialTodos.cuerpo.items.length);
+  const volver = [...contenido().querySelectorAll("button")].find((b) => b.textContent.trim() === "Volver");
+  await tocar(volver);
+  assert.deepEqual(navegacion.at(-1), ["push", "/modulos/pedidos"]);
 });
