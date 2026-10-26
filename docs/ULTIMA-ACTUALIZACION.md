@@ -1,12 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-26 03:44
+**Fecha:** 2026-10-26 14:51
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla), fix(compras): un papel leído corrido una fila se detecta con el pedido y se acomoda solo; el % del papel baja en rojo, feat(compras): recibir lo que llega sin ningún papel — SIN VERIFICAR en pantalla
-- Archivos: 1 modificados (1 total)
+- fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado, refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida, feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
+- Archivos: 7 modificados (7 total)
+
+### pos-transferencias
+- fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado, refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
+- Archivos: 2 modificados (2 total)
+
+### pos-ventas
+- fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
+- Archivos: 2 modificados (2 total)
 
 
 
