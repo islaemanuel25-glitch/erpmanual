@@ -43,7 +43,9 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
  * componente agrega igual, y ganan porque `styles/sunmi.css` las define DESPUÉS
  * del bloque de colores (`variantesDeAccion.test.mjs` lo exige).
  */
-export const CLASE_ACCION_RAPIDA = "sunmi-btn-accent-outline";
+// La rápida vive en el kit, con su pieza (`SunmiAccionRapida`): se reexporta
+// para quien solo necesita la clase.
+export { CLASE_ACCION_RAPIDA } from "@/components/sunmi/SunmiAccionRapida";
 export const CLASE_ACCION_CORREGIR = "sunmi-btn-accent-suave";
 
 /**

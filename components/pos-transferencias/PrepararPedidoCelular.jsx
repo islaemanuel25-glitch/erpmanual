@@ -52,11 +52,11 @@ import {
   CajaDeCantidad,
   CantidadDestacada,
   CLASE_ACCION_CORREGIR,
-  CLASE_ACCION_RAPIDA,
   FilaRevisada,
   ParDeCantidades,
   TarjetaDeRevision,
 } from "@/components/revision/PiezasDeRevision";
+import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import FilaCatalogoRecepcion from "@/components/transferencias/FilaCatalogoRecepcion";
 import { cuandoDelPedido } from "@/lib/pedidos/cuandoDelPedido";
 import { estaRevisada, loPedido, vaCompleto } from "@/lib/pedidos/revisionDeLinea";
@@ -190,9 +190,9 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onCorregir }) {
       }
       accionArriba={
         estado === ESTADO_PREPARACION.PENDIENTE ? (
-          <SunmiButton onClick={() => onVaCompleto(l)} disabled={guardando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+          <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
             {TEXTO_VA_COMPLETO}
-          </SunmiButton>
+          </SunmiAccionRapida>
         ) : null
       }
       accionAbajo={

@@ -55,6 +55,7 @@ import { MoreHorizontal } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -99,12 +100,6 @@ import {
 // LAS COPIAS. Ver el encabezado: el teléfono no se toca, así que lo que esta
 // pantalla necesita de adentro de sus archivos se copia acá, tal cual.
 // ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * COPIA de `CLASE_COINCIDE` de `TarjetaRecepcionMovil.jsx`, que no la exporta:
- * el botón "✓ Coincide" se pinta igual en la fila que en la tarjeta.
- */
-const CLASE_COINCIDE = "sunmi-btn-accent-outline";
 
 /**
  * SI SE PUEDE CONFIRMAR, Y POR QUÉ NO. COPIA de las cuentas de
@@ -379,16 +374,18 @@ function CeldaAcciones({ d, l, puedeRecibir, guardando, onCoincide, onCorregir }
   return (
     <span className="inline-flex items-center gap-2">
       {corregir}
-      <SunmiButton
+      {/* La acción rápida del kit, la misma de la tarjeta, con las medidas de
+          la celda de la tabla. */}
+      <SunmiAccionRapida
         onClick={(e) => {
           e.stopPropagation();
           onCoincide(d);
         }}
         disabled={guardando}
-        className={`shrink-0 min-h-0 px-3 py-1.5 text-sm2 ${CLASE_COINCIDE}`}
+        className="min-h-0 px-3 py-1.5 text-sm2"
       >
         {TEXTO_COINCIDE}
-      </SunmiButton>
+      </SunmiAccionRapida>
     </span>
   );
 }

@@ -21,9 +21,8 @@
 
 import { useState } from "react";
 
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
+import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import { kilosValidos } from "@/lib/proveedores/listas/cajaRecordada";
 
 export const TEXTO_PREGUNTA_CAJA = "¿Cuántas trae la caja?";
@@ -80,9 +79,9 @@ export default function PreguntaQueFalta({ id, porKilo = false, sugerido = null,
         disabled={trabajando}
         className="w-20 text-right tabular-nums"
       />
-      <SunmiButton type="submit" disabled={trabajando || !valida} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+      <SunmiAccionRapida type="submit" disabled={trabajando || !valida}>
         {TEXTO_LISTO}
-      </SunmiButton>
+      </SunmiAccionRapida>
     </form>
   );
 }

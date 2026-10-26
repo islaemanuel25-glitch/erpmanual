@@ -188,15 +188,14 @@ test("las copias de la computadora dicen lo mismo que el teléfono, renglón por
     assert.ok(fuente(rel).includes(renglon), `${rel} ya no dice «${renglon}»: la regla cambió, hay que copiarla a la computadora`);
     assert.ok(compu.includes(renglon), `la computadora no dice «${renglon}»: su copia se despegó del teléfono`);
   }
-  // Cómo se pinta "✓ Coincide". Desde el 2026-10-22 la clase del teléfono vive
-  // en la pieza compartida con el depósito (`PiezasDeRevision`) y la tarjeta la
-  // toma de ahí: el renglón ya no es el mismo texto en los dos archivos, pero
-  // el VALOR sí tiene que serlo.
+  // Cómo se pinta "✓ Coincide". Desde el 2026-10-26 ya no es una copia: los dos
+  // lo dibujan con la acción rápida del kit (`SunmiAccionRapida`), que es de
+  // donde salió la del teléfono. Si alguno vuelve a escribir la clase a mano,
+  // la copia vuelve a poder despegarse.
   const tarjeta = fuente("components/transferencias/TarjetaRecepcionMovil.jsx");
-  assert.ok(tarjeta.includes("const CLASE_COINCIDE = CLASE_ACCION_RAPIDA;"), "la tarjeta dejó de tomar la clase de la pieza compartida");
-  assert.ok(
-    fuente("components/revision/PiezasDeRevision.jsx").includes('export const CLASE_ACCION_RAPIDA = "sunmi-btn-accent-outline";'),
-    "la clase de la acción rápida cambió: hay que copiarla a la computadora"
-  );
-  assert.ok(compu.includes('const CLASE_COINCIDE = "sunmi-btn-accent-outline";'), "la computadora no pinta Coincide igual que el teléfono");
+  for (const [quien, codigo] of [["el teléfono", tarjeta], ["la computadora", compu]]) {
+    assert.ok(codigo.includes('from "@/components/sunmi/SunmiAccionRapida"'), `${quien} no toma «✓ Coincide» del kit`);
+    assert.ok(/<SunmiAccionRapida[\s\S]*?\{TEXTO_COINCIDE\}\s*<\/SunmiAccionRapida>/.test(codigo), `${quien} no dibuja «✓ Coincide» con la pieza del kit`);
+    assert.ok(!codigo.includes('"sunmi-btn-accent-outline"'), `${quien} volvió a escribir la clase a mano`);
+  }
 });

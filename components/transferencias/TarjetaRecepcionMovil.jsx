@@ -56,10 +56,11 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import {
   CantidadDestacada,
   CLASE_ACCION_CORREGIR,
-  CLASE_ACCION_RAPIDA,
   FilaRevisada,
   TarjetaDeRevision,
 } from "@/components/revision/PiezasDeRevision";
+// "✓ Coincide" es la acción rápida del kit: esta tarjeta es de donde salió.
+import SunmiAccionRapida, { TEXTO_COINCIDE } from "@/components/sunmi/SunmiAccionRapida";
 
 import { formatearMoneda } from "@/lib/moneda";
 import {
@@ -81,17 +82,15 @@ import {
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
 
-export const TEXTO_COINCIDE = "✓ Coincide";
+export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 export const TEXTO_CARGA_NO_DECLARADO = "Cargá la cantidad que llegó";
 
 /**
- * Las dos clases de acción de la tarjeta: "Coincide" cierra la línea sin abrir
- * nada y "Corregir" lleva al panel, así que no pueden pesar igual. El porqué de
- * cada una, y de que vayan en `className`, está junto a ellas en
+ * "Corregir" lleva al panel y pesa menos que "Coincide", que es la acción
+ * rápida del kit (`SunmiAccionRapida`). El porqué de las dos clases está en
  * `components/revision/PiezasDeRevision.jsx`.
  */
-const CLASE_COINCIDE = CLASE_ACCION_RAPIDA;
 const CLASE_CORREGIR = CLASE_ACCION_CORREGIR;
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
@@ -464,13 +463,9 @@ export default function TarjetaRecepcionMovil({
   // sentido ofrecer "coincide" en una línea donde alguien ya contó y dijo que
   // no coincide. Ahí el único camino es "Corregir".
   const accionArriba = puedeRecibir && !esAgregada && !hayDiferencia && (
-    <SunmiButton
-      onClick={coincidir}
-      disabled={guardando}
-      className={`shrink-0 ${CLASE_COINCIDE}`}
-    >
+    <SunmiAccionRapida onClick={coincidir} disabled={guardando}>
       {TEXTO_COINCIDE}
-    </SunmiButton>
+    </SunmiAccionRapida>
   );
 
   // La fila 2 se fue con el V26. Ver arriba, donde se armaba `queHay`. La

@@ -52,9 +52,9 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
 import {
   CLASE_ACCION_CORREGIR,
-  CLASE_ACCION_RAPIDA,
   TarjetaDeRevision,
 } from "@/components/revision/PiezasDeRevision";
+import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import {
   EtiquetaFueraDeRango,
   money,
@@ -86,15 +86,17 @@ export const TEXTO_OTRO = "Otro";
  */
 export function BotonUsar({ enUso = false, trabajando = false, onClick }) {
   return (
-    <SunmiButton
-      color={enUso ? "primary" : undefined}
-      aria-pressed={enUso}
-      onClick={onClick}
-      disabled={trabajando}
-      className={`shrink-0 ${enUso ? "" : CLASE_ACCION_RAPIDA}`}
-    >
-      {TEXTO_USAR}
-    </SunmiButton>
+    // Sin usar es la acción rápida del kit; en uso, el botón lleno, que dice
+    // que ya está elegido.
+    enUso ? (
+      <SunmiButton color="primary" aria-pressed onClick={onClick} disabled={trabajando} className="shrink-0">
+        {TEXTO_USAR}
+      </SunmiButton>
+    ) : (
+      <SunmiAccionRapida aria-pressed={false} onClick={onClick} disabled={trabajando}>
+        {TEXTO_USAR}
+      </SunmiAccionRapida>
+    )
   );
 }
 
@@ -178,15 +180,15 @@ export default function TarjetaProductoDeLaLista({
   let accionArriba = null;
   if (sugerencia) {
     accionArriba = (
-      <SunmiButton onClick={() => onSi?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+      <SunmiAccionRapida onClick={() => onSi?.(item)} disabled={trabajando}>
         {TEXTO_SI}
-      </SunmiButton>
+      </SunmiAccionRapida>
     );
   } else if (abierta && sinRenglon) {
     accionArriba = (
-      <SunmiButton onClick={() => onVincular?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+      <SunmiAccionRapida onClick={() => onVincular?.(item)} disabled={trabajando}>
         {TEXTO_VINCULAR}
-      </SunmiButton>
+      </SunmiAccionRapida>
     );
   } else if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
     accionArriba = <BotonUsar enUso={cambia} trabajando={trabajando} onClick={() => onUsar?.(item)} />;

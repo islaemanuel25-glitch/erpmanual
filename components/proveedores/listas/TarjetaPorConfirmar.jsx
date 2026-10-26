@@ -13,7 +13,8 @@
 // la pantalla.
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { TarjetaDeRevision, CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
+import { TarjetaDeRevision, CLASE_ACCION_CORREGIR } from "@/components/revision/PiezasDeRevision";
+import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import { money } from "@/components/proveedores/listas/PiezasPantallas";
 import { preguntaDeLaSugerencia, TEXTO_OTRO, TEXTO_SI } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 
@@ -36,9 +37,9 @@ export default function TarjetaPorConfirmar({ item, abierta = true, trabajando =
       }
       accionArriba={
         abierta ? (
-          <SunmiButton onClick={() => onSi?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_RAPIDA}`}>
+          <SunmiAccionRapida onClick={() => onSi?.(item)} disabled={trabajando}>
             {TEXTO_SI}
-          </SunmiButton>
+          </SunmiAccionRapida>
         ) : null
       }
       avisos={error ? <p className="text-sm2 sunmi-text-danger">{error}</p> : null}
