@@ -271,8 +271,31 @@ export default function PanelComprobantes({
     }
   }
 
+  // ── AL ABRIR, SE RECALCULA CON LO YA LEÍDO ─────────────────────────────
+  //
+  // Antes de la primera lista: une las hojas que solo cierran sumadas y
+  // vincula contra el pedido lo que el pedido explica (`recepcion/recalcular`,
+  // sin llamar a la IA). Es lo que deja bien los papeles que se leyeron con
+  // las reglas de antes, sin volver a subirlos (Mauro #298). Si falla, la
+  // lista se carga igual: es una mejora, no una condición.
   useEffect(() => {
-    recargar();
+    let vigente = true;
+    (async () => {
+      if (pedidoId && puedeRecibir) {
+        try {
+          await fetch("/api/compras-proveedor/recepcion/recalcular", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pedidoId }),
+          });
+        } catch {}
+      }
+      if (vigente) recargar();
+    })();
+    return () => {
+      vigente = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoId, proveedorId]);
 

@@ -120,7 +120,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
       }
       const dice = Number(d?.lineasEnElPapel);
       const trajo = Number(d?.lineasTranscriptas);
-      if (Number.isFinite(dice) && Number.isFinite(trajo) && dice > trajo) {
+      if (d?.faltanRenglones === true) {
         setMensaje({
           tipo: "aviso",
           texto:

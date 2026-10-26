@@ -32,6 +32,7 @@ import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
+import { renglonesQueFaltan } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 import { fechaLeidaONull } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
@@ -46,6 +47,7 @@ import {
   textoDeDuplicado,
 } from "@/lib/compras-proveedor/comprobante/facturaRepetida";
 import { agruparLasHojasDelPapel } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
+import { vincularContraElPedido } from "@/lib/compras-proveedor/comprobante/vincularContraElPedido";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import {
   estadoDeLaFalla,
@@ -385,20 +387,15 @@ export async function POST(req, { params }) {
       // otra vez a Flash serían tres llamadas por una lectura. Este reintento
       // queda para cuando el modelo grande no está configurado.
       const cuantasTrajo = (r) => (Array.isArray(r?.lectura?.lineas) ? r.lectura.lineas.length : 0);
-      const cuantasDice = (r) => {
-        const n = Number(r?.lectura?.lineasEnElPapel);
-        return Number.isFinite(n) ? n : null;
-      };
-      const quedoCorta = (r) => {
-        const dice = cuantasDice(r);
-        return r?.ok === true && dice !== null && dice > cuantasTrajo(r);
-      };
+      // La misma pregunta que la puerta: si la suma cierra contra el total
+      // impreso, los que contó de más tienen el importe en cero y no faltan.
+      const quedoCorta = (r) => r?.ok === true && renglonesQueFaltan(r.lectura) !== null;
 
       let reintento = null;
       if (!escalada.llamo && quedoCorta(resultado)) {
         console.log(
           `[comprobante ${comprobante.id}] transcribió ${cuantasTrajo(resultado)} de ` +
-            `${cuantasDice(resultado)} renglones: se le pide otra vez`
+            `${resultado.lectura?.lineasEnElPapel} renglones: se le pide otra vez`
         );
         reintento = await pedirle();
         // Se queda la que trajo MÁS renglones. Si el reintento falló o trajo
@@ -747,6 +744,17 @@ export async function POST(req, { params }) {
         console.error("No se pudieron agrupar las hojas del comprobante:", e?.message);
       }
 
+      // Y lo que el pedido explica por nombre y por precio queda vinculado y
+      // guardado como alias (Mauro #298). Igual que la agrupación: si falla, la
+      // lectura ya está guardada y la pantalla lo vuelve a intentar al abrir.
+      if (comprobante.pedidoId) {
+        try {
+          await vincularContraElPedido(prisma, { grupoId, localId: ctx.localId, pedidoId: comprobante.pedidoId });
+        } catch (e) {
+          console.error("No se pudo vincular el papel contra el pedido:", e?.message);
+        }
+      }
+
       let siembra = null;
       if (comprobante.pedidoId) {
         try {
@@ -780,6 +788,9 @@ export async function POST(req, { params }) {
         // veces seguidas.
         lineasEnElPapel: puerta.aGuardar?.lineasEnElPapel ?? null,
         lineasTranscriptas: puerta.aGuardar?.lineasTranscriptas ?? null,
+        // Si quedó corta, con la MISMA pregunta que la puerta: la pantalla no
+        // vuelve a comparar los dos números por su cuenta.
+        faltanRenglones: puerta.faltanLineas != null,
         // La única puerta hacia una propuesta de costo.
         proponeCostos: puerta.proponeCostos,
         porque: puerta.porque,
