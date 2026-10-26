@@ -85,6 +85,9 @@ import { ORIGEN_VINCULO } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
+  contadoEnLaEscala,
+  frenoYaDecidido,
+  precioDeUnaUnidad,
   cantidadFueConvertida,
   costoPropioParaDecidir,
   difiereDeLoPedido,
@@ -97,7 +100,7 @@ import {
   unidadesFisicasEsperadas,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
-import { quedoEnBultos } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
+import { quedoEnBultos, unidadDeComparacion } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
   laCantidadCuadraConElPrecio,
   textoDeLaEscalaQueNoCuadra,
@@ -368,6 +371,16 @@ export default function HojaCorregirLinea({
   // que producía una comparación hecha arriba y un "no hay con qué comparar" en
   // rojo abajo.
   const sinComparacion = motivoSinComparacion(fila);
+  // ── EL FRENO CON "DEJO MI PRECIO" YA DECIDIDO ──────────────────────────
+  //
+  // Emanuel, 2026-10-26 (Pablo #337): si ya se decidió dejar el precio propio,
+  // el freno no es algo a resolver: no se escribe costo, entra el stock y
+  // listo. Se dice como decidido, con el precio de una unidad —la misma unidad
+  // que el "Precio de la unidad" del papel, de arriba—.
+  const yaDecidioElFreno = frenoYaDecidido(fila);
+  const deUnaUnidad = precioDeUnaUnidad(fila);
+  // En qué unidad van los dos precios cuando se muestran juntos: dicho al lado.
+  const unidadDelPrecio = unidadDeComparacion(fila);
   // Y lo que ya está decidido por regla tampoco se ofrece: una baja no se
   // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
   // es dejar el propio, que es la única que corresponde.
@@ -492,16 +505,30 @@ export default function HojaCorregirLinea({
     // abajo, que es lo que entra al stock.
     const contadasDelFiambre =
       fila.cantidadEnKilos === true ? piezasContadasDeLaFila(fila) : null;
+    // Lo ya contado, rearmado desde las unidades físicas en la escala de HOY:
+    // si el producto cambió de bultos a unidades, 5 bultos de 6 son 30, no 5
+    // (Pablo #337, `contadoEnLaEscala`).
+    const contado = contadoEnLaEscala(fila);
     setBultos(
       fila.cantidadEnKilos === true
         ? contadasDelFiambre != null
           ? String(contadasDelFiambre)
           : ""
-        : fila.cantidadRecibida != null
-          ? String(fila.cantidadRecibida)
-          : String(cantidadEnEscalaDelPedido(fila) ?? "")
+        : contado
+          ? String(contado.completos)
+          : fila.cantidadRecibida != null
+            ? String(fila.cantidadRecibida)
+            : String(cantidadEnEscalaDelPedido(fila) ?? "")
     );
-    setSueltas(fila.unidadesSueltas != null ? String(fila.unidadesSueltas) : "");
+    setSueltas(
+      contado
+        ? contado.sueltas > 0
+          ? String(contado.sueltas)
+          : ""
+        : fila.unidadesSueltas != null
+          ? String(fila.unidadesSueltas)
+          : ""
+    );
     // Lo pesado antes si lo hubo; si no, LO QUE DICE EL PAPEL. Nunca el peso de
     // referencia del producto: ése es una estimación y el papel es un dato.
     setKilos(
@@ -779,7 +806,9 @@ export default function HojaCorregirLinea({
   };
 
   // ── EL TÍTULO DEL BLOQUE DE PRECIO DICE EN CUÁL DE LOS CUATRO CASOS ESTÁ ──
-  const tituloDelPrecio = sinComparacion
+  const tituloDelPrecio = yaDecidioElFreno
+    ? "Ya decidiste este precio"
+    : sinComparacion
     ? "El precio no se puede comparar"
     : yaDecidido && !cambiandoPrecio
       ? "Ya decidiste este precio"
@@ -792,9 +821,10 @@ export default function HojaCorregirLinea({
   /** Los dos números, en una línea. Es lo que se compara, en los cuatro casos. */
   const losDosPrecios = (
     <span className="text-sm3 sunmi-text-muted">
-      Tenías {formatearMoneda(tuPrecio)} · la factura trae{" "}
-      {formatearMoneda(fila.costoFactura)}
-      {viaPack ? ` por bulto de ${limpio(fila.factorPack)}` : ""}
+      {/* Los dos en la misma unidad, dicha al lado de cada uno (Emanuel,
+          2026-10-26): un precio por pack al lado de uno por unidad no se lee. */}
+      Tenías {formatearMoneda(tuPrecio)} / {unidadDelPrecio} · la factura trae{" "}
+      {formatearMoneda(fila.costoFactura)} / {unidadDelPrecio}
     </span>
   );
 
@@ -1179,6 +1209,11 @@ export default function HojaCorregirLinea({
               // Sin uno de los dos precios no hay decisión posible: se dice cuál
               // falta y qué pasa igual. Nada que elegir.
               <>
+                {yaDecidioElFreno && deUnaUnidad && (
+                  <span className="text-sm3 sunmi-text-muted break-words">
+                    {textoDeDecision(DECISION_DE_PRECIO.DEJA_EL_MIO)} · {formatearMoneda(deUnaUnidad.erp)} la unidad
+                  </span>
+                )}
                 <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
                 <span className="text-sm3 sunmi-text-muted break-words">
                   La mercadería entra igual y tu costo no se toca.
@@ -1194,7 +1229,8 @@ export default function HojaCorregirLinea({
                   yaDecidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
                     ? tuPrecio
                     : fila.costoFactura
-                )}
+                )}{" "}
+                / {unidadDelPrecio}
               </span>
             ) : cambio ? (
               <>

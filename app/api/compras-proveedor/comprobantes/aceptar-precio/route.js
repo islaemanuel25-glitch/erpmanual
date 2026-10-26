@@ -63,6 +63,7 @@ import {
 import {
   AVISO_PAPEL_CORRIDO,
   elCatalogoSeMovio,
+  escalaSinDeducir,
   motivoSinComparacion,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
@@ -314,7 +315,12 @@ export async function POST(req) {
       unidad: analisis?.unidad ?? null,
     };
     const sinComparacion = motivoSinComparacion(comparacion);
-    if (sinComparacion) {
+    // "Dejo mi precio" no escribe ningún costo, así que un freno de escala o de
+    // precio no lo bloquea: es justamente lo que el freno deja hacer (Emanuel,
+    // 2026-10-26, Pablo #337). Rechazarlo pintaba el freno en rojo en la hoja
+    // sobre una decisión ya tomada. Aceptar el precio del papel sigue frenado.
+    const dejaElMioBajoFreno = decisionPedida === DECISION_DE_PRECIO.DEJA_EL_MIO && escalaSinDeducir(comparacion);
+    if (sinComparacion && !dejaElMioBajoFreno) {
       return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
     }
 

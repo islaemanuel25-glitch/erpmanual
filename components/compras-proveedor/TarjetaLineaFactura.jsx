@@ -46,11 +46,12 @@ import { formatearMoneda } from "@/lib/moneda";
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import { tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
 import {
-  AVISO_ESCALA,
   AVISO_NO_DA_EL_PAPEL,
   AVISO_PAPEL_CORRIDO,
   cuadraConElPapel,
   escalaSinDeducir,
+  frenoYaDecidido,
+  loQueNoCuadra,
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
@@ -212,8 +213,10 @@ export default function TarjetaLineaFactura({
           {/* Pablo #337: sin saber en qué viene —o con una cuenta que no da
               el importe del papel— no hay porcentaje ni costo, y se dice por
               qué. Mismo aviso y misma pieza que el de arriba. */}
-          {fila?.corridaSospechada !== true && escalaSinDeducir(fila) && (
-            <p className="text-sm2 sunmi-text-warning break-words">{AVISO_ESCALA}</p>
+          {/* Lo que no cuadra de verdad —la escala o el precio—, y nada si ya
+              se decidió dejar el precio propio: no hay nada que resolver. */}
+          {fila?.corridaSospechada !== true && escalaSinDeducir(fila) && !frenoYaDecidido(fila) && (
+            <p className="text-sm2 sunmi-text-warning break-words">{loQueNoCuadra(fila)?.texto}</p>
           )}
           {fila?.corridaSospechada !== true && !escalaSinDeducir(fila) && cuadraConElPapel(fila) === false && (
             <p className="text-sm2 sunmi-text-warning break-words">{AVISO_NO_DA_EL_PAPEL}</p>
