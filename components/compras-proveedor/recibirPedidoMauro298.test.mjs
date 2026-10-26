@@ -33,17 +33,20 @@ const PAGINA = "app/modulos/compras-proveedor/[id]/page.jsx";
 const LISTAR = "app/api/compras-proveedor/comprobantes/listar/route.js";
 const CONCILIACION = "app/api/compras-proveedor/conciliacion/[pedidoId]/route.js";
 
-test("1 · «+ Agregar comprobante» va debajo de la lista Y debajo del bloque vacío, con la misma subida", () => {
+test("1 · «+ Agregar comprobante» va debajo de la lista desde el primer papel, y con cero no está", () => {
+  // Emanuel, 2026-10-26: con cero papeles el recuadro de la foto ya es la forma
+  // de subir, y el botón sobraba. Con uno o más, el botón es la única forma de
+  // subir el siguiente: ese era el defecto 1.
   const c = codigoDe(PANEL);
-  // Uno solo, con la condición de recibir y nada más: no depende de `vacio`.
-  assert.match(c, /const botonAgregar = puedeRecibir \? \(/);
+  // Uno solo, con la condición de recibir y de que haya al menos un papel: no depende de `vacio`.
+  assert.match(c, /const botonAgregar = puedeRecibir && items\.length > 0 \? \(/);
   const boton = c.slice(c.indexOf("const botonAgregar"), c.indexOf(") : null;", c.indexOf("const botonAgregar")));
   assert.match(boton, /onClick=\{\(\) => inputRef\.current\?\.click\(\)\}/, "la misma subida que el primero");
   assert.match(boton, /\+ Agregar comprobante/);
-  // Dos lugares: con cero (debajo del bloque de la pantalla) y con uno o más.
-  assert.equal(c.match(/\{botonAgregar\}/g)?.length, 2);
+  // Un solo lugar, debajo de la lista; el bloque vacío no lo lleva.
+  assert.equal(c.match(/\{botonAgregar\}/g)?.length, 1);
   const vacio = c.slice(c.indexOf("vacio({"), c.indexOf(") : (", c.indexOf("vacio({")));
-  assert.match(vacio, /\{botonAgregar\}/, "con cero comprobantes también está");
+  assert.doesNotMatch(vacio, /botonAgregar/, "con cero comprobantes el recuadro de la foto alcanza");
   // CONTRAPRUEBA del defecto: ningún botón de subir queda atado a `!vacio`.
   assert.doesNotMatch(c, /!vacio/);
   assert.doesNotMatch(c, /\+ Agregar factura/);

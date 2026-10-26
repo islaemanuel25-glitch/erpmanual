@@ -623,15 +623,15 @@ export default function PanelComprobantes({
   const alternar = (id) =>
     setSeleccion((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
-  // ── AGREGAR OTRO COMPROBANTE, SIEMPRE DEBAJO DE LA LISTA ───────────────
+  // ── AGREGAR OTRO COMPROBANTE, DEBAJO DE LA LISTA ───────────────────────
   //
   // Un pedido puede venir con varias boletas o facturas, y se agrupan por
-  // comprobante en el orden en que se subieron. El botón está haya cero, uno o
-  // varios, con el mismo texto y en el mismo lugar: que aparezca o cambie de
-  // tamaño al cargar el primero movería todo lo de abajo. Es la MISMA subida
-  // que la del primero —el mismo campo, la misma validación, el mismo
-  // circuito—: solo cambia desde dónde se toca.
-  const botonAgregar = puedeRecibir ? (
+  // comprobante en el orden en que se subieron. El botón aparece recién con el
+  // primer papel subido: con cero, el recuadro de la foto ya es la forma de
+  // subir y el botón sobraba (Emanuel, 2026-10-26). Es la MISMA subida que la
+  // del primero —el mismo campo, la misma validación, el mismo circuito—: solo
+  // cambia desde dónde se toca.
+  const botonAgregar = puedeRecibir && items.length > 0 ? (
     <SunmiButton
       color="slate"
       type="button"
@@ -782,19 +782,16 @@ export default function PanelComprobantes({
         // es la única acción que hay para hacer en ese estado. Los dos
         // disparadores salen de este panel: el circuito de subida sigue siendo
         // uno solo.
-        <>
-          {vacio({
-            sacarFoto: () => inputCamaraRef.current?.click(),
-            subir: () => inputRef.current?.click(),
-            subiendo,
-          })}
-          {botonAgregar}
-        </>
+        vacio({
+          sacarFoto: () => inputCamaraRef.current?.click(),
+          subir: () => inputRef.current?.click(),
+          subiendo,
+        })
       ) : (
         <>
           {/* ── Escritorio: tabla ────────────────────────────────────── */}
           <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
-            <SunmiTable headers={["", "Comprobante", "Estado", "Fotos", "Líneas", "Último intento", ""]}>
+            <SunmiTable headers={["", "Comprobante", "Estado", "Fotos", "Productos", "Último intento", ""]}>
               {items.length === 0 ? (
                 <SunmiTableEmpty message="Todavía no hay comprobantes" />
               ) : (
