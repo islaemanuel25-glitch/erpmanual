@@ -156,6 +156,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // compila igual —es un error de ejecución, no de sintaxis— y ningún candado
   // lo ve, porque ninguno monta esta pantalla.
   const [recargarConciliacion, setRecargarConciliacion] = useState(0);
+  // La lista de comprobantes del panel, cuando una corrección le cambia el
+  // estado a un papel ("no cierra" → "cierra") sin pasar por el panel.
+  const [recargarPapeles, setRecargarPapeles] = useState(0);
   const [lineaACorregir, setLineaACorregir] = useState(null);
   // La hoja que se abre antes de cerrar: pregunta por las líneas que ningún
   // comprobante trajo y dice qué queda a medias.
@@ -758,6 +761,9 @@ export default function DetallePedidoProveedorPage({ params }) {
       const d = await r.json().catch(() => null);
       if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar lo que dice el papel." };
       setRecargarConciliacion((n) => n + 1);
+      // Corregir —o «No vino», que pasa por acá— puede cambiar si el papel
+      // cierra: el aviso de la lista de comprobantes también se vuelve a pedir.
+      setRecargarPapeles((n) => n + 1);
       cargar();
       return { ok: true, cierra: d.cierra === true };
     } catch (e) {
@@ -1500,6 +1506,7 @@ export default function DetallePedidoProveedorPage({ params }) {
             onCantidad={setHayComprobantes}
             onMalLeidos={setMalLeidos}
             onPapeles={setFirmaDeLosPapeles}
+            recargarLista={recargarPapeles}
             // Cuánto del pedido llegó, con la cuenta de la lista de abajo.
             coberturaDelPedido={conciliacion?.cobertura ?? null}
             // ── SIN COMPROBANTES Y RECIBIENDO: EL BLOQUE DE LA FACTURA ─────

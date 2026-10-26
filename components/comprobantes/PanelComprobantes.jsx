@@ -225,6 +225,16 @@ export default function PanelComprobantes({
    * atados solos decía «0 de 24 llegaron».
    */
   coberturaDelPedido = null,
+  /**
+   * ── VOLVER A PEDIR LA LISTA DESDE AFUERA ────────────────────────────────
+   *
+   * Un número que la pantalla sube cuando cambió algo que mueve el estado de
+   * un papel sin pasar por este panel: corregir un producto en la hoja de
+   * Corregir o tocar «No vino» (2026-10-26). Sin esto el aviso "no cierra" /
+   * "cierra" de la lista quedaba como estaba hasta recargar la página, mientras
+   * la conciliación y el pedido ya mostraban lo nuevo.
+   */
+  recargarLista = 0,
 }) {
   const router = useRouter();
   const [items, setItems] = useState([]);
@@ -298,6 +308,14 @@ export default function PanelComprobantes({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoId, proveedorId]);
+
+  // ── LO CORREGIDO AFUERA SE VE EN LA LISTA EN EL MOMENTO ────────────────
+  //
+  // Con cero no hace nada: la primera lista ya la pide el efecto de arriba.
+  useEffect(() => {
+    if (recargarLista > 0) recargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recargarLista]);
 
   // ── SI UNA FACTURA SE ESTÁ LEYENDO, LA PANTALLA SE ENGANCHA ────────────
   //
