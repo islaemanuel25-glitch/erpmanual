@@ -156,8 +156,9 @@ test("EL SERVIDOR: solo vale lo guardado, no escribe costo, suma a la deuda y de
   const correccion = codigoDe("app/api/compras-proveedor/recepcion/correccion/route.js");
   assert.match(correccion, /typeof body\.llegoSinPapel === "boolean" \? body\.llegoSinPapel : null/);
   // Cuenta como llegado en «N de M llegaron».
+  // La carga de la conciliación vive en `conciliacionDelPedido.js` desde Mauro #298.
+  assert.match(codigoDe("lib/compras-proveedor/comprobante/conciliacionDelPedido.js"), /llegoSinPapel: true,/);
   const conc = codigoDe("app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
-  assert.match(conc, /llegoSinPapel: true,/);
   assert.match(conc, /\.filter\(\(d\) => llegada\(d\) === LLEGADA\.LLEGO && d\.productoBaseId != null\)/);
   assert.match(conc, /totalAPagar: totalAPagarDelComprobante\(porId\.get\(g\.comprobante\.id\)\)/);
 });

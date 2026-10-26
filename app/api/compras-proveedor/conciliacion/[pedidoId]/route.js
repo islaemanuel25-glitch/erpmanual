@@ -25,15 +25,11 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import {
-  cargarContexto,
-  aplanarDetalles,
-  analizarLineas,
-  vinculadasDeTodos,
-} from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
-import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
+  cargarConciliacion,
+  lineasSospechadasDeCorrimiento,
+} from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
 import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
-import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { elCatalogoSeMovio } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { LLEGADA, llegada } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import { totalAPagarDelComprobante } from "@/lib/compras-proveedor/pagoDelCierre";
@@ -54,139 +50,22 @@ export async function GET(req, { params }) {
       return NextResponse.json({ ok: false, error: "Falta decir de qué pedido." }, { status: 400 });
     }
 
-    const pedido = await prisma.pedidoProveedor.findFirst({
-      where: { id: pedidoId, grupoId },
-      // `nacidoDeFactura`: en ese pedido lo esperado es lo que dice el papel, no
-      // la cantidad con que se sembró cada línea. Ver `unidadesFisicasEsperadas`.
-      select: { id: true, estado: true, proveedorId: true, nacidoDeFactura: true },
-    });
-    if (!pedido) {
+    // ── LA CONCILIACIÓN SE CARGA EN UN SOLO LUGAR ──────────────────────────
+    //
+    // `cargarConciliacion` trae el pedido, sus líneas y sus papeles, y arma las
+    // filas con `analizarLineas` + `filasDeConciliacion`. La usan también el
+    // acomodo de un papel leído corrido y `aceptar-precio` (Mauro #298): las
+    // tres preguntan lo mismo.
+    const conciliacion = await cargarConciliacion(prisma, { grupoId, localId, pedidoId });
+    if (!conciliacion) {
       return NextResponse.json({ ok: false, error: "No existe ese pedido." }, { status: 404 });
     }
+    const { pedido, detallesPlanos, comprobantes, analizados, grupos, sinComprobante, hayFaltantes, totales, variacionNormalPct } =
+      conciliacion;
+    // Los productos de un bloque que puede haberse leído corrido y no se pudo
+    // acomodar: la tarjeta lo avisa y no propone su costo (`filasCorridas.js`).
+    const sospechadas = lineasSospechadasDeCorrimiento(conciliacion);
 
-    // Las líneas del pedido, con lo que la fila muestra al lado de la factura.
-    const detalles = await prisma.pedidoProveedorDetalle.findMany({
-      where: { pedidoId },
-      orderBy: { id: "asc" },
-      select: {
-        id: true, cantidad: true, precioCosto: true, cantidadRecibida: true, unidad: true,
-        kgRecibidos: true,
-        // Lo que la hoja de corregir necesita para contar: cuántas sueltas se
-        // anotaron y por qué la cantidad no coincide. Sin esto la hoja se abre
-        // en blanco cada vez y la corrección de ayer se pierde de vista.
-        unidadesSueltas: true, motivoPrincipal: true, motivoDetalle: true,
-        // "Llegó sin papel" o "No llegó", para las que no están en ninguna
-        // boleta: se contesta antes de recibir y tiene que sobrevivir al refresco.
-        llegoSinPapel: true,
-        // `modoCompraProveedor` es lo que decide si la línea es fiambre, y de eso
-        // depende que aparezca la columna de kilos. El fiambre entra por PIEZA en
-        // el depósito y se mide en KILOS en los locales: si esa columna
-        // desapareciera, alguien recibiría fiambre sin poder cargar el peso.
-        producto: {
-          select: {
-            id: true, baseId: true,
-            // `factor_pack` es cuántas unidades trae un bulto. Lo usa la hoja
-            // para decir "1 bulto = 24 u" y para calcular qué entra al stock
-            // con los dos steppers. Sin él, la hoja no puede sumar sueltas.
-            base: {
-              select: {
-                id: true,
-                nombre: true,
-                modoCompraProveedor: true,
-                factor_pack: true,
-                // ── PARA PONER LOS DOS PRECIOS EN LA MISMA UNIDAD ─────────
-                //
-                // El costo del catálogo de un producto en kilos está POR KILO,
-                // y el depósito puede contarlo por PIEZA. Sin estos campos la
-                // tarjeta comparaba $8.166,54 la bolsa contra $3.800 el kilo y
-                // mostraba +114,9 % sobre un renglón donde el depósito gana.
-                unidad_medida: true,
-                modoVentaDeposito: true,
-                pesoEsFijo: true,
-                pesoReferenciaKg: true,
-                // El costo maestro de HOY: el cierre compara contra éste, y la
-                // hoja tiene que poder preguntar cuando se movió después del
-                // pedido aunque el papel coincida con la línea.
-                precio_costo: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    const detallesPlanos = aplanarDetalles(detalles);
-
-    // El alcance va en el WHERE: un comprobante de otro grupo no existe.
-    const comprobantes = await prisma.comprobanteProveedor.findMany({
-      where: { grupoId, pedidoId, estado: { not: "ANULADO" } },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true, estado: true, tipo: true, puntoVenta: true, numero: true, fecha: true,
-        confirmadoEn: true, imagenBorradaEn: true, leidoEn: true, recetaUsada: true,
-        // El total IMPRESO del papel, para que el rótulo "Factura" muestre lo
-        // que factura el papel y no una suma parcial de los renglones que se
-        // pudieron comparar.
-        totalLeido: true,
-        // ── Y EL RESTO DEL PIE, QUE ES PARTE DEL COSTO ─────────────────
-        //
-        // El costo de cada producto lleva adentro los conceptos que el papel
-        // imprime entre el subtotal y el total —percepción de IVA, IIBB,
-        // internos—, repartidos en proporción al neto de su renglón. Sin estos
-        // campos el reparto se hace sobre un pie vacío y el precio vuelve a ser
-        // neto + IVA, que es lo que pasaba hasta el 2026-09-23.
-        netoLeido: true,
-        ivaLeido: true,
-        internoLeido: true,
-        conceptosDelPieLeidos: true,
-        proveedor: { select: { id: true, nombre: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
-        lineas: {
-          orderBy: { orden: "asc" },
-          select: {
-            id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
-            netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
-            // El subtotal corregido, que manda sobre el leído: sin esto la
-            // conciliación sigue valorizando el renglón con el dígito mal leído
-            // aunque el comprobante ya haya cerrado.
-            subtotalCorregido: true,
-            // Los kilos y el descuento del papel: el costo real de un renglón
-            // con peso sale de dividir por ellos, no por las piezas.
-            pesoKg: true, bonificacionPct: true,
-            // Lo que interpretó el modelo: de acá sale el costo del renglón.
-            costoFinalRenglon: true, enQueViene: true, tipoRenglon: true,
-            // La alícuota de IVA de cada renglón, y con ella su costo: la
-            // harina de DYSSA va al 10,5 y el resto al 21.
-            ivaPct: true,
-            productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
-            // La marca de controlado, que ahora es un hecho guardado y no
-            // estado de React: sin esto la pantalla vuelve a 0 revisadas en
-            // cada refresco.
-            revisadoEnRecepcion: true, revisadoEnRecepcionAt: true,
-            // Por unidad o por bulto, cuando alguien ya lo eligió. Sin esto la
-            // elección se pierde en cada refresco y el renglón vuelve a
-            // preguntar lo mismo: el yogur del 242 preguntaba siempre.
-            unidadElegida: true,
-          },
-        },
-      },
-    });
-
-    const contexto = await cargarContexto(prisma, {
-      grupoId,
-      localId,
-      proveedorId: pedido.proveedorId,
-    });
-    const porProductoLocal = await vinculadasDeTodos(prisma, comprobantes);
-
-    const analizados = comprobantes.map((c) => ({
-      ...c,
-      lineas: analizarLineas({ comprobante: c, contexto, detallesPlanos, porProductoLocal }),
-    }));
-
-    const { grupos, sinComprobante, hayFaltantes, totales } = filasDeConciliacion({
-      comprobantes: analizados,
-      detalles: detallesPlanos,
-      nacidoDeFactura: pedido.nacidoDeFactura === true,
-    });
 
     // La cobertura, con la MISMA regla de siempre: mientras falten comprobantes
     // por subir o por leer, lo que falta NO es un error y no se pinta como tal.
@@ -222,24 +101,9 @@ export async function GET(req, { params }) {
     });
     const sinLeer = comprobantes.filter((c) => !c.leidoEn).length;
 
-    // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ────────────────────
-    //
-    // Sale de la receta VIGENTE del proveedor, no del snapshot que quedó
-    // guardado con la lectura: es una decisión de hoy sobre cómo leer una
-    // diferencia, y si alguien la cambia tiene que valer para lo que está
-    // recibiendo ahora. Sin receta cargada, el 10 % por defecto.
+    // La variación normal del proveedor viene con la conciliación: sale de su
+    // receta VIGENTE, no del snapshot que quedó guardado con la lectura.
     const proveedorId = comprobantes[0]?.proveedor?.id ?? pedido.proveedorId ?? null;
-    const recetaVigente = proveedorId
-      ? await prisma.recetaProveedor.findFirst({
-          where: { grupoId, proveedorId },
-          select: { variacionNormalPct: true },
-        })
-      : null;
-
-    const variacionNormalPct =
-      recetaVigente?.variacionNormalPct != null
-        ? Number(recetaVigente.variacionNormalPct)
-        : VARIACION_POR_DEFECTO;
 
     // ── EL CATÁLOGO QUE SE MOVIÓ DESPUÉS DEL PEDIDO ─────────────────────
     //
@@ -283,6 +147,7 @@ export async function GET(req, { params }) {
         : g.comprobante,
       filas: (g.filas ?? []).map((f) => ({
         ...f,
+        corridaSospechada: sospechadas.has(f.lineaId),
         catalogoMovido: elCatalogoSeMovio(f, { variacionPct: variacionNormalPct }),
         // Con la fila, para que la tarjeta y la hoja midan con la misma regla
         // cuánto puede alejarse una estimación de piezas —la del fiambre que

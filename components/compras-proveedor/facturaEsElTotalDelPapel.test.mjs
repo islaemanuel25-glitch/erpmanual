@@ -71,8 +71,9 @@ test("Y LA GANANCIA DICE SOBRE CUÁNTOS SE CALCULÓ, EN EL RÓTULO", () => {
 test("EL TOTAL DEL PAPEL VIAJA DESDE EL COMPROBANTE, NO SE SUMA", () => {
   const filas = codigoDe("lib/compras-proveedor/comprobante/filasDeConciliacion.js");
   assert.match(filas, /totalDelPapel: c\.totalLeido == null \? null : num\(c\.totalLeido\)/);
-  const ruta = codigoDe("app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
-  assert.match(ruta, /totalLeido: true/);
+  // La carga de la conciliación vive en `conciliacionDelPedido.js` desde Mauro #298.
+  const carga = codigoDe("lib/compras-proveedor/comprobante/conciliacionDelPedido.js");
+  assert.match(carga, /totalLeido: true/);
   // ── Y DESDE QUE UN PEDIDO PUEDE TENER VARIAS FACTURAS, ES LA SUMA ────
   //
   // Era `comprobanteActivo?.totalDelPapel`, o sea el total de UNA: con cuatro

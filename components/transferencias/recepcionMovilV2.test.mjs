@@ -653,7 +653,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // el paquete 2 de una lista de proveedor. No toca transferencias.
   // Sube a 90 el 2026-10-26: `20261026005002_detalle_llego_sin_papel`, aditiva:
   // una columna nula en la línea de un pedido a proveedor. No toca transferencias.
-  assert.equal(migraciones.length, 90,"aparecio una migracion que nadie declaro aca");
+  // Sube a 91 el 2026-10-26: `20261026030000_comprobante_linea_acomodo`, aditiva:
+  // una columna nula en la fila de un comprobante de proveedor. No toca transferencias.
+  assert.equal(migraciones.length, 91,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

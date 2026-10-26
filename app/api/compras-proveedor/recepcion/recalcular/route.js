@@ -11,9 +11,11 @@
 //   1. juntar las hojas de un mismo papel, incluidas las que solo cierran
 //      sumadas (`agruparLasHojasDelPapel`);
 //   2. vincular contra el pedido lo que el pedido explica por nombre y por
-//      precio, y guardarlo como alias (`vincularContraElPedido`).
+//      precio, y guardarlo como alias (`vincularContraElPedido`);
+//   3. acomodar un papel leído corrido una fila, si el pedido dice cómo
+//      (`acomodarFilasCorridas`, Mauro #298), y volver a vincular.
 //
-// Las dos son idempotentes: con nada que hacer, no escriben nada. No mueve
+// Las tres son idempotentes: con nada que hacer, no escriben nada. No mueve
 // stock ni escribe costos —eso es de `recibir/[id]`— y no toca un pedido que no
 // esté ENVIADO.
 
@@ -25,6 +27,7 @@ import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { agruparLasHojasDelPapel } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
 import { vincularContraElPedido } from "@/lib/compras-proveedor/comprobante/vincularContraElPedido";
+import { acomodarFilasCorridas } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
 
 export async function POST(req) {
   try {
@@ -56,8 +59,13 @@ export async function POST(req) {
       proveedorId: pedido.proveedorId,
     });
     const { vinculadas } = await vincularContraElPedido(prisma, { grupoId, localId, pedidoId });
+    // Y si un papel se leyó corrido una fila y el pedido dice cómo acomodarlo,
+    // se acomoda (`filasCorridas.js`, Mauro #298). Después se vuelve a vincular:
+    // con los números en su lugar, el precio de cada fila es el suyo.
+    const acomodados = await acomodarFilasCorridas(prisma, { grupoId, localId, pedidoId });
+    if (acomodados.length) await vincularContraElPedido(prisma, { grupoId, localId, pedidoId });
 
-    return NextResponse.json({ ok: true, fusiones: agrupacion?.fusiones ?? [], vinculadas });
+    return NextResponse.json({ ok: true, fusiones: agrupacion?.fusiones ?? [], vinculadas, acomodados });
   } catch (e) {
     console.error("Error compras-proveedor/recepcion/recalcular:", e);
     return NextResponse.json(

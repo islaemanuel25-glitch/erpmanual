@@ -44,7 +44,9 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
+import { tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
 import {
+  AVISO_PAPEL_CORRIDO,
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
@@ -187,6 +189,13 @@ export default function TarjetaLineaFactura({
             {fila?.producto || fila?.textoCrudo || "Sin nombre"}
           </p>
 
+          {/* Mauro #298: un bloque que puede haberse leído corrido una fila y
+              no se pudo acomodar con el pedido. Se dice acá, arriba, antes que
+              cualquier número de la tarjeta: los de abajo pueden ser del vecino. */}
+          {fila?.corridaSospechada === true && (
+            <p className="text-sm2 sunmi-text-warning break-words">{AVISO_PAPEL_CORRIDO}</p>
+          )}
+
           {sinVincular ? (
             <p className="text-xs sunmi-text-muted break-words">
               Todavía no se sabe qué producto es. Tocá Corregir para elegirlo.
@@ -278,9 +287,10 @@ export default function TarjetaLineaFactura({
               )}
 
               {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
-                  El precio interno y cuánto gana el depósito sobre él. Verde
-                  con "+" cuando el ERP es mayor, naranja con "−" cuando el
-                  proveedor cobra más. El signo y el color dicen lo mismo a
+                  El precio interno y cuánto cambió el del papel contra él:
+                  "−" y rojo cuando el papel es más barato, "+" y verde cuando
+                  es más caro, gris si es el mismo. Es la regla de toda la app
+                  (`tonoDelPorcentaje`); el signo y el color dicen lo mismo a
                   propósito: un color solo no se lee.
 
                   No se dibuja si no hay con qué comparar —renglón sin vincular,
@@ -297,9 +307,7 @@ export default function TarjetaLineaFactura({
                   </span>
                   {renglones.erp.texto && (
                     <span
-                      className={`text-sm2 font-semibold tabular-nums shrink-0 ${
-                        renglones.erp.gana ? "sunmi-text-success" : "sunmi-text-warning"
-                      }`}
+                      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDelPorcentaje(renglones.erp.pct)}`}
                     >
                       {renglones.erp.texto}
                     </span>

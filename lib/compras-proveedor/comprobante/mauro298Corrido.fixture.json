@@ -1,0 +1,4441 @@
+{
+ "_origen": "Producción, 2026-10-26, solo lectura: el pedido 298 de Mauro con su comprobante 34 tal como quedó guardado (corrido una fila en el bloque M.CRAFTED), sus 24 líneas, los vínculos y productos del proveedor 3 y las decisiones de precio. El catálogo va recortado a los productos que aparecen acá.",
+ "detalles": [
+  {
+   "id": 3189,
+   "cantidad": "2",
+   "precioCosto": "30780",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6076,
+   "producto": {
+    "id": 6076,
+    "baseId": 2045,
+    "base": {
+     "id": 2045,
+     "nombre": "Chester 10 mentolado ",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "30780"
+    }
+   }
+  },
+  {
+   "id": 3190,
+   "cantidad": "3",
+   "precioCosto": "46980",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6086,
+   "producto": {
+    "id": 6086,
+    "baseId": 2037,
+    "base": {
+     "id": 2037,
+     "nombre": "Chester 20 común",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "46980"
+    }
+   }
+  },
+  {
+   "id": 3191,
+   "cantidad": "50",
+   "precioCosto": "8800",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6276,
+   "producto": {
+    "id": 6276,
+    "baseId": 2128,
+    "base": {
+     "id": 2128,
+     "nombre": "Dover Rojo",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "8800"
+    }
+   }
+  },
+  {
+   "id": 3192,
+   "cantidad": "3",
+   "precioCosto": "16500",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 9056,
+   "producto": {
+    "id": 9056,
+    "baseId": 2389,
+    "base": {
+     "id": 2389,
+     "nombre": "liverpool pop",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "16500"
+    }
+   }
+  },
+  {
+   "id": 3193,
+   "cantidad": "1",
+   "precioCosto": "35035.2",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6164,
+   "producto": {
+    "id": 6164,
+    "baseId": 2047,
+    "base": {
+     "id": 2047,
+     "nombre": "Lucky 10",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "35035.2"
+    }
+   }
+  },
+  {
+   "id": 3194,
+   "cantidad": "2",
+   "precioCosto": "35035.2",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6163,
+   "producto": {
+    "id": 6163,
+    "baseId": 2048,
+    "base": {
+     "id": 2048,
+     "nombre": "Lucky 10 mentolado",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "35035.2"
+    }
+   }
+  },
+  {
+   "id": 3195,
+   "cantidad": "1",
+   "precioCosto": "59346",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6152,
+   "producto": {
+    "id": 6152,
+    "baseId": 2059,
+    "base": {
+     "id": 2059,
+     "nombre": "Lucky 20 convertible xl ",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "59346"
+    }
+   }
+  },
+  {
+   "id": 3196,
+   "cantidad": "5",
+   "precioCosto": "37260",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6149,
+   "producto": {
+    "id": 6149,
+    "baseId": 2062,
+    "base": {
+     "id": 2062,
+     "nombre": "Lucky origen 20 común mentolado",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "37260"
+    }
+   }
+  },
+  {
+   "id": 3197,
+   "cantidad": "2",
+   "precioCosto": "38772",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6355,
+   "producto": {
+    "id": 6355,
+    "baseId": 2161,
+    "base": {
+     "id": 2161,
+     "nombre": "Marlboro 10",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "38772"
+    }
+   }
+  },
+  {
+   "id": 3198,
+   "cantidad": "1",
+   "precioCosto": "38340",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6165,
+   "producto": {
+    "id": 6165,
+    "baseId": 2046,
+    "base": {
+     "id": 2046,
+     "nombre": "Marlboro 10 Uva",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "38340"
+    }
+   }
+  },
+  {
+   "id": 3199,
+   "cantidad": "1",
+   "precioCosto": "40500",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6290,
+   "producto": {
+    "id": 6290,
+    "baseId": 2132,
+    "base": {
+     "id": 2132,
+     "nombre": "Marlboro 20 Crafted Box",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "40500"
+    }
+   }
+  },
+  {
+   "id": 3200,
+   "cantidad": "9",
+   "precioCosto": "37260",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6089,
+   "producto": {
+    "id": 6089,
+    "baseId": 2035,
+    "base": {
+     "id": 2035,
+     "nombre": "Marlboro 20 crafted común",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "37260"
+    }
+   }
+  },
+  {
+   "id": 3201,
+   "cantidad": "3",
+   "precioCosto": "40500",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6088,
+   "producto": {
+    "id": 6088,
+    "baseId": 2036,
+    "base": {
+     "id": 2036,
+     "nombre": "Marlboro 20 crafted coral box",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "40500"
+    }
+   }
+  },
+  {
+   "id": 3202,
+   "cantidad": "5",
+   "precioCosto": "37260",
+   "cantidadRecibida": "5",
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": true,
+   "productoLocalId": 6090,
+   "producto": {
+    "id": 6090,
+    "baseId": 2034,
+    "base": {
+     "id": 2034,
+     "nombre": "Marlboro 20 crafted mentolado común",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "37260"
+    }
+   }
+  },
+  {
+   "id": 3203,
+   "cantidad": "1",
+   "precioCosto": "37260",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6146,
+   "producto": {
+    "id": 6146,
+    "baseId": 2065,
+    "base": {
+     "id": 2065,
+     "nombre": "Marlboro 20 Crafted suave ",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "37260"
+    }
+   }
+  },
+  {
+   "id": 3204,
+   "cantidad": "3",
+   "precioCosto": "40500",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6287,
+   "producto": {
+    "id": 6287,
+    "baseId": 2131,
+    "base": {
+     "id": 2131,
+     "nombre": "Marlboro 20 Crafted Uva Box",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "40500"
+    }
+   }
+  },
+  {
+   "id": 3205,
+   "cantidad": "1",
+   "precioCosto": "70000",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6142,
+   "producto": {
+    "id": 6142,
+    "baseId": 2069,
+    "base": {
+     "id": 2069,
+     "nombre": "Marlboro 20 titanio",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "70000"
+    }
+   }
+  },
+  {
+   "id": 3206,
+   "cantidad": "6",
+   "precioCosto": "18300",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6162,
+   "producto": {
+    "id": 6162,
+    "baseId": 2049,
+    "base": {
+     "id": 2049,
+     "nombre": "Milenio click mentolado",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "18300"
+    }
+   }
+  },
+  {
+   "id": 3207,
+   "cantidad": "5",
+   "precioCosto": "18300",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6160,
+   "producto": {
+    "id": 6160,
+    "baseId": 2051,
+    "base": {
+     "id": 2051,
+     "nombre": "Milenio coral",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "18300"
+    }
+   }
+  },
+  {
+   "id": 3208,
+   "cantidad": "6",
+   "precioCosto": "18300",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6159,
+   "producto": {
+    "id": 6159,
+    "baseId": 2052,
+    "base": {
+     "id": 2052,
+     "nombre": "Milenio uva",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "18300"
+    }
+   }
+  },
+  {
+   "id": 3209,
+   "cantidad": "3",
+   "precioCosto": "34603.2",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6079,
+   "producto": {
+    "id": 6079,
+    "baseId": 2043,
+    "base": {
+     "id": 2043,
+     "nombre": "Philips 10",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "34603.2"
+    }
+   }
+  },
+  {
+   "id": 3210,
+   "cantidad": "2",
+   "precioCosto": "56500",
+   "cantidadRecibida": "2",
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6082,
+   "producto": {
+    "id": 6082,
+    "baseId": 2041,
+    "base": {
+     "id": 2041,
+     "nombre": "Philips 20 común",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "54594"
+    }
+   }
+  },
+  {
+   "id": 3211,
+   "cantidad": "2",
+   "precioCosto": "58320",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6477,
+   "producto": {
+    "id": 6477,
+    "baseId": 2219,
+    "base": {
+     "id": 2219,
+     "nombre": "philips 20 mentolado box",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "58320"
+    }
+   }
+  },
+  {
+   "id": 3212,
+   "cantidad": "7",
+   "precioCosto": "26460",
+   "cantidadRecibida": null,
+   "unidad": "BULTO",
+   "kgRecibidos": null,
+   "unidadesSueltas": null,
+   "motivoPrincipal": null,
+   "motivoDetalle": null,
+   "llegoSinPapel": null,
+   "productoLocalId": 6150,
+   "producto": {
+    "id": 6150,
+    "baseId": 2061,
+    "base": {
+     "id": 2061,
+     "nombre": "Philips 20 red común",
+     "modoCompraProveedor": "BULTO",
+     "factor_pack": 10,
+     "unidad_medida": "pack",
+     "modoVentaDeposito": "PESO",
+     "pesoEsFijo": false,
+     "pesoReferenciaKg": null,
+     "precio_costo": "26460"
+    }
+   }
+  }
+ ],
+ "comprobante": {
+  "id": 34,
+  "estado": "CARGADO",
+  "tipo": null,
+  "totalLeido": "2026100",
+  "recetaUsada": {
+   "explicacion": "Cómo se costea este papel (traducido de la receta que estaba cargada): el precio impreso ya trae el IVA, no se le suma nada. Las bonificaciones de cada renglón ya están en su importe.",
+   "interpretada": true,
+   "tipoComprobante": "SIN_FACTURA"
+  },
+  "leidoEn": "2026-10-26T02:17:20.051Z",
+  "lineas": [
+   {
+    "id": 440,
+    "orden": 1,
+    "textoCrudo": "PHILIPS MORRIS 10",
+    "codigoProveedor": null,
+    "cantidad": "30",
+    "netoUnitario": "3360",
+    "subtotalImpreso": "100800",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "100800",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 441,
+    "orden": 2,
+    "textoCrudo": "PHILIPS SELECT RED KS",
+    "codigoProveedor": null,
+    "cantidad": "70",
+    "netoUnitario": "2250",
+    "subtotalImpreso": "157500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "157500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 442,
+    "orden": 3,
+    "textoCrudo": "PHILIPS MORRIS 20 KS",
+    "codigoProveedor": null,
+    "cantidad": "20",
+    "netoUnitario": "5250",
+    "subtotalImpreso": "105000",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "105000",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 443,
+    "orden": 4,
+    "textoCrudo": "PHILIPS MORRIS 20 CONV",
+    "codigoProveedor": null,
+    "cantidad": "20",
+    "netoUnitario": "5650",
+    "subtotalImpreso": "113000",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "113000",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6477,
+    "pedidoDetalleId": 3211,
+    "precioPedidoPrevio": "54594",
+    "revisadoEnRecepcion": true,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 444,
+    "orden": 5,
+    "textoCrudo": "CHESTERFIELD 10 CONV",
+    "codigoProveedor": null,
+    "cantidad": "20",
+    "netoUnitario": "3010",
+    "subtotalImpreso": "60200",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "60200",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 445,
+    "orden": 6,
+    "textoCrudo": "CHESTERFIELD 20 KS",
+    "codigoProveedor": null,
+    "cantidad": "30",
+    "netoUnitario": "4650",
+    "subtotalImpreso": "139500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "139500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 446,
+    "orden": 7,
+    "textoCrudo": "MARLBORO 10",
+    "codigoProveedor": null,
+    "cantidad": "20",
+    "netoUnitario": "3700",
+    "subtotalImpreso": "74000",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "74000",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 447,
+    "orden": 8,
+    "textoCrudo": "MARLBORO 10 FUSION UVA",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "3700",
+    "subtotalImpreso": "37000",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "37000",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6165,
+    "pedidoDetalleId": 3198,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 448,
+    "orden": 9,
+    "textoCrudo": "MARLBORO 20 TITANIUM BLUE",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "6750",
+    "subtotalImpreso": "67500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "67500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 449,
+    "orden": 10,
+    "textoCrudo": "M.CRAFTED 20 BOX CONV",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "4050",
+    "subtotalImpreso": "40500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "40500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6093,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 450,
+    "orden": 11,
+    "textoCrudo": "M.CRAFTED 20 BOX RED",
+    "codigoProveedor": null,
+    "cantidad": "30",
+    "netoUnitario": "4050",
+    "subtotalImpreso": "121500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "121500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 451,
+    "orden": 12,
+    "textoCrudo": "M.CRAFTED 20 BOX CORAL",
+    "codigoProveedor": null,
+    "cantidad": "30",
+    "netoUnitario": "4050",
+    "subtotalImpreso": "121500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "121500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6088,
+    "pedidoDetalleId": 3201,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 452,
+    "orden": 13,
+    "textoCrudo": "M.CRAFTED 20 BOX UVA",
+    "codigoProveedor": null,
+    "cantidad": "90",
+    "netoUnitario": "3650",
+    "subtotalImpreso": "328500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "328500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 453,
+    "orden": 14,
+    "textoCrudo": "M.CRAFTED 20 KS RED",
+    "codigoProveedor": null,
+    "cantidad": "50",
+    "netoUnitario": "3650",
+    "subtotalImpreso": "182500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "182500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 454,
+    "orden": 15,
+    "textoCrudo": "M.CRAFTED 20 SUAVE KS",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "3650",
+    "subtotalImpreso": "36500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "36500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6146,
+    "pedidoDetalleId": 3203,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 421,
+    "orden": 16,
+    "textoCrudo": "LUCKY STRIKE 10",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "3360",
+    "subtotalImpreso": "33600",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "33600",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6164,
+    "pedidoDetalleId": 3193,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 422,
+    "orden": 17,
+    "textoCrudo": "LUCKY STRIKE 10 CONV",
+    "codigoProveedor": null,
+    "cantidad": "20",
+    "netoUnitario": "3400",
+    "subtotalImpreso": "68000",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "68000",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": 6163,
+    "pedidoDetalleId": 3194,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 423,
+    "orden": 18,
+    "textoCrudo": "LUCKY STRIKE 20 CONV XL",
+    "codigoProveedor": null,
+    "cantidad": "10",
+    "netoUnitario": "5650",
+    "subtotalImpreso": "56500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "56500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   },
+   {
+    "id": 424,
+    "orden": 19,
+    "textoCrudo": "LUCKY ORIGEN 20 CONV KS",
+    "codigoProveedor": null,
+    "cantidad": "50",
+    "netoUnitario": "3650",
+    "subtotalImpreso": "182500",
+    "internoUnitario": "0",
+    "subtotalCorregido": null,
+    "pesoKg": null,
+    "bonificacionPct": null,
+    "descuento": null,
+    "costoFinalRenglon": "182500",
+    "enQueViene": "unidad",
+    "tipoRenglon": "MERCADERIA",
+    "ivaPct": null,
+    "productoLocalId": null,
+    "pedidoDetalleId": null,
+    "precioPedidoPrevio": null,
+    "revisadoEnRecepcion": false,
+    "unidadElegida": null,
+    "costoEscrito": false
+   }
+  ],
+  "proveedor": {
+   "id": 3,
+   "nombre": "Mauro",
+   "umbralRevisarPct": null,
+   "umbralSospechaBajaPct": null
+  }
+ },
+ "productosLocales": [
+  {
+   "id": 6088,
+   "baseId": 2036
+  },
+  {
+   "id": 6093,
+   "baseId": 2031
+  },
+  {
+   "id": 6146,
+   "baseId": 2065
+  },
+  {
+   "id": 6163,
+   "baseId": 2048
+  },
+  {
+   "id": 6164,
+   "baseId": 2047
+  },
+  {
+   "id": 6165,
+   "baseId": 2046
+  },
+  {
+   "id": 6477,
+   "baseId": 2219
+  }
+ ],
+ "datos": {
+  "codigosProveedor": [
+   {
+    "id": 553,
+    "productoBaseId": 2061,
+    "codigoInterno": "TXT:philips select red ks",
+    "descripcionProveedor": "PHILIPS SELECT RED KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 554,
+    "productoBaseId": 2041,
+    "codigoInterno": "TXT:philips morris 20 ks",
+    "descripcionProveedor": "PHILIPS MORRIS 20 KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 552,
+    "productoBaseId": 2043,
+    "codigoInterno": "TXT:philips morris 10",
+    "descripcionProveedor": "PHILIPS MORRIS 10",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 664,
+    "productoBaseId": 2035,
+    "codigoInterno": "TXT:m crafted 20 ks red",
+    "descripcionProveedor": "M.CRAFTED 20 KS RED",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 665,
+    "productoBaseId": 2034,
+    "codigoInterno": "TXT:m crafted 20 conv ks",
+    "descripcionProveedor": "M.CRAFTED 20 CONV KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 666,
+    "productoBaseId": 2131,
+    "codigoInterno": "TXT:m crafted 20 box uva",
+    "descripcionProveedor": "M.CRAFTED 20 BOX UVA",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 653,
+    "productoBaseId": 2042,
+    "codigoInterno": "TXT:philips morris conv 10",
+    "descripcionProveedor": "PHILIPS MORRIS CONV 10",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 654,
+    "productoBaseId": 2044,
+    "codigoInterno": "TXT:chesterfield 10",
+    "descripcionProveedor": "CHESTERFIELD 10",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 655,
+    "productoBaseId": 2045,
+    "codigoInterno": "TXT:chesterfield 10 conv",
+    "descripcionProveedor": "CHESTERFIELD 10 CONV",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 656,
+    "productoBaseId": 2037,
+    "codigoInterno": "TXT:chesterfield 20 ks",
+    "descripcionProveedor": "CHESTERFIELD 20 KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 657,
+    "productoBaseId": 2218,
+    "codigoInterno": "TXT:chesterfield 20 conv ks",
+    "descripcionProveedor": "CHESTERFIELD 20 CONV KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 658,
+    "productoBaseId": 2216,
+    "codigoInterno": "TXT:marlboro 20 ks",
+    "descripcionProveedor": "MARLBORO 20 KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 659,
+    "productoBaseId": 2058,
+    "codigoInterno": "TXT:marlboro 20 xl fusion uva",
+    "descripcionProveedor": "MARLBORO 20 XL FUSION UVA",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 660,
+    "productoBaseId": 2132,
+    "codigoInterno": "TXT:m crafted 20 box red",
+    "descripcionProveedor": "M.CRAFTED 20 BOX RED",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1022,
+    "productoBaseId": 2161,
+    "codigoInterno": "TXT:marlboro 10",
+    "descripcionProveedor": "MARLBORO 10",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1023,
+    "productoBaseId": 2069,
+    "codigoInterno": "TXT:marlboro 20 titanium blue",
+    "descripcionProveedor": "MARLBORO 20 TITANIUM BLUE",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1024,
+    "productoBaseId": 2059,
+    "codigoInterno": "TXT:lucky strike 20 conv xl",
+    "descripcionProveedor": "LUCKY STRIKE 20 CONV XL",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1025,
+    "productoBaseId": 2062,
+    "codigoInterno": "TXT:lucky origen 20 conv ks",
+    "descripcionProveedor": "LUCKY ORIGEN 20 CONV KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1026,
+    "productoBaseId": 2046,
+    "codigoInterno": "TXT:marlboro 10 fusion uva",
+    "descripcionProveedor": "MARLBORO 10 FUSION UVA",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 555,
+    "productoBaseId": 2031,
+    "codigoInterno": "TXT:m crafted 20 box conv",
+    "descripcionProveedor": "M.CRAFTED 20 BOX CONV",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1028,
+    "productoBaseId": 2036,
+    "codigoInterno": "TXT:m crafted 20 box coral",
+    "descripcionProveedor": "M.CRAFTED 20 BOX CORAL",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1029,
+    "productoBaseId": 2065,
+    "codigoInterno": "TXT:m crafted 20 suave ks",
+    "descripcionProveedor": "M.CRAFTED 20 SUAVE KS",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1030,
+    "productoBaseId": 2047,
+    "codigoInterno": "TXT:lucky strike 10",
+    "descripcionProveedor": "LUCKY STRIKE 10",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1031,
+    "productoBaseId": 2048,
+    "codigoInterno": "TXT:lucky strike 10 conv",
+    "descripcionProveedor": "LUCKY STRIKE 10 CONV",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   },
+   {
+    "id": 1021,
+    "productoBaseId": 2219,
+    "codigoInterno": "TXT:philips morris 20 conv",
+    "descripcionProveedor": "PHILIPS MORRIS 20 CONV",
+    "activo": true,
+    "unidadesPorPresentacion": null
+   }
+  ],
+  "productos": [
+   {
+    "productoBaseId": 2161,
+    "nombre": "Marlboro 10",
+    "precioCostoActual": 38772,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77983343"
+    ]
+   },
+   {
+    "productoBaseId": 2031,
+    "nombre": "Marlboro 20 Crafted menta box",
+    "precioCostoActual": 39420,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77988225"
+    ]
+   },
+   {
+    "productoBaseId": 822,
+    "nombre": "PRIME PRESERVATIVO",
+    "precioCostoActual": 77700,
+    "factorPack": 24,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "17791519000321"
+    ]
+   },
+   {
+    "productoBaseId": 2032,
+    "nombre": "Liverpool rojo",
+    "precioCostoActual": 13200,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77969675"
+    ]
+   },
+   {
+    "productoBaseId": 2090,
+    "nombre": "Encendedor Cancun",
+    "precioCostoActual": 9500,
+    "factorPack": 50,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "1234567890128"
+    ]
+   },
+   {
+    "productoBaseId": 2033,
+    "nombre": "Lucky 20 red",
+    "precioCostoActual": 26460,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77981028"
+    ]
+   },
+   {
+    "productoBaseId": 2035,
+    "nombre": "Marlboro 20 crafted común",
+    "precioCostoActual": 37260,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77987303"
+    ]
+   },
+   {
+    "productoBaseId": 2034,
+    "nombre": "Marlboro 20 crafted mentolado común",
+    "precioCostoActual": 37260,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77993397"
+    ]
+   },
+   {
+    "productoBaseId": 849,
+    "nombre": "Encendedor Candela x25",
+    "precioCostoActual": 6500,
+    "factorPack": 25,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798322400686"
+    ]
+   },
+   {
+    "productoBaseId": 2036,
+    "nombre": "Marlboro 20 crafted coral box",
+    "precioCostoActual": 40500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77989345"
+    ]
+   },
+   {
+    "productoBaseId": 2091,
+    "nombre": "Tabaco Pacha Mama",
+    "precioCostoActual": 29500,
+    "factorPack": 5,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 2037,
+    "nombre": "Chester 20 común",
+    "precioCostoActual": 46980,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77953513"
+    ]
+   },
+   {
+    "productoBaseId": 2038,
+    "nombre": "Chester 20 Purple motion 2 box",
+    "precioCostoActual": 52380,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77973887"
+    ]
+   },
+   {
+    "productoBaseId": 2128,
+    "nombre": "Dover Rojo",
+    "precioCostoActual": 8800,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7796568108342"
+    ]
+   },
+   {
+    "productoBaseId": 2039,
+    "nombre": "Chester 20 mentolado box ",
+    "precioCostoActual": 51300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77953957"
+    ]
+   },
+   {
+    "productoBaseId": 2040,
+    "nombre": "Philips 20 box",
+    "precioCostoActual": 58266,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77912954"
+    ]
+   },
+   {
+    "productoBaseId": 664,
+    "nombre": "AZUFRE",
+    "precioCostoActual": 1200,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798014062642"
+    ]
+   },
+   {
+    "productoBaseId": 2041,
+    "nombre": "Philips 20 común",
+    "precioCostoActual": 54594,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77912879"
+    ]
+   },
+   {
+    "productoBaseId": 2129,
+    "nombre": "Lucky origen 20 comun",
+    "precioCostoActual": 37260,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990921"
+    ]
+   },
+   {
+    "productoBaseId": 1198,
+    "nombre": "Filtros 6 mm",
+    "precioCostoActual": 30000,
+    "factorPack": 20,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798205440891"
+    ]
+   },
+   {
+    "productoBaseId": 2042,
+    "nombre": "Philips 10 mentolado",
+    "precioCostoActual": 35078.4,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77971913"
+    ]
+   },
+   {
+    "productoBaseId": 2043,
+    "nombre": "Philips 10",
+    "precioCostoActual": 34603.2,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77981813"
+    ]
+   },
+   {
+    "productoBaseId": 2044,
+    "nombre": "Chester 10",
+    "precioCostoActual": 30780,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77994059"
+    ]
+   },
+   {
+    "productoBaseId": 2045,
+    "nombre": "Chester 10 mentolado ",
+    "precioCostoActual": 30780,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77953964"
+    ]
+   },
+   {
+    "productoBaseId": 2131,
+    "nombre": "Marlboro 20 Crafted Uva Box",
+    "precioCostoActual": 40500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77958099"
+    ]
+   },
+   {
+    "productoBaseId": 247,
+    "nombre": "FANTOCHE ALFAJOR  NEGRO 24 U",
+    "precioCostoActual": 17614.56,
+    "factorPack": 24,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7791672000353",
+     "17791672000350"
+    ]
+   },
+   {
+    "productoBaseId": 2046,
+    "nombre": "Marlboro 10 Uva",
+    "precioCostoActual": 38340,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77978141"
+    ]
+   },
+   {
+    "productoBaseId": 2132,
+    "nombre": "Marlboro 20 Crafted Box",
+    "precioCostoActual": 40500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77987297"
+    ]
+   },
+   {
+    "productoBaseId": 2047,
+    "nombre": "Lucky 10",
+    "precioCostoActual": 35035.2,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976505"
+    ]
+   },
+   {
+    "productoBaseId": 2708,
+    "nombre": "encendedor neoclich",
+    "precioCostoActual": 9500,
+    "factorPack": 50,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "6986070813037"
+    ]
+   },
+   {
+    "productoBaseId": 2048,
+    "nombre": "Lucky 10 mentolado",
+    "precioCostoActual": 35035.2,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976994"
+    ]
+   },
+   {
+    "productoBaseId": 246,
+    "nombre": "ALFAJOR FANTOCHE BLANCO",
+    "precioCostoActual": 17614.56,
+    "factorPack": 24,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 3,
+    "codigosBarra": [
+     "7791672000360",
+     "17791672000367"
+    ]
+   },
+   {
+    "productoBaseId": 2049,
+    "nombre": "Milenio click mentolado",
+    "precioCostoActual": 18300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798100200453"
+    ]
+   },
+   {
+    "productoBaseId": 2050,
+    "nombre": "Milenio rojo",
+    "precioCostoActual": 16300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77906618"
+    ]
+   },
+   {
+    "productoBaseId": 2052,
+    "nombre": "Milenio uva",
+    "precioCostoActual": 18300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798100200521"
+    ]
+   },
+   {
+    "productoBaseId": 2149,
+    "nombre": "Eight Click Mentolado",
+    "precioCostoActual": 13000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7840371007320"
+    ]
+   },
+   {
+    "productoBaseId": 2051,
+    "nombre": "Milenio coral",
+    "precioCostoActual": 18300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798100200538"
+    ]
+   },
+   {
+    "productoBaseId": 2150,
+    "nombre": "Eight Comun",
+    "precioCostoActual": 9500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "78400924"
+    ]
+   },
+   {
+    "productoBaseId": 663,
+    "nombre": "TAMPONES OB MEDIANO",
+    "precioCostoActual": 3700,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7891010254773"
+    ]
+   },
+   {
+    "productoBaseId": 2233,
+    "nombre": "Lucky 20 Silver",
+    "precioCostoActual": 51300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976970"
+    ]
+   },
+   {
+    "productoBaseId": 2053,
+    "nombre": "milenio mentolado",
+    "precioCostoActual": 16300,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798100200491"
+    ]
+   },
+   {
+    "productoBaseId": 2134,
+    "nombre": "Dover Verde",
+    "precioCostoActual": 8800,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 2054,
+    "nombre": "Pier rojo",
+    "precioCostoActual": 13200,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990501"
+    ]
+   },
+   {
+    "productoBaseId": 2135,
+    "nombre": "Lucky 20 Origen Menta Box",
+    "precioCostoActual": 40500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77980908"
+    ]
+   },
+   {
+    "productoBaseId": 2058,
+    "nombre": "Marlboro 20 uva box",
+    "precioCostoActual": 65880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77947550"
+    ]
+   },
+   {
+    "productoBaseId": 2183,
+    "nombre": "Lucky 20 Menta Comun",
+    "precioCostoActual": 53460,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976956"
+    ]
+   },
+   {
+    "productoBaseId": 2056,
+    "nombre": "Marlboro 20 coral XL ",
+    "precioCostoActual": 65880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77968401"
+    ]
+   },
+   {
+    "productoBaseId": 2057,
+    "nombre": "Marlboro 20 menta box",
+    "precioCostoActual": 65880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77941015"
+    ]
+   },
+   {
+    "productoBaseId": 2059,
+    "nombre": "Lucky 20 convertible xl ",
+    "precioCostoActual": 59346,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77988379"
+    ]
+   },
+   {
+    "productoBaseId": 2061,
+    "nombre": "Philips 20 red común",
+    "precioCostoActual": 26460,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77992536"
+    ]
+   },
+   {
+    "productoBaseId": 2062,
+    "nombre": "Lucky origen 20 común mentolado",
+    "precioCostoActual": 37260,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990938"
+    ]
+   },
+   {
+    "productoBaseId": 2060,
+    "nombre": "Liverpool azul",
+    "precioCostoActual": 13200,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990525"
+    ]
+   },
+   {
+    "productoBaseId": 2063,
+    "nombre": "Lucky 20 común",
+    "precioCostoActual": 54593.99,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976512"
+    ]
+   },
+   {
+    "productoBaseId": 2065,
+    "nombre": "Marlboro 20 Crafted suave ",
+    "precioCostoActual": 37260,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77987310"
+    ]
+   },
+   {
+    "productoBaseId": 2265,
+    "nombre": "Marlboro 20 gold",
+    "precioCostoActual": 61020,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77905819"
+    ]
+   },
+   {
+    "productoBaseId": 2064,
+    "nombre": "Liverpool verde",
+    "precioCostoActual": 13200,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990549"
+    ]
+   },
+   {
+    "productoBaseId": 11,
+    "nombre": "AGUA OXIGENADA 10V 100ML",
+    "precioCostoActual": 443,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798121760189"
+    ]
+   },
+   {
+    "productoBaseId": 2266,
+    "nombre": "Tabaco cerrito yelow",
+    "precioCostoActual": 57500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7730104034290"
+    ]
+   },
+   {
+    "productoBaseId": 2066,
+    "nombre": "Lucky 20 mix",
+    "precioCostoActual": 65880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77993250"
+    ]
+   },
+   {
+    "productoBaseId": 2067,
+    "nombre": "Lucky 10 parisien",
+    "precioCostoActual": 72414,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77977090"
+    ]
+   },
+   {
+    "productoBaseId": 2068,
+    "nombre": "Lucky 20 box",
+    "precioCostoActual": 59346,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77976529"
+    ]
+   },
+   {
+    "productoBaseId": 2267,
+    "nombre": "Filtro 7,5mm",
+    "precioCostoActual": 40000,
+    "factorPack": 25,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "8414775017040"
+    ]
+   },
+   {
+    "productoBaseId": 2069,
+    "nombre": "Marlboro 20 titanio",
+    "precioCostoActual": 70000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77993403"
+    ]
+   },
+   {
+    "productoBaseId": 2193,
+    "nombre": "Chocolatin Jack 14g",
+    "precioCostoActual": 25000,
+    "factorPack": 20,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7790206015108"
+    ]
+   },
+   {
+    "productoBaseId": 2268,
+    "nombre": "Marlboro 20 Red Titanium",
+    "precioCostoActual": 59000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77993441"
+    ]
+   },
+   {
+    "productoBaseId": 2389,
+    "nombre": "liverpool pop",
+    "precioCostoActual": 16500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990532"
+    ]
+   },
+   {
+    "productoBaseId": 2872,
+    "nombre": "alcohol san iginio 500",
+    "precioCostoActual": 22800,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7796551000042"
+    ]
+   },
+   {
+    "productoBaseId": 2213,
+    "nombre": "Tabaco La Hoja",
+    "precioCostoActual": 43500,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 2874,
+    "nombre": "Philips 20 bluw select",
+    "precioCostoActual": 26460,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77981691"
+    ]
+   },
+   {
+    "productoBaseId": 2214,
+    "nombre": "Papel Cellulosa Zeus",
+    "precioCostoActual": 12500,
+    "factorPack": 25,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "600609850336"
+    ]
+   },
+   {
+    "productoBaseId": 2875,
+    "nombre": "Lucky 10 origen",
+    "precioCostoActual": 21000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77989871"
+    ]
+   },
+   {
+    "productoBaseId": 2215,
+    "nombre": "Papel Celulosa Stamp",
+    "precioCostoActual": 23000,
+    "factorPack": 25,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "644536840121"
+    ]
+   },
+   {
+    "productoBaseId": 2218,
+    "nombre": "chester 20 mentolado comun",
+    "precioCostoActual": 46980,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77983916"
+    ]
+   },
+   {
+    "productoBaseId": 2876,
+    "nombre": "Lucky 10 origen convertible",
+    "precioCostoActual": 23000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990945"
+    ]
+   },
+   {
+    "productoBaseId": 27,
+    "nombre": "ALGODON ESTRELLA 75GR",
+    "precioCostoActual": 760,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7790064101814"
+    ]
+   },
+   {
+    "productoBaseId": 2219,
+    "nombre": "philips 20 mentolado box",
+    "precioCostoActual": 58320,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77940735"
+    ]
+   },
+   {
+    "productoBaseId": 92,
+    "nombre": "Bicarbonato Paez",
+    "precioCostoActual": 26000,
+    "factorPack": 100,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 234,
+    "nombre": "ENERGIZER AAA ",
+    "precioCostoActual": 3482,
+    "factorPack": 4,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "39800099099"
+    ]
+   },
+   {
+    "productoBaseId": 233,
+    "nombre": "ENERGIZER AA ",
+    "precioCostoActual": 3482,
+    "factorPack": 4,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "39800011329"
+    ]
+   },
+   {
+    "productoBaseId": 235,
+    "nombre": "ESCARBADIENTE DESAFIO ",
+    "precioCostoActual": 4590,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7790773034090"
+    ]
+   },
+   {
+    "productoBaseId": 286,
+    "nombre": "GUAYMALLEN ALFAJOR BLANCO",
+    "precioCostoActual": 10850,
+    "factorPack": 24,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7790000080265",
+     "47790000080263"
+    ]
+   },
+   {
+    "productoBaseId": 277,
+    "nombre": "GAZA SUEZ CAJA ",
+    "precioCostoActual": 2672,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798013319617"
+    ]
+   },
+   {
+    "productoBaseId": 308,
+    "nombre": "DISMAR HISOPOS 100U",
+    "precioCostoActual": 942,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798014060976"
+    ]
+   },
+   {
+    "productoBaseId": 285,
+    "nombre": "GUAYMALLEN ALFAJOR NEGRO",
+    "precioCostoActual": 10850,
+    "factorPack": 24,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7790000080272",
+     "47790000080270"
+    ]
+   },
+   {
+    "productoBaseId": 457,
+    "nombre": "Pier Verde",
+    "precioCostoActual": 11200,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77990570"
+    ]
+   },
+   {
+    "productoBaseId": 586,
+    "nombre": "TARRITO ORINA",
+    "precioCostoActual": 250,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 662,
+    "nombre": "TAMPONES OB GRANDE",
+    "precioCostoActual": 3700,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7891010254780"
+    ]
+   },
+   {
+    "productoBaseId": 665,
+    "nombre": "IODOPOVIDONA",
+    "precioCostoActual": 2140,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 2225,
+    "nombre": "Camel 10",
+    "precioCostoActual": 38880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": []
+   },
+   {
+    "productoBaseId": 752,
+    "nombre": "OCB Negro",
+    "precioCostoActual": 17400,
+    "factorPack": 25,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "3057067101253"
+    ]
+   },
+   {
+    "productoBaseId": 768,
+    "nombre": "AGUA OXIGENADA 20V",
+    "precioCostoActual": 400,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "46648758759"
+    ]
+   },
+   {
+    "productoBaseId": 887,
+    "nombre": "SUERO COPEA SOLIUCION FISIOLOGICA",
+    "precioCostoActual": 891,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "778110210572"
+    ]
+   },
+   {
+    "productoBaseId": 1006,
+    "nombre": "EVEREADY AA  ",
+    "precioCostoActual": 2700,
+    "factorPack": 4,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7501037600056"
+    ]
+   },
+   {
+    "productoBaseId": 1007,
+    "nombre": "ENERGIZER PILAS AA 10U",
+    "precioCostoActual": 9000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "8999002671924"
+    ]
+   },
+   {
+    "productoBaseId": 1008,
+    "nombre": "ENERGIZER PILAS AAA ",
+    "precioCostoActual": 9000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "8999002672013"
+    ]
+   },
+   {
+    "productoBaseId": 2237,
+    "nombre": "Oblea fantoche",
+    "precioCostoActual": 5000,
+    "factorPack": 16,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7791672014763"
+    ]
+   },
+   {
+    "productoBaseId": 1196,
+    "nombre": "picadores marihuana  x12",
+    "precioCostoActual": 13800,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798205440686"
+    ]
+   },
+   {
+    "productoBaseId": 2055,
+    "nombre": "Marlboro 20 Box ",
+    "precioCostoActual": 65880,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77918482"
+    ]
+   },
+   {
+    "productoBaseId": 1256,
+    "nombre": "ALCOHOL SAN IGINIO 250",
+    "precioCostoActual": 15000,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7796551000059"
+    ]
+   },
+   {
+    "productoBaseId": 1315,
+    "nombre": "GEL INTIMO TULIPAN",
+    "precioCostoActual": 2993,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7791014003004"
+    ]
+   },
+   {
+    "productoBaseId": 2240,
+    "nombre": "Huevos Jack x14G",
+    "precioCostoActual": 25000,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7790206015375"
+    ]
+   },
+   {
+    "productoBaseId": 2216,
+    "nombre": "marlboro 20 comun ",
+    "precioCostoActual": 60480,
+    "factorPack": 10,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "77916433"
+    ]
+   },
+   {
+    "productoBaseId": 1497,
+    "nombre": "FANTOCHE ALFAJOR NIGHT NEGRO",
+    "precioCostoActual": 9000,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7791672000247"
+    ]
+   },
+   {
+    "productoBaseId": 1583,
+    "nombre": "DONCELLA HISOPOS ",
+    "precioCostoActual": 14520,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7790940801067"
+    ]
+   },
+   {
+    "productoBaseId": 1601,
+    "nombre": "DISMAR ALCOHOL 250ML",
+    "precioCostoActual": 12000,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7798014062444"
+    ]
+   },
+   {
+    "productoBaseId": 1796,
+    "nombre": "MAXX PRESERVATIVO X12",
+    "precioCostoActual": 11500,
+    "factorPack": 12,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 2,
+    "codigosBarra": [
+     "7798171946618",
+     "17798171946615"
+    ]
+   },
+   {
+    "productoBaseId": 1971,
+    "nombre": "TAMPONES OB CHICO",
+    "precioCostoActual": 3700,
+    "factorPack": 1,
+    "unidadMedida": "unidad",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "7891010254766"
+    ]
+   },
+   {
+    "productoBaseId": 2030,
+    "nombre": "Budin elixir x6",
+    "precioCostoActual": 6000,
+    "factorPack": 6,
+    "unidadMedida": "pack",
+    "modoCompraProveedor": "BULTO",
+    "pesoReferenciaKg": null,
+    "creadoEnLocalId": 1,
+    "esCombo": false,
+    "relacionProveedor": 1,
+    "codigosBarra": [
+     "17791672014906"
+    ]
+   }
+  ]
+ },
+ "catalogo": [
+  {
+   "id": 11,
+   "nombre": "AGUA OXIGENADA 10V 100ML",
+   "factor_pack": 1,
+   "precio_costo": "443",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 27,
+   "nombre": "ALGODON ESTRELLA 75GR",
+   "factor_pack": 1,
+   "precio_costo": "760",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 92,
+   "nombre": "Bicarbonato Paez",
+   "factor_pack": 100,
+   "precio_costo": "26000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 233,
+   "nombre": "ENERGIZER AA ",
+   "factor_pack": 4,
+   "precio_costo": "3482",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 234,
+   "nombre": "ENERGIZER AAA ",
+   "factor_pack": 4,
+   "precio_costo": "3482",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 235,
+   "nombre": "ESCARBADIENTE DESAFIO ",
+   "factor_pack": 12,
+   "precio_costo": "4590",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 246,
+   "nombre": "ALFAJOR FANTOCHE BLANCO",
+   "factor_pack": 24,
+   "precio_costo": "17614.56",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 247,
+   "nombre": "FANTOCHE ALFAJOR  NEGRO 24 U",
+   "factor_pack": 24,
+   "precio_costo": "17614.56",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 277,
+   "nombre": "GAZA SUEZ CAJA ",
+   "factor_pack": 1,
+   "precio_costo": "2672",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 285,
+   "nombre": "GUAYMALLEN ALFAJOR NEGRO",
+   "factor_pack": 24,
+   "precio_costo": "10850",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 286,
+   "nombre": "GUAYMALLEN ALFAJOR BLANCO",
+   "factor_pack": 24,
+   "precio_costo": "10850",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 308,
+   "nombre": "DISMAR HISOPOS 100U",
+   "factor_pack": 1,
+   "precio_costo": "942",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 457,
+   "nombre": "Pier Verde",
+   "factor_pack": 10,
+   "precio_costo": "11200",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 586,
+   "nombre": "TARRITO ORINA",
+   "factor_pack": 1,
+   "precio_costo": "250",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 662,
+   "nombre": "TAMPONES OB GRANDE",
+   "factor_pack": 1,
+   "precio_costo": "3700",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 663,
+   "nombre": "TAMPONES OB MEDIANO",
+   "factor_pack": 1,
+   "precio_costo": "3700",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 664,
+   "nombre": "AZUFRE",
+   "factor_pack": 1,
+   "precio_costo": "1200",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 665,
+   "nombre": "IODOPOVIDONA",
+   "factor_pack": 1,
+   "precio_costo": "2140",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 752,
+   "nombre": "OCB Negro",
+   "factor_pack": 25,
+   "precio_costo": "17400",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 768,
+   "nombre": "AGUA OXIGENADA 20V",
+   "factor_pack": 1,
+   "precio_costo": "400",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 822,
+   "nombre": "PRIME PRESERVATIVO",
+   "factor_pack": 24,
+   "precio_costo": "77700",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 849,
+   "nombre": "Encendedor Candela x25",
+   "factor_pack": 25,
+   "precio_costo": "6500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 887,
+   "nombre": "SUERO COPEA SOLIUCION FISIOLOGICA",
+   "factor_pack": 1,
+   "precio_costo": "891",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1006,
+   "nombre": "EVEREADY AA  ",
+   "factor_pack": 4,
+   "precio_costo": "2700",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1007,
+   "nombre": "ENERGIZER PILAS AA 10U",
+   "factor_pack": 10,
+   "precio_costo": "9000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1008,
+   "nombre": "ENERGIZER PILAS AAA ",
+   "factor_pack": 10,
+   "precio_costo": "9000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1196,
+   "nombre": "picadores marihuana  x12",
+   "factor_pack": 12,
+   "precio_costo": "13800",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1198,
+   "nombre": "Filtros 6 mm",
+   "factor_pack": 20,
+   "precio_costo": "30000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1256,
+   "nombre": "ALCOHOL SAN IGINIO 250",
+   "factor_pack": 12,
+   "precio_costo": "15000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1315,
+   "nombre": "GEL INTIMO TULIPAN",
+   "factor_pack": 1,
+   "precio_costo": "2993",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1497,
+   "nombre": "FANTOCHE ALFAJOR NIGHT NEGRO",
+   "factor_pack": 12,
+   "precio_costo": "9000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1583,
+   "nombre": "DONCELLA HISOPOS ",
+   "factor_pack": 12,
+   "precio_costo": "14520",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1601,
+   "nombre": "DISMAR ALCOHOL 250ML",
+   "factor_pack": 12,
+   "precio_costo": "12000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1796,
+   "nombre": "MAXX PRESERVATIVO X12",
+   "factor_pack": 12,
+   "precio_costo": "11500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 1971,
+   "nombre": "TAMPONES OB CHICO",
+   "factor_pack": 1,
+   "precio_costo": "3700",
+   "unidad_medida": "unidad",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2030,
+   "nombre": "Budin elixir x6",
+   "factor_pack": 6,
+   "precio_costo": "6000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2031,
+   "nombre": "Marlboro 20 Crafted menta box",
+   "factor_pack": 10,
+   "precio_costo": "39420",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2032,
+   "nombre": "Liverpool rojo",
+   "factor_pack": 10,
+   "precio_costo": "13200",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2033,
+   "nombre": "Lucky 20 red",
+   "factor_pack": 10,
+   "precio_costo": "26460",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2034,
+   "nombre": "Marlboro 20 crafted mentolado común",
+   "factor_pack": 10,
+   "precio_costo": "37260",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2035,
+   "nombre": "Marlboro 20 crafted común",
+   "factor_pack": 10,
+   "precio_costo": "37260",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2036,
+   "nombre": "Marlboro 20 crafted coral box",
+   "factor_pack": 10,
+   "precio_costo": "40500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2037,
+   "nombre": "Chester 20 común",
+   "factor_pack": 10,
+   "precio_costo": "46980",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2038,
+   "nombre": "Chester 20 Purple motion 2 box",
+   "factor_pack": 10,
+   "precio_costo": "52380",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2039,
+   "nombre": "Chester 20 mentolado box ",
+   "factor_pack": 10,
+   "precio_costo": "51300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2040,
+   "nombre": "Philips 20 box",
+   "factor_pack": 10,
+   "precio_costo": "58266",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2041,
+   "nombre": "Philips 20 común",
+   "factor_pack": 10,
+   "precio_costo": "54594",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2042,
+   "nombre": "Philips 10 mentolado",
+   "factor_pack": 10,
+   "precio_costo": "35078.4",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2043,
+   "nombre": "Philips 10",
+   "factor_pack": 10,
+   "precio_costo": "34603.2",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2044,
+   "nombre": "Chester 10",
+   "factor_pack": 10,
+   "precio_costo": "30780",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2045,
+   "nombre": "Chester 10 mentolado ",
+   "factor_pack": 10,
+   "precio_costo": "30780",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2046,
+   "nombre": "Marlboro 10 Uva",
+   "factor_pack": 10,
+   "precio_costo": "38340",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2047,
+   "nombre": "Lucky 10",
+   "factor_pack": 10,
+   "precio_costo": "35035.2",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2048,
+   "nombre": "Lucky 10 mentolado",
+   "factor_pack": 10,
+   "precio_costo": "35035.2",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2049,
+   "nombre": "Milenio click mentolado",
+   "factor_pack": 10,
+   "precio_costo": "18300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2050,
+   "nombre": "Milenio rojo",
+   "factor_pack": 10,
+   "precio_costo": "16300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2051,
+   "nombre": "Milenio coral",
+   "factor_pack": 10,
+   "precio_costo": "18300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2052,
+   "nombre": "Milenio uva",
+   "factor_pack": 10,
+   "precio_costo": "18300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2053,
+   "nombre": "milenio mentolado",
+   "factor_pack": 10,
+   "precio_costo": "16300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2054,
+   "nombre": "Pier rojo",
+   "factor_pack": 10,
+   "precio_costo": "13200",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2055,
+   "nombre": "Marlboro 20 Box ",
+   "factor_pack": 10,
+   "precio_costo": "65880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2056,
+   "nombre": "Marlboro 20 coral XL ",
+   "factor_pack": 10,
+   "precio_costo": "65880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2057,
+   "nombre": "Marlboro 20 menta box",
+   "factor_pack": 10,
+   "precio_costo": "65880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2058,
+   "nombre": "Marlboro 20 uva box",
+   "factor_pack": 10,
+   "precio_costo": "65880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2059,
+   "nombre": "Lucky 20 convertible xl ",
+   "factor_pack": 10,
+   "precio_costo": "59346",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2060,
+   "nombre": "Liverpool azul",
+   "factor_pack": 10,
+   "precio_costo": "13200",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2061,
+   "nombre": "Philips 20 red común",
+   "factor_pack": 10,
+   "precio_costo": "26460",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2062,
+   "nombre": "Lucky origen 20 común mentolado",
+   "factor_pack": 10,
+   "precio_costo": "37260",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2063,
+   "nombre": "Lucky 20 común",
+   "factor_pack": 10,
+   "precio_costo": "54593.99",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2064,
+   "nombre": "Liverpool verde",
+   "factor_pack": 10,
+   "precio_costo": "13200",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2065,
+   "nombre": "Marlboro 20 Crafted suave ",
+   "factor_pack": 10,
+   "precio_costo": "37260",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2066,
+   "nombre": "Lucky 20 mix",
+   "factor_pack": 10,
+   "precio_costo": "65880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2067,
+   "nombre": "Lucky 10 parisien",
+   "factor_pack": 10,
+   "precio_costo": "72414",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2068,
+   "nombre": "Lucky 20 box",
+   "factor_pack": 10,
+   "precio_costo": "59346",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2069,
+   "nombre": "Marlboro 20 titanio",
+   "factor_pack": 10,
+   "precio_costo": "70000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2090,
+   "nombre": "Encendedor Cancun",
+   "factor_pack": 50,
+   "precio_costo": "9500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2091,
+   "nombre": "Tabaco Pacha Mama",
+   "factor_pack": 5,
+   "precio_costo": "29500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2128,
+   "nombre": "Dover Rojo",
+   "factor_pack": 10,
+   "precio_costo": "8800",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2129,
+   "nombre": "Lucky origen 20 comun",
+   "factor_pack": 10,
+   "precio_costo": "37260",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2131,
+   "nombre": "Marlboro 20 Crafted Uva Box",
+   "factor_pack": 10,
+   "precio_costo": "40500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2132,
+   "nombre": "Marlboro 20 Crafted Box",
+   "factor_pack": 10,
+   "precio_costo": "40500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2134,
+   "nombre": "Dover Verde",
+   "factor_pack": 10,
+   "precio_costo": "8800",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2135,
+   "nombre": "Lucky 20 Origen Menta Box",
+   "factor_pack": 10,
+   "precio_costo": "40500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2149,
+   "nombre": "Eight Click Mentolado",
+   "factor_pack": 10,
+   "precio_costo": "13000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2150,
+   "nombre": "Eight Comun",
+   "factor_pack": 10,
+   "precio_costo": "9500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2161,
+   "nombre": "Marlboro 10",
+   "factor_pack": 10,
+   "precio_costo": "38772",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2183,
+   "nombre": "Lucky 20 Menta Comun",
+   "factor_pack": 10,
+   "precio_costo": "53460",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2193,
+   "nombre": "Chocolatin Jack 14g",
+   "factor_pack": 20,
+   "precio_costo": "25000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2213,
+   "nombre": "Tabaco La Hoja",
+   "factor_pack": 10,
+   "precio_costo": "43500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2214,
+   "nombre": "Papel Cellulosa Zeus",
+   "factor_pack": 25,
+   "precio_costo": "12500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2215,
+   "nombre": "Papel Celulosa Stamp",
+   "factor_pack": 25,
+   "precio_costo": "23000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2216,
+   "nombre": "marlboro 20 comun ",
+   "factor_pack": 10,
+   "precio_costo": "60480",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2218,
+   "nombre": "chester 20 mentolado comun",
+   "factor_pack": 10,
+   "precio_costo": "46980",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2219,
+   "nombre": "philips 20 mentolado box",
+   "factor_pack": 10,
+   "precio_costo": "58320",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2225,
+   "nombre": "Camel 10",
+   "factor_pack": 10,
+   "precio_costo": "38880",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2233,
+   "nombre": "Lucky 20 Silver",
+   "factor_pack": 10,
+   "precio_costo": "51300",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2237,
+   "nombre": "Oblea fantoche",
+   "factor_pack": 16,
+   "precio_costo": "5000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2240,
+   "nombre": "Huevos Jack x14G",
+   "factor_pack": 10,
+   "precio_costo": "25000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2265,
+   "nombre": "Marlboro 20 gold",
+   "factor_pack": 10,
+   "precio_costo": "61020",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2266,
+   "nombre": "Tabaco cerrito yelow",
+   "factor_pack": 10,
+   "precio_costo": "57500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2267,
+   "nombre": "Filtro 7,5mm",
+   "factor_pack": 25,
+   "precio_costo": "40000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2268,
+   "nombre": "Marlboro 20 Red Titanium",
+   "factor_pack": 10,
+   "precio_costo": "59000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2389,
+   "nombre": "liverpool pop",
+   "factor_pack": 10,
+   "precio_costo": "16500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2708,
+   "nombre": "encendedor neoclich",
+   "factor_pack": 50,
+   "precio_costo": "9500",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2872,
+   "nombre": "alcohol san iginio 500",
+   "factor_pack": 12,
+   "precio_costo": "22800",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2874,
+   "nombre": "Philips 20 bluw select",
+   "factor_pack": 10,
+   "precio_costo": "26460",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2875,
+   "nombre": "Lucky 10 origen",
+   "factor_pack": 10,
+   "precio_costo": "21000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  },
+  {
+   "id": 2876,
+   "nombre": "Lucky 10 origen convertible",
+   "factor_pack": 10,
+   "precio_costo": "23000",
+   "unidad_medida": "pack",
+   "modoVentaDeposito": "PESO",
+   "modoCompraProveedor": "BULTO",
+   "pesoReferenciaKg": null,
+   "pesoEsFijo": false,
+   "pesoPromedioKg": null
+  }
+ ],
+ "decisiones": [
+  [
+   2131,
+   {
+    "decision": "ACEPTA_FACTURA",
+    "precioFacturado": 40500,
+    "precioPropio": 41580,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T20:50:32.377Z"
+   }
+  ],
+  [
+   2034,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 36500,
+    "precioPropio": 37260,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:35:49.587Z"
+   }
+  ],
+  [
+   2035,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 36500,
+    "precioPropio": 37260,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:35:51.991Z"
+   }
+  ],
+  [
+   2031,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 40500,
+    "precioPropio": 39420,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:36:56.144Z"
+   }
+  ],
+  [
+   2058,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 62000,
+    "precioPropio": 65880,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:36:57.898Z"
+   }
+  ],
+  [
+   2216,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 58000,
+    "precioPropio": 60480,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:37:00.801Z"
+   }
+  ],
+  [
+   2218,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 46500,
+    "precioPropio": 46980,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:37:02.837Z"
+   }
+  ],
+  [
+   2037,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 46500,
+    "precioPropio": 46980,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T21:37:08.768Z"
+   }
+  ],
+  [
+   2044,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 30100,
+    "precioPropio": 30780,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T22:10:07.544Z"
+   }
+  ],
+  [
+   2045,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 30100,
+    "precioPropio": 30780,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T22:10:09.346Z"
+   }
+  ],
+  [
+   2043,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 33600,
+    "precioPropio": 34603.2,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T23:15:35.418Z"
+   }
+  ],
+  [
+   2042,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 34000,
+    "precioPropio": 35078.4,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T23:15:38.606Z"
+   }
+  ],
+  [
+   2061,
+   {
+    "decision": "DEJA_EL_MIO",
+    "precioFacturado": 22500,
+    "precioPropio": 26460,
+    "costoMaestroObservado": null,
+    "decididaEn": "2026-09-20T23:15:51.537Z"
+   }
+  ],
+  [
+   2041,
+   {
+    "decision": "ACEPTA_FACTURA",
+    "precioFacturado": 56500,
+    "precioPropio": 54594,
+    "costoMaestroObservado": 54594,
+    "decididaEn": "2026-10-26T02:18:04.194Z"
+   }
+  ]
+ ],
+ "variacionNormalPct": 10
+}

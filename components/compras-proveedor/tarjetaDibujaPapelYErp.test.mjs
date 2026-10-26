@@ -64,7 +64,11 @@ test("CON PEDIDO PREVIO, LA TARJETA DIBUJA FACTURA, PAPEL Y ERP", () => {
   assert.match(texto, /8\.166,54/);
   assert.match(texto, /9\.500,00/);
   assert.match(texto, /\/ u/);
-  assert.match(texto, /\+14,0 %/);
+  // El papel es más barato que el ERP: baja, con "−" y en rojo (Emanuel,
+  // 2026-10-26, Mauro #298). Hasta ese día decía "+14,0 %" en verde.
+  assert.match(texto, /−14,0 %/);
+  const html = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: FILA }));
+  assert.match(html, /sunmi-text-danger[^"]*">−14,0 %/);
   // Y el pie: la acción a la izquierda, el total a la derecha.
   assert.match(texto, /Corregir/);
   assert.match(texto, /97\.998,47/);
@@ -82,7 +86,7 @@ test("Y SIN PEDIDO PREVIO TAMBIÉN — QUE ES EL CASO DEL #242", () => {
   assert.match(texto, /ERP/, "la rama del pedido nacido de factura no dibuja el ERP");
   assert.match(texto, /8\.166,54/);
   assert.match(texto, /9\.500,00/);
-  assert.match(texto, /\+14,0 %/);
+  assert.match(texto, /−14,0 %/);
 });
 
 test("SIN PEDIDO PREVIO NO SE DICE «falta» NI «sobra»", () => {

@@ -40,6 +40,10 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
+import {
+  cargarConciliacion,
+  lineasSospechadasDeCorrimiento,
+} from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { cargosDelPapel } from "@/lib/compras-proveedor/comprobante/cargos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
@@ -56,7 +60,11 @@ import {
   esDecisionConocida,
   mismoPrecio,
 } from "@/lib/compras-proveedor/decisionDePrecio";
-import { elCatalogoSeMovio, motivoSinComparacion } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  AVISO_PAPEL_CORRIDO,
+  elCatalogoSeMovio,
+  motivoSinComparacion,
+} from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
@@ -358,6 +366,22 @@ export async function POST(req) {
           "Queda tu costo. No se vuelve a preguntar mientras la factura traiga el mismo precio " +
           "contra el mismo costo tuyo.",
       });
+    }
+
+    // ── UN PRODUCTO DE UN BLOQUE QUE PUEDE ESTAR CORRIDO NO ACEPTA COSTO ──
+    //
+    // Sus números pueden ser los de la fila vecina (`filasCorridas.js`, Mauro
+    // #298). Se pregunta con la MISMA conciliación que dibuja la pantalla
+    // (`cargarConciliacion`): si la tarjeta dice que no se propone, acá no se
+    // acepta.
+    if (linea.comprobante.pedidoId) {
+      const conciliacion = await cargarConciliacion(prisma, { grupoId, localId, pedidoId: linea.comprobante.pedidoId });
+      if (lineasSospechadasDeCorrimiento(conciliacion).has(linea.id)) {
+        return NextResponse.json(
+          { ok: false, error: AVISO_PAPEL_CORRIDO, queHacer: AVISO_PAPEL_CORRIDO },
+          { status: 409 }
+        );
+      }
     }
 
     const puede = puedeAceptarse({

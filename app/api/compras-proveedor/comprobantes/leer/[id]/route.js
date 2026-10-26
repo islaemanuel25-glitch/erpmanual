@@ -48,6 +48,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/facturaRepetida";
 import { agruparLasHojasDelPapel } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
 import { vincularContraElPedido } from "@/lib/compras-proveedor/comprobante/vincularContraElPedido";
+import { acomodarFilasCorridas } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import {
   estadoDeLaFalla,
@@ -750,6 +751,16 @@ export async function POST(req, { params }) {
       if (comprobante.pedidoId) {
         try {
           await vincularContraElPedido(prisma, { grupoId, localId: ctx.localId, pedidoId: comprobante.pedidoId });
+          // Si se leyó corrido una fila y el pedido dice cómo acomodarlo, se
+          // acomoda y se vuelve a vincular (`filasCorridas.js`, Mauro #298).
+          const acomodados = await acomodarFilasCorridas(prisma, {
+            grupoId,
+            localId: ctx.localId,
+            pedidoId: comprobante.pedidoId,
+          });
+          if (acomodados.length) {
+            await vincularContraElPedido(prisma, { grupoId, localId: ctx.localId, pedidoId: comprobante.pedidoId });
+          }
         } catch (e) {
           console.error("No se pudo vincular el papel contra el pedido:", e?.message);
         }

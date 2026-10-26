@@ -166,7 +166,8 @@ test("Y LA ELECCIÓN DE UNIDAD SE GUARDA Y SE VUELVE A LEER", () => {
   assert.match(aceptar, /unidadElegida: body\?\.unidad \?\? linea\.unidadElegida/);
   // La conciliación la trae y el análisis la usa, así que sobrevive al refresco
   // para las dos pantallas y no solo para la que la eligió.
-  const conciliacion = codigoDe("app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
+  // La carga de la conciliación vive en `conciliacionDelPedido.js` desde Mauro #298.
+  const conciliacion = codigoDe("lib/compras-proveedor/comprobante/conciliacionDelPedido.js");
   assert.match(conciliacion, /unidadElegida: true/);
   const analisis = codigoDe("lib/compras-proveedor/comprobante/analisisDeComprobante.js");
   assert.match(analisis, /unidadElegida: l\.unidadElegida \?\? undefined/);

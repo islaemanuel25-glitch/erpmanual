@@ -16,8 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **90 migraciones**, las mismas que el árbol, la
-última `20261026005002_detalle_llego_sin_papel`.
+- `20261026030000_comprobante_linea_acomodo` — **Aditiva, sin backfill.**
+  Agrega `ComprobanteLinea.acomodo` (JSONB nulo): en cada fila que el sistema
+  acomodó porque el papel se leyó corrido (Mauro #298), qué tenía antes. No
+  toca ninguna fila. **Va ANTES de la imagen:** el acomodo escribe la columna.
+  Comprobada con `prisma migrate diff` entre el esquema de `main` y el nuevo:
+  da exactamente esta sentencia.
+
+Producción está en **90 migraciones**, la última
+`20261026005002_detalle_llego_sin_papel`.
 
 **Verificado en código contra la base de producción el 2026-10-26**, después
 del despliegue de `21fe528e`, de solo lectura: las 90 carpetas de

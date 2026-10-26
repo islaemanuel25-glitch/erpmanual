@@ -6003,6 +6003,15 @@ model ComprobanteLinea {
   /// MERCADERIA o ENVASE (`TIPO_RENGLON` en `lector/lecturaInterpretada.js`).
   tipoRenglon       String?
 
+  /// SI EL SISTEMA ACOMODÓ ESTA FILA PORQUE EL PAPEL SE LEYÓ CORRIDO (Mauro #298).
+  ///
+  /// El lector le dejó a un nombre los números de la fila vecina; con el pedido
+  /// se probó correr el bloque y así coincidió todo (`comprobante/filasCorridas.js`).
+  /// Guarda cuándo, en qué sentido y qué tenía la fila antes —el texto y los
+  /// números que había leído el lector—: el hecho de que se acomodó no se pisa.
+  /// Null en las filas que nadie acomodó.
+  acomodo           Json?
+
   unidadElegida String?
 
   revisadoEnRecepcion      Boolean   @default(false)
