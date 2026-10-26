@@ -296,11 +296,11 @@ export default function TarjetaLineaFactura({
               )}
 
               {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
-                  El precio interno y cuánto cambió el del papel contra él:
-                  "−" y rojo cuando el papel es más barato, "+" y verde cuando
-                  es más caro, gris si es el mismo. Es la regla de toda la app
-                  (`tonoDelPorcentaje`); el signo y el color dicen lo mismo a
-                  propósito: un color solo no se lee.
+                  El precio interno y cuánto está contra el papel: "+" y verde
+                  cuando el ERP está más caro —el depósito gana—, "−" y rojo
+                  cuando está más barato, gris si es el mismo
+                  (`gananciaDelRenglonPct` y `tonoDelPorcentaje`). El signo y el
+                  color dicen lo mismo a propósito: un color solo no se lee.
 
                   No se dibuja si no hay con qué comparar —renglón sin vincular,
                   producto sin costo—. Una comparación contra nada es peor que
