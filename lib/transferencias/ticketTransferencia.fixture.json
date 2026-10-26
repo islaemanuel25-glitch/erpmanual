@@ -1,17 +1,17 @@
 {
-  "tomadaSobre": "841ed16",
+  "tomadaSobre": "e1ad248",
   "venta": {
     "numero": 1,
     "breakdown": {
-      "subtotal": 108125,
+      "subtotal": 56203,
       "descuentoAutomatico": 0,
       "descuentoManual": 0,
       "descuentoPorPuntos": 0,
       "descuentoTotal": 0,
-      "total": 108125,
-      "subtotalSinOferta": 108125,
+      "total": 56203,
+      "subtotalSinOferta": 56203,
       "descuentoPromocional": 0,
-      "totalAntesRecargo": 108125,
+      "totalAntesRecargo": 56203,
       "recargoPagoPct": 0,
       "recargoPagoImporte": 0,
       "recargoPagoMedio": null,
@@ -29,16 +29,7 @@
           "esServicio": false,
           "importeBaseServicio": null,
           "recargoServicioPct": null,
-          "recargoServicioImporte": null,
-          "deposito": {
-            "esDeposito": true,
-            "modo": null,
-            "factorPack": 1,
-            "cantidadStock": "3.000",
-            "unidadMedida": "unidad",
-            "modoVentaDeposito": "PESO",
-            "modoEnvio": null
-          }
+          "recargoServicioImporte": null
         },
         {
           "nombre": "ELITE PAÑUELOS X6paq",
@@ -51,16 +42,7 @@
           "esServicio": false,
           "importeBaseServicio": null,
           "recargoServicioPct": null,
-          "recargoServicioImporte": null,
-          "deposito": {
-            "esDeposito": true,
-            "modo": "PACK",
-            "factorPack": 6,
-            "cantidadStock": "24.000",
-            "unidadMedida": "pack",
-            "modoVentaDeposito": "PESO",
-            "modoEnvio": null
-          }
+          "recargoServicioImporte": null
         },
         {
           "nombre": "ELITE PAÑUELOS X6paq",
@@ -73,38 +55,20 @@
           "esServicio": false,
           "importeBaseServicio": null,
           "recargoServicioPct": null,
-          "recargoServicioImporte": null,
-          "deposito": {
-            "esDeposito": true,
-            "modo": "UNIDAD",
-            "factorPack": 6,
-            "cantidadStock": "2.000",
-            "unidadMedida": "pack",
-            "modoVentaDeposito": "PESO",
-            "modoEnvio": null
-          }
+          "recargoServicioImporte": null
         },
         {
-          "nombre": "BARRA TREMBLAY",
-          "cantidad": 3.615,
-          "precio": 15000,
-          "subtotal": 54225,
-          "precioNormal": 15000,
+          "nombre": "QUESO CREMOSO",
+          "cantidad": 0.235,
+          "precio": 9800,
+          "subtotal": 2303,
+          "precioNormal": 9800,
           "ofertaNombre": null,
           "descuentoPromocional": 0,
           "esServicio": false,
           "importeBaseServicio": null,
           "recargoServicioPct": null,
-          "recargoServicioImporte": null,
-          "deposito": {
-            "esDeposito": true,
-            "modo": null,
-            "factorPack": 1,
-            "cantidadStock": "3.615",
-            "unidadMedida": "kg",
-            "modoVentaDeposito": "PESO",
-            "modoEnvio": null
-          }
+          "recargoServicioImporte": null
         },
         {
           "nombre": "SALAME MILAN PIEZA",
@@ -117,16 +81,7 @@
           "esServicio": false,
           "importeBaseServicio": null,
           "recargoServicioPct": null,
-          "recargoServicioImporte": null,
-          "deposito": {
-            "esDeposito": true,
-            "modo": "PIEZA",
-            "factorPack": 1,
-            "cantidadStock": "2.000",
-            "unidadMedida": "kg",
-            "modoVentaDeposito": "PIEZA",
-            "modoEnvio": null
-          }
+          "recargoServicioImporte": null
         }
       ],
       "ofertasAplicadas": []
@@ -136,8 +91,8 @@
     "id": 1,
     "estado": "Enviada",
     "tieneDiferencias": true,
-    "fechaCreada": "2026-10-26T15:42:15.451Z",
-    "fechaEnvio": "2026-10-26T15:42:15.450Z",
+    "fechaCreada": "2026-10-26T15:10:54.591Z",
+    "fechaEnvio": "2026-10-26T15:10:54.590Z",
     "fechaRecepcion": null,
     "origen": {
       "id": 1,
@@ -155,14 +110,14 @@
     "confirmadores": [],
     "cancelacion": null,
     "resumen": {
-      "itemsEnviados": 34.615,
+      "itemsEnviados": 31.235,
       "itemsRecibidos": 0,
-      "diferenciaTotal": -34.615,
-      "importeOriginal": 76263.18468333334,
+      "diferenciaTotal": -31.235,
+      "importeOriginal": 37958.84333333334,
       "importeCorregido": null,
       "diferenciaImporte": null,
-      "importeEnviado": 76263.18468333334,
-      "costoTotal": 76263.18468333334,
+      "importeEnviado": 37958.84333333334,
+      "costoTotal": 37958.84333333334,
       "ajusteOrigenTotal": 0,
       "devolucionOrigenTotal": 0
     },
@@ -267,15 +222,15 @@
       },
       {
         "id": 3,
-        "nombre": "BARRA TREMBLAY",
+        "nombre": "QUESO CREMOSO",
         "codigoBarra": null,
-        "cantidadEnviada": 3.615,
+        "cantidadEnviada": 0.235,
         "cantidadRecibida": null,
-        "precioCosto": 11018.49,
-        "subtotal": 39831.84135,
-        "costoUnitarioFisico": 11018.49,
-        "subtotalRecibido": 39831.84135,
-        "costoNormalizadoRecibido": 11018.49,
+        "precioCosto": 6500,
+        "subtotal": 1527.5,
+        "costoUnitarioFisico": 6500,
+        "subtotalRecibido": 1527.5,
+        "costoNormalizadoRecibido": 6500,
         "ajusteOrigen": null,
         "devolucionOrigen": null,
         "excedenteOrigen": null,
@@ -299,7 +254,7 @@
         "esFiambreFijo": false,
         "pesoReferenciaKg": null,
         "presentacionEnvio": "KG",
-        "cantidadPresentada": 3.615,
+        "cantidadPresentada": 0.235,
         "sueltasEnviadas": 0,
         "factorPresentacion": null,
         "pesoPiezaKg": 0,

@@ -374,9 +374,6 @@ export default function HistorialDia({
                         precioNormal: d.precioNormal,
                         ofertaNombre: d.ofertaNombre,
                         descuentoPromocional: d.descuentoPromocional,
-                        // Por kilo, por pieza o en bulto, para que el papel
-                        // diga "3,615 kg" igual que el original.
-                        deposito: d.deposito ?? null,
                       })),
                       subtotal: Number(detalle.subtotal),
                       descuento: Number(detalle.descuento),

@@ -103,8 +103,7 @@ try {
   };
   const unidad = await producto("CIF LIMA 300ml", 2500, 1832.67);
   const bulto = await producto("ELITE PAÑUELOS X6paq", 2400, 1600, { unidad_medida: "pack", factor_pack: 6 });
-  // La línea de la #520: 3,615 kg a $11.018,49 el kilo de costo.
-  const kilo = await producto("BARRA TREMBLAY", 15000, 11018.49, { unidad_medida: "kg" });
+  const kilo = await producto("QUESO CREMOSO", 9800, 6500, { unidad_medida: "kg" });
   const pieza = await producto("SALAME MILAN PIEZA", 12000, 8000, {
     unidad_medida: "kg", modoVentaDeposito: "PIEZA", pesoReferenciaKg: 1.5, modoCompraProveedor: "UNIDAD",
   });
@@ -142,7 +141,7 @@ try {
     linea(unidad, "CIF LIMA 300ml", 2500, 3, 1832.67),
     linea(bulto, "ELITE PAÑUELOS X6paq", 2400, 4, 1600),
     linea(bulto, "ELITE PAÑUELOS X6paq", 400, 2, 266.67, "UNIDAD_REMANENTE"),
-    linea(kilo, "BARRA TREMBLAY", 15000, 3.615, 11018.49),
+    linea(kilo, "QUESO CREMOSO", 9800, 0.235, 6500),
     linea(pieza, "SALAME MILAN PIEZA", 18000, 2, 12000),
   ];
   const total = items.reduce((a, i) => a + Math.round(i.precio * i.cantidad * 100), 0) / 100;
