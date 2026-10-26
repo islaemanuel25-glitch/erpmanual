@@ -45,6 +45,8 @@ const FILA = {
   pedidoDetalleId: 900,
   subtotal: 97998.47,
   costoFactura: 97998.47 / 12,
+  // Lo que `filasDeConciliacion` pone en la fila: el costo final del papel.
+  importeDelPapel: 97998.47,
   costoCatalogo: 9500,
 };
 

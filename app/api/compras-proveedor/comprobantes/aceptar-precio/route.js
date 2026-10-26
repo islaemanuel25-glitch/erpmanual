@@ -309,6 +309,9 @@ export async function POST(req) {
       costoFactura: analisis?.precioAEscribir ?? null,
       costoCatalogo: delPedido.detalle?.precioCosto ?? null,
       pedidoDetalleId: delPedido.detalle?.id ?? null,
+      // En qué viene lo facturado: sin escala sabida no hay costo que aceptar,
+      // igual que en la tarjeta (`escalaSinDeducir`, Pablo #337).
+      unidad: analisis?.unidad ?? null,
     };
     const sinComparacion = motivoSinComparacion(comparacion);
     if (sinComparacion) {
