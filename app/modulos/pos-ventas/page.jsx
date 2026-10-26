@@ -1778,11 +1778,17 @@ export default function PosVentasPage() {
               importeBaseServicio: l.importeBaseServicio,
               recargoServicioPct: l.recargoServicioPct,
               recargoServicioImporte: l.recargoServicioImporte,
+              // Por kilo, por pieza o en bulto: lo que el ticket necesita para
+              // imprimir "3,615 kg" y no un 3.615 suelto.
+              deposito: l.deposito ?? null,
             }))
           : state.carrito.map((item) => ({
               nombre: item.nombre,
               precio: item.precio,
               cantidad: item.cantidad,
+              // Sin respuesta del servidor, la unidad con la que el propio POS
+              // decidió pedir el peso (`unidadMedida === "kg"` abre el modal).
+              deposito: { unidadMedida: item.unidadMedida ?? null },
             }));
 
         // Preparar datos del ticket
@@ -2304,6 +2310,7 @@ export default function PosVentasPage() {
                             nombre: d.nombre,
                             precio: Number(d.precio),
                             cantidad: d.cantidad,
+                            deposito: d.deposito ?? null,
                           })),
                           subtotal: Number(v.subtotal),
                           descuento: Number(v.descuento),

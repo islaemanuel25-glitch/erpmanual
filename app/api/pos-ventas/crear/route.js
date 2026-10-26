@@ -57,6 +57,7 @@ import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
 import { cargarMapasDeProductos } from "@/lib/pos-ventas/mapasDeProductos";
+import { descriptorDeposito } from "@/lib/reportes-ventas/modoLineaDeposito";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
@@ -1735,6 +1736,25 @@ async function procesarCrear(req, intento) {
           importeBaseServicio: l.servicio?.importeBaseServicio ?? null,
           recargoServicioPct: l.servicio?.recargoServicioPct ?? null,
           recargoServicioImporte: l.servicio?.recargoServicioImporte ?? null,
+          // Cómo se vendió la línea —por kilo, por pieza, en bulto—, con el MISMO
+          // descriptor que manda el detalle de Reportes. Sin él el ticket no
+          // sabe que 3.615 son kilos y lo imprime como un número suelto.
+          deposito: descriptorDeposito(
+            {
+              cantidad: l.cantidad,
+              cantidadStock: l.consumoFisico?.cantidadStock ?? null,
+              esServicio: l.tipo === "SERVICIO",
+              productoBase: l.baseStock
+                ? {
+                    unidad_medida: l.baseStock.unidad_medida,
+                    factor_pack: l.baseStock.factorPack,
+                    modoVentaDeposito: l.baseStock.modoVentaDeposito,
+                    modo_envio: l.baseStock.modo_envio,
+                  }
+                : null,
+            },
+            esDeposito
+          ),
         })),
         ofertasAplicadas: comercial.lineas
           .filter((l) => l.ofertaAplicada)

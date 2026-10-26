@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getRangoArgentina, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
+import { descriptorDeposito } from "@/lib/reportes-ventas/modoLineaDeposito";
 
 export async function GET(req) {
   try {
@@ -97,8 +98,16 @@ export async function GET(req) {
             cantidad: true,
             precio: true,
             subtotal: true,
+            // Lo que lee `descriptorDeposito`, igual que en el detalle de
+            // Reportes: sin esto la reimpresión no sabe que 3.615 son kilos.
+            esServicio: true,
+            cantidadStock: true,
+            productoBase: {
+              select: { unidad_medida: true, factor_pack: true, modoVentaDeposito: true, modo_envio: true },
+            },
           },
         },
+        local: { select: { es_deposito: true } },
         vendedor: {
           select: { id: true, nombre: true, email: true },
         },
@@ -112,7 +121,17 @@ export async function GET(req) {
       },
     });
 
-    return NextResponse.json({ ok: true, items: ventas });
+    // Cada línea sale con su descriptor de presentación y sin los campos crudos
+    // que hicieron falta para armarlo.
+    const items = ventas.map(({ local, detalles, ...v }) => ({
+      ...v,
+      detalles: detalles.map(({ cantidadStock, productoBase, ...d }) => ({
+        ...d,
+        deposito: descriptorDeposito({ ...d, cantidadStock, productoBase }, local?.es_deposito === true),
+      })),
+    }));
+
+    return NextResponse.json({ ok: true, items });
   } catch (error) {
     console.error("Error historial dia:", error);
     return NextResponse.json(
