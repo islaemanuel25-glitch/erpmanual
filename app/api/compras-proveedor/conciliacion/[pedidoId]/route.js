@@ -184,6 +184,14 @@ export async function GET(req, { params }) {
 
     // La cobertura, con la MISMA regla de siempre: mientras falten comprobantes
     // por subir o por leer, lo que falta NO es un error y no se pinta como tal.
+    //
+    // ── CON EL PRODUCTO QUE RESOLVIÓ EL ANÁLISIS, NO SOLO EL GUARDADO ──────
+    //
+    // Filtraba por `pedidoDetalleId` y `productoLocalId`, que son las columnas
+    // de un vínculo hecho a mano. La lista ata sola —por código, por alias— sin
+    // escribir nada, así que con los 15 renglones de Mauro atados esto contaba
+    // cero (#298). Ahora cuenta lo mismo que la lista: el producto y la línea
+    // del pedido que salieron de `analizarLineas`.
     const cobertura = coberturaDelPedido({
       detalles: detallesPlanos.map((d) => ({
         id: d.id,
@@ -192,11 +200,11 @@ export async function GET(req, { params }) {
       })),
       lineasDeComprobantes: analizados.flatMap((c) =>
         (c.lineas ?? [])
-          .filter((l) => l.pedidoDetalleId != null || l.productoLocalId != null)
           .map((l) => ({
-            productoBaseId: l.pedidoDetalle?.productoBaseId ?? null,
+            productoBaseId: l.pedidoDetalle?.productoBaseId ?? l.productoBaseId ?? null,
             comprobanteId: c.id,
           }))
+          .filter((l) => l.productoBaseId != null)
       ),
     });
     const sinLeer = comprobantes.filter((c) => !c.leidoEn).length;

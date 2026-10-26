@@ -13,12 +13,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenDeLista } from "@/lib/compras-proveedor/comprobante/pantalla";
-import {
-  coberturaDelPedido,
-  productosDelPapel,
-  textoDeCobertura,
-} from "@/lib/compras-proveedor/comprobante/cobertura";
-import { productosDeLasFilas, baseIdDeLaFila } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
+import { productosDelPapel } from "@/lib/compras-proveedor/comprobante/cobertura";
 import { armarCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comprobante/lector/cuota";
 // El índice registra los lectores al importarse. Sin esto la cadena diría que no
@@ -133,39 +128,17 @@ export async function GET(req) {
       conProducto: delPapel.get(c.id)?.conProducto ?? 0,
     }));
 
-    // ── LA COBERTURA DEL PEDIDO, CONTRA TODOS LOS COMPROBANTES ───────────
+    // ── CUÁNTO LLEGÓ DEL PEDIDO YA NO SE CUENTA ACÁ ──────────────────────
     //
-    // Un pedido se cubre con VARIAS facturas: el de Mauro tiene 34 líneas y el
-    // comprobante que llegó trajo 21. Contarlo por comprobante haría que toda
-    // entrega parcial pareciera incompleta, y un aviso que siempre dice que
-    // falta algo deja de significar que falta algo.
+    // Se contaba con los vínculos GUARDADOS —los que alguien hizo a mano—, y la
+    // lista de la recepción ata sola por código y por alias sin guardar nada.
+    // Con la factura de Mauro leída, 15 renglones atados, esto decía «0 de 24
+    // llegaron» encima de la lista que los mostraba (#298). La cuenta la da la
+    // conciliación, que es la que arma esa lista, y el panel la recibe de la
+    // pantalla. Acá queda el tamaño del pedido, para el encabezado.
     let cobertura = null;
     if (pedidoId) {
-      const detalles = await prisma.pedidoProveedorDetalle.findMany({
-        where: { pedidoId },
-        select: { id: true, producto: { select: { baseId: true, base: { select: { nombre: true } } } } },
-      });
-      // `productoLocal` NO es una relación del esquema: solo existe el escalar.
-      // Pedirla acá es lo que tumbaba esta ruta —y con ella la pantalla entera—
-      // con `Unknown field productoLocal`. La traducción va en una consulta
-      // aparte, en un solo lugar para las tres rutas que la necesitan.
-      const vinculadas = await prisma.comprobanteLinea.findMany({
-        where: { comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } }, productoLocalId: { not: null } },
-        select: { comprobanteId: true, productoLocalId: true },
-      });
-      const porProductoLocal = await productosDeLasFilas(prisma, vinculadas);
-      const c = coberturaDelPedido({
-        detalles: detalles.map((d) => ({
-          id: d.id,
-          productoBaseId: d.producto?.baseId ?? null,
-          nombre: d.producto?.base?.nombre ?? null,
-        })),
-        lineasDeComprobantes: vinculadas.map((v) => ({
-          productoBaseId: baseIdDeLaFila(v, porProductoLocal),
-          comprobanteId: v.comprobanteId,
-        })),
-      });
-      const sinLeer = items.filter((x) => !x.leidoEn && x.estado !== "ANULADO").length;
+      const totalPedido = await prisma.pedidoProveedorDetalle.count({ where: { pedidoId } });
       // ── EL PEDIDO NACIDO DE UNA FACTURA SE CUENTA CONTRA EL PAPEL ───────
       //
       // Sus líneas salen de los renglones que se pudieron atar, así que
@@ -177,8 +150,7 @@ export async function GET(req) {
       });
       const vivos = conFotos.filter((x) => x.estado !== "ANULADO");
       cobertura = {
-        ...c,
-        ...textoDeCobertura(c, { comprobantesSinLeer: sinLeer }),
+        totalPedido,
         nacidoDeFactura: pedido?.nacidoDeFactura === true,
         productosDelPapel: vivos.reduce((a, x) => a + x.productosDelPapel, 0),
         conProducto: vivos.reduce((a, x) => a + x.conProducto, 0),

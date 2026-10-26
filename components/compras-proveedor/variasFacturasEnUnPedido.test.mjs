@@ -119,7 +119,7 @@ test("LA PANTALLA CONCATENA LOS RENGLONES DE TODAS LAS FACTURAS", () => {
 
 test("LA TARJETA ES DE FACTURAS, Y DICE EL PEDIDO CONTRA TODAS", () => {
   const panel = codigoDe("components/comprobantes/PanelComprobantes.jsx");
-  assert.match(panel, /\+ Agregar factura/);
+  assert.match(panel, /\+ Agregar comprobante/);
   assert.match(panel, /Pedido contra facturas/);
   assert.match(panel, /de \$\{cobertura\.totalPedido\} llegaron/);
   // "Leyendo" también cuando la lectura la lanzó otra pantalla o la misma antes

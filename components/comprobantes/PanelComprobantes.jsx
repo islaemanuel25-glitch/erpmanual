@@ -205,10 +205,32 @@ export default function PanelComprobantes({
    * día que una se filtre distinto.
    */
   onMalLeidos = null,
+  /**
+   * Cómo están los papeles, avisado hacia afuera: una firma con el id, el
+   * estado y la hora de lectura de cada uno.
+   *
+   * ── SIN ESTO LA LISTA DE ABAJO NO SE DIBUJABA DESPUÉS DE LEER ──────────
+   *
+   * La pantalla de recibir pedía la conciliación cuando cambiaba la CANTIDAD
+   * de comprobantes. Subir la factura la pasaba de 0 a 1 y la pedía con el
+   * papel todavía sin leer —cero renglones—; leerlo dejaba la cantidad en 1 y
+   * no la volvía a pedir. Así quedó el #298: «está señalado abajo» y abajo
+   * nada, hasta refrescar. Con la firma, leer, releer o borrar la cambia.
+   */
+  onPapeles = null,
+  /**
+   * El pedido contra las facturas, contado por la conciliación de la pantalla:
+   * la MISMA cuenta que arma la lista de abajo. La lista de comprobantes solo
+   * veía los vínculos guardados a mano, así que con 15 renglones leídos y
+   * atados solos decía «0 de 24 llegaron».
+   */
+  coberturaDelPedido = null,
 }) {
   const router = useRouter();
   const [items, setItems] = useState([]);
-  const [cobertura, setCobertura] = useState(null);
+  const [coberturaListada, setCoberturaListada] = useState(null);
+  const cobertura =
+    coberturaListada || coberturaDelPedido ? { ...coberturaListada, ...coberturaDelPedido } : null;
   const [cuota, setCuota] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [subiendo, setSubiendo] = useState(false);
@@ -228,8 +250,10 @@ export default function PanelComprobantes({
 
   const resumen = useMemo(() => resumenDeLista(items), [items]);
 
+  // El cargando es SOLO el de la primera vez. Recargar después de subir, leer o
+  // borrar cambiaba la lista entera por la ruedita y la volvía a poner: todo lo
+  // de abajo subía y bajaba en cada toque.
   async function recargar() {
-    setCargando(true);
     try {
       const q = pedidoId ? `pedidoId=${pedidoId}` : `proveedorId=${proveedorId}`;
       const r = await fetch(`/api/compras-proveedor/comprobantes/listar?${q}`);
@@ -238,7 +262,8 @@ export default function PanelComprobantes({
         setItems(d.items || []);
         onCantidad?.((d.items || []).length);
         onMalLeidos?.((d.items || []).filter((c) => c.estado === "MAL_LEIDO").map((c) => c.id));
-        setCobertura(d.cobertura ?? null);
+        onPapeles?.((d.items || []).map((c) => `${c.id}:${c.estado}:${c.leidoEn ?? ""}`).join("|"));
+        setCoberturaListada(d.cobertura ?? null);
         setCuota(d.cuota ?? null);
       } else setMensaje({ tipo: "error", texto: d.error });
     } finally {
@@ -575,6 +600,26 @@ export default function PanelComprobantes({
   const alternar = (id) =>
     setSeleccion((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
+  // ── AGREGAR OTRO COMPROBANTE, SIEMPRE DEBAJO DE LA LISTA ───────────────
+  //
+  // Un pedido puede venir con varias boletas o facturas, y se agrupan por
+  // comprobante en el orden en que se subieron. El botón está haya cero, uno o
+  // varios, con el mismo texto y en el mismo lugar: que aparezca o cambie de
+  // tamaño al cargar el primero movería todo lo de abajo. Es la MISMA subida
+  // que la del primero —el mismo campo, la misma validación, el mismo
+  // circuito—: solo cambia desde dónde se toca.
+  const botonAgregar = puedeRecibir ? (
+    <SunmiButton
+      color="slate"
+      type="button"
+      disabled={subiendo}
+      onClick={() => inputRef.current?.click()}
+      className="mt-2 w-full min-h-toque justify-center text-sm3 font-bold"
+    >
+      {subiendo ? "Subiendo…" : "+ Agregar comprobante"}
+    </SunmiButton>
+  ) : null;
+
   return (
     <SunmiCard className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -604,25 +649,21 @@ export default function PanelComprobantes({
                 (resumen.sinLeer ? ` · ${resumen.sinLeer} sin leer` : "")}
           </p>
         </div>
-        {/* ── EL BOTÓN PROPIO DEL PANEL SE CALLA CUANDO LA PANTALLA PONE
-            EL SUYO ────────────────────────────────────────────────────────
-            Con la pantalla de recibir dibujando su bloque de "Sacar foto",
-            este quedaba justo encima: dos botones pegados que hacen lo mismo,
-            y el de arriba naranja y de ancho completo. Mientras no haya ningún
-            comprobante y la pantalla haya puesto su cara, manda la de ella. */}
-        {puedeRecibir && !vacio && (
+        {/* ── AGREGAR UN COMPROBANTE YA NO VA ACÁ ARRIBA ──────────────────
+            Se mudó debajo de la lista, y está siempre. Acá se callaba cuando
+            la pantalla ponía su bloque de "Sacar foto" —eran dos botones
+            pegados que hacían lo mismo—, pero el bloque solo se dibuja sin
+            ningún comprobante: con la primera factura cargada no quedaba
+            ninguna forma de subir la segunda (Mauro #298). Quedan las dos
+            acciones sobre lo ya subido, que solo aparecen cuando hay algo
+            que hacer con ellas. */}
+        {puedeRecibir && (seleccion.length >= 2 || resumen.sinLeer > 0) && (
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {seleccion.length >= 2 && (
               <SunmiButton color="slate" type="button" onClick={unir}>
                 Unir {seleccion.length} en uno
               </SunmiButton>
             )}
-            {/* LA ACCIÓN PRINCIPAL DE LA PANTALLA, y se toca con el dedo en el
-                Sunmi. Los 36px del botón del kit alcanzan para el mouse y no
-                para el pulgar: `py-3` lo lleva a 44, que es la medida a la que
-                se apunta sin errarle. Y a lo ancho en el celular, donde no hay
-                nada que compita por ese espacio: el blanco alrededor de un
-                botón chico es lo que lo hacía parecer una etiqueta. */}
             {/* ── LEER LAS QUE FALTAN, DE UN TOQUE ─────────────────────
                 Cada foto se lee por separado, así que diez fotos son diez
                 lecturas. Tocarlas de a una es el trabajo que esta tanda vino a
@@ -640,18 +681,6 @@ export default function PanelComprobantes({
                 {leyendo != null ? "Leyendo…" : `Leer las ${resumen.sinLeer} sin leer`}
               </SunmiButton>
             )}
-            {/* LA ACCIÓN PRINCIPAL. Dice FACTURA y no "fotos": lo que se agrega
-                es una factura, y que sean una o tres fotos es un detalle de
-                cómo se saca. */}
-            <SunmiButton
-              color="amber"
-              type="button"
-              disabled={subiendo}
-              onClick={() => inputRef.current?.click()}
-              className="py-3 px-5 text-sm font-bold w-full sm:w-auto justify-center"
-            >
-              {subiendo ? "Subiendo…" : "+ Agregar factura"}
-            </SunmiButton>
           </div>
         )}
         <SunmiInput
@@ -730,11 +759,14 @@ export default function PanelComprobantes({
         // es la única acción que hay para hacer en ese estado. Los dos
         // disparadores salen de este panel: el circuito de subida sigue siendo
         // uno solo.
-        vacio({
-          sacarFoto: () => inputCamaraRef.current?.click(),
-          subir: () => inputRef.current?.click(),
-          subiendo,
-        })
+        <>
+          {vacio({
+            sacarFoto: () => inputCamaraRef.current?.click(),
+            subir: () => inputRef.current?.click(),
+            subiendo,
+          })}
+          {botonAgregar}
+        </>
       ) : (
         <>
           {/* ── Escritorio: tabla ────────────────────────────────────── */}
@@ -894,6 +926,8 @@ export default function PanelComprobantes({
             })}
           </div>
 
+          {botonAgregar}
+
           {/* ── EL PEDIDO CONTRA TODAS LAS FACTURAS ──────────────────────
               Es la última línea de la tarjeta a propósito: se lee después de
               las facturas, que es el orden en que se piensa —«tengo estas
@@ -917,15 +951,19 @@ export default function PanelComprobantes({
                   </span>
                 </div>
               )
-            : cobertura?.totalPedido > 0 && (
+            : // El renglón está desde que hay una factura, aunque la cuenta
+              // todavía no haya llegado: aparecer después empujaría la lista.
+              items.length > 0 && (
             <div className="md:hidden mt-2 pt-2 border-t sunmi-border flex items-center justify-between gap-2">
               <span className="text-xs sunmi-text-strong">Pedido contra facturas</span>
               <span
                 className={`text-xs font-bold shrink-0 ${
-                  cobertura.sinCubrir === 0 ? TONOS.ok : TONOS.neutro
+                  cobertura?.cubiertas != null && cobertura.sinCubrir === 0 ? TONOS.ok : TONOS.neutro
                 }`}
               >
-                {`${cobertura.cubiertas} de ${cobertura.totalPedido} llegaron`}
+                {cobertura?.cubiertas != null
+                  ? `${cobertura.cubiertas} de ${cobertura.totalPedido} llegaron`
+                  : "Comparando…"}
               </span>
             </div>
           )}

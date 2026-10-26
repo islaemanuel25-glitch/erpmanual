@@ -113,6 +113,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   // de abajo queda trabada hasta que cierre. La lista la avisa
   // `PanelComprobantes`, que ya la tiene cargada.
   const [malLeidos, setMalLeidos] = useState([]);
+  // Cómo están los papeles —id, estado y hora de lectura de cada uno—. Leer
+  // una factura no cambia CUÁNTAS hay, y la conciliación se pedía solo por la
+  // cantidad: quedaba la de antes de leer, con cero renglones (#298).
+  const [firmaDeLosPapeles, setFirmaDeLosPapeles] = useState("");
 
   // ── LA FACTURA LEÍDA, CON SUS LÍNEAS EN EL ORDEN DEL PAPEL ─────────────
   //
@@ -493,7 +497,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     return () => {
       vigente = false;
     };
-  }, [pedido?.id, pedido?.estado, hayComprobantes, pidioSinFactura, recargarConciliacion]);
+  }, [pedido?.id, pedido?.estado, hayComprobantes, firmaDeLosPapeles, pidioSinFactura, recargarConciliacion]);
 
   // ── LO QUE LA HOJA GUARDA ───────────────────────────────────────────────
   //
@@ -1435,6 +1439,9 @@ export default function DetallePedidoProveedorPage({ params }) {
             puedeRecibir={esRecepcion}
             onCantidad={setHayComprobantes}
             onMalLeidos={setMalLeidos}
+            onPapeles={setFirmaDeLosPapeles}
+            // Cuánto del pedido llegó, con la cuenta de la lista de abajo.
+            coberturaDelPedido={conciliacion?.cobertura ?? null}
             // ── SIN COMPROBANTES Y RECIBIENDO: EL BLOQUE DE LA FACTURA ─────
             //
             // El panel sigue siendo el dueño de la subida —el endpoint, la
@@ -1450,12 +1457,11 @@ export default function DetallePedidoProveedorPage({ params }) {
             // fotos", según hubiera o no un papel cargado. Eran las dos caras
             // del mismo panel alternándose, y eso es lo que se veía desprolijo.
             //
-            // Ahora la subida es SIEMPRE el bloque de la foto —el panel ya no
-            // dibuja su botón en esta pantalla— y cuando hay comprobantes el
-            // panel suma su lista debajo, que es de donde sale "Leer". La
-            // ranura solo dibuja el bloque grande cuando no hay ninguno: con
+            // La ranura solo dibuja el bloque grande cuando no hay ninguno: con
             // uno cargado, lo que hace falta arriba es la lista, no volver a
-            // ofrecer la foto en tamaño protagonista.
+            // ofrecer la foto en tamaño protagonista. Debajo de la lista —o
+            // del bloque— el panel deja siempre «+ Agregar comprobante», con
+            // la misma subida: un pedido puede venir con varias boletas.
             vacio={
               esRecepcion && !sinFactura
                 ? ({ sacarFoto, subir, subiendo }) => (
