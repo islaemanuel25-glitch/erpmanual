@@ -228,7 +228,7 @@ export default function TransferenciaDetallePage() {
     const { default: imprimir } = await import(
       "@/lib/transferencias/ticketTransferencia"
     );
-    imprimir(item, me);
+    imprimir(item);
   };
 
   // ===============================
@@ -724,7 +724,6 @@ export default function TransferenciaDetallePage() {
             <AccionesRecepcion
               id={id}
               item={item}
-              me={me}
               puedeRecibir={puedeRecibir}
               guardando={guardando}
               // ── SIN GUARDADO POR LOTES CUANDO SE ESTÁ RECIBIENDO ────────

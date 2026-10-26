@@ -70,20 +70,6 @@ export async function GET(req) {
         destino: {
           select: { id: true, nombre: true },
         },
-        // La venta de la que nació, si nació de una. Solo para el ticket POS:
-        // imprime las líneas de la venta —nombre y cantidad como se vendieron,
-        // en bultos— y no las del remito, que van en unidades sueltas. Por `id`
-        // ascendente porque `pos-ventas/crear` crea los detalles uno por uno en
-        // el orden del carrito, que es el orden del ticket de Posventa.
-        venta: {
-          select: {
-            numero: true,
-            detalles: {
-              select: { nombre: true, cantidad: true },
-              orderBy: { id: "asc" },
-            },
-          },
-        },
         detalle: {
           include: {
             producto: {
@@ -517,18 +503,6 @@ export async function GET(req) {
         id: transferencia.destino.id,
         nombre: transferencia.destino.nombre,
       },
-      // Las líneas de la venta asociada, tal como las imprime su ticket. Lo lee
-      // SOLO el ticket POS de la transferencia; el remito, el stock y la
-      // valorización siguen saliendo de `items`. `null` sin venta asociada.
-      ventaAsociada: transferencia.venta
-        ? {
-            numero: transferencia.venta.numero,
-            lineas: transferencia.venta.detalles.map((d) => ({
-              nombre: d.nombre,
-              cantidad: toNumber(d.cantidad),
-            })),
-          }
-        : null,
       // Usuario al que se atribuye el envío. `null` cuando la transferencia no
       // guardó autor o el usuario ya no existe: la pantalla muestra "—".
       creadaPor: creadaPor ? { id: creadaPor.id, nombre: creadaPor.nombre } : null,

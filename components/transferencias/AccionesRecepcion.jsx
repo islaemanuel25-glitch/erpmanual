@@ -23,7 +23,6 @@ export const AVISO_SIN_GUARDAR = "Guardá los cambios antes de confirmar.";
 export default function AccionesRecepcion({
   id,
   item,
-  me,
   puedeRecibir,
   guardando,
   confirmarRecepcion,
@@ -59,7 +58,7 @@ export default function AccionesRecepcion({
     const { default: imprimirTicketDeTransferencia } = await import(
       "@/lib/transferencias/ticketTransferencia"
     );
-    imprimirTicketDeTransferencia(item, me);
+    imprimirTicketDeTransferencia(item);
   };
 
   return (
