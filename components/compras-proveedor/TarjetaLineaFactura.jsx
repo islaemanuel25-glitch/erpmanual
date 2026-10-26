@@ -42,8 +42,10 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import SunmiAccionRapida, { TEXTO_COINCIDE } from "@/components/sunmi/SunmiAccionRapida";
 import { formatearMoneda } from "@/lib/moneda";
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
+import { DECISION_DE_PRECIO, decisionVigente, textoDeDecision } from "@/lib/compras-proveedor/decisionDePrecio";
 import { tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
 import {
   AVISO_NO_DA_EL_PAPEL,
@@ -58,18 +60,20 @@ import {
   diferenciaDeCantidad,
   estadoDeLinea,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
-// ── LA DECISIÓN DE PRECIO YA NO SE MIRA DESDE LA TARJETA ──────────────────
+// ── LA DECISIÓN DE PRECIO SE TOMA EN LA HOJA, LA TARJETA SOLO LA DICE ──────
 //
-// Se importaban `decisionVigente`, `hayQueDecidirElPrecio` y `precioCambio`
-// para elegir entre el bloque tachado y el de "Ya decidido", que eran los dos
-// que se fueron. La decisión no cambió de reglas: sigue viviendo en la hoja de
-// Corregir, que es la que la toma y la guarda.
+// La hoja de Corregir es la que la toma y la guarda. La tarjeta solo dice
+// "Dejás tu precio" cuando esa decisión está sobre algo que no coincide
+// (`dejaSuPrecio`, Pablo #337): sin eso, una tarjeta en "Coincide" o en alerta
+// contaría otra cosa que lo que se decidió.
 
-/** Las mismas dos clases de botón que usa la tarjeta de transferencias. */
-const CLASE_COINCIDE = "sunmi-btn-accent-outline";
+/** La clase de "Corregir", la misma que usa la tarjeta de transferencias. */
 const CLASE_CORREGIR = "sunmi-btn-accent-suave";
 
-export const TEXTO_COINCIDE = "✓ Coincide";
+// "✓ Coincide" es la acción rápida del kit, la de la tarjeta de transferencias
+// (Emanuel, 2026-10-26): acá era un `SunmiLinkButton` que se veía como una
+// etiqueta chica y cuadrada.
+export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
@@ -186,9 +190,20 @@ export default function TarjetaLineaFactura({
   // Sin pedido previo NADA es "no pedido": no hubo pedido. Pintar de rojo una
   // línea por no estar en un pedido que no existió sería marcar como problema
   // la mercadería que se está recibiendo.
+  // ── "DEJO MI PRECIO" SOBRE ALGO QUE NO COINCIDE ─────────────────────────
+  //
+  // Emanuel, 2026-10-26 (Pablo #337, Chandon y Santa Julia): "dejo mi precio"
+  // quiere decir que el costo no se toca, NO que coincida. La tarjeta dice la
+  // decisión —"Dejás tu precio" y cuál— en vez de "Coincide", y no vuelve a
+  // frenar: no hay nada que resolver, así que tampoco va en tono de alerta.
+  const dejaSuPrecio =
+    estado !== ESTADO_LINEA.COINCIDE &&
+    fila?.decisionPrecio?.decision === DECISION_DE_PRECIO.DEJA_EL_MIO &&
+    (frenoYaDecidido(fila) || decisionVigente(fila) != null) &&
+    renglones.erp != null;
   const tono = esNoPedida && !sinPedidoPrevio
     ? "sunmi-state-danger"
-    : estado === ESTADO_LINEA.COINCIDE
+    : estado === ESTADO_LINEA.COINCIDE || dejaSuPrecio
       ? ""
       : "sunmi-state-warning";
 
@@ -220,6 +235,11 @@ export default function TarjetaLineaFactura({
           )}
           {fila?.corridaSospechada !== true && !escalaSinDeducir(fila) && cuadraConElPapel(fila) === false && (
             <p className="text-sm2 sunmi-text-warning break-words">{AVISO_NO_DA_EL_PAPEL}</p>
+          )}
+          {dejaSuPrecio && (
+            <p className="text-sm2 sunmi-text-muted break-words">
+              {textoDeDecision(DECISION_DE_PRECIO.DEJA_EL_MIO)} · {formatearMoneda(renglones.erp.importe)} / {renglones.erp.unidad}
+            </p>
           )}
 
           {sinVincular ? (
@@ -361,7 +381,7 @@ export default function TarjetaLineaFactura({
             La decisión de precio no se movió: sigue viviendo en la hoja de
             Corregir, con los mismos dos caminos. */}
         {!esNoPedida && !sinVincular && estado === ESTADO_LINEA.COINCIDE && (
-          <SunmiLinkButton
+          <SunmiAccionRapida
             onClick={() => onCoincide?.(fila)}
             disabled={guardando}
             aria-label={
@@ -369,10 +389,9 @@ export default function TarjetaLineaFactura({
                 ? `Llegó lo pedido de ${fila?.producto || "este producto"}`
                 : `Aceptar lo que dice la factura para ${fila?.producto || "este producto"}`
             }
-            className={`shrink-0 no-underline ${CLASE_COINCIDE}`}
           >
             {TEXTO_COINCIDE}
-          </SunmiLinkButton>
+          </SunmiAccionRapida>
         )}
       </div>
 
