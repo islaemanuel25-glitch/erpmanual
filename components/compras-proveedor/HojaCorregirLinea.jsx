@@ -475,7 +475,14 @@ export default function HojaCorregirLinea({
   const viaPack = fila?.unidad?.unidad === "POR_PRESENTACION" ? lecturaElegida(fila.unidad) : null;
   const explicacionDeLaUnidad = fila?.unidad?.explicacion ?? null;
   const fraseDeLaUnidad =
-    viaPack || fila?.unidad?.requiereDecision ? explicacionDeLaUnidad?.frase ?? null : null;
+    viaPack || fila?.unidad?.requiereDecision || explicacionDeLaUnidad?.noCompletanPacks
+      ? explicacionDeLaUnidad?.frase ?? null
+      : null;
+  // Pablo #337: cuando las unidades no completan packs la frase lo dice todo
+  // —"El papel dice 30 unidades. No completan packs de 6: cargá cuántas
+  // entraron."— y un "la factura dice 2.5" al lado volvería a hablar en packs
+  // que no existen.
+  const soloLaFrase = explicacionDeLaUnidad?.noCompletanPacks === true;
 
   useEffect(() => {
     if (!abierta || !fila) return;
@@ -979,11 +986,17 @@ export default function HojaCorregirLinea({
             <span className="text-sm3 sunmi-text-muted">
               {sinPapel
                 ? `Pediste ${limpio(fila.cantidadPedida)}`
-                : sinPedidoPrevio
-                  ? `La factura dice ${loQueDiceLaFactura}`
-                  : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${loQueDiceLaFactura}`}
-              {fraseDeLaUnidad
-                ? ` · ${fraseDeLaUnidad}${explicacionDeLaUnidad?.avisoDivision ? `. ${explicacionDeLaUnidad.avisoDivision}` : ""}`
+                : soloLaFrase
+                  ? sinPedidoPrevio
+                    ? fraseDeLaUnidad
+                    : `Pediste ${limpio(fila.cantidadPedida)} · ${fraseDeLaUnidad}`
+                  : sinPedidoPrevio
+                    ? `La factura dice ${loQueDiceLaFactura}`
+                    : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${loQueDiceLaFactura}`}
+              {soloLaFrase
+                ? ""
+                : fraseDeLaUnidad
+                ? ` · ${fraseDeLaUnidad}`
                 : convertida
                   ? ` · el papel dice ${limpio(fila.cantidad)} u`
                   : ""}
