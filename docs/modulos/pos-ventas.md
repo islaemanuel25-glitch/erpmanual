@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-26 15:19
+**Última actualización:** 2026-10-26 15:49
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-26: fix(tickets): una venta por peso se imprime "3,615 kg x $11.018,49" y la fila parte el renglón en vez de cortar el número —en Posventa y en Transferencias—
 - 2026-10-26: fix(transferencias): cada línea del ticket sale como Posventa imprime esa venta —bultos en bultos, sueltas aparte, sin prefijo—
 - 2026-10-26: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
 - 2026-10-24: feat(turnos): Turnos y cierres, nueva y anterior, solo para dueño y admin — SIN VERIFICAR en pantalla
