@@ -161,10 +161,10 @@ export default function ListaDeLaFactura({
 
   // ── QUÉ SE PIERDE CON ESTE PAPEL, EN UNA LÍNEA ────────────────────────
   //
-  // Un comprobante SIN_TOTAL se concilia igual, pero hay algo que no se pudo
-  // hacer y quien controla tiene que saberlo antes de empezar: no hubo total
-  // impreso contra el cual verificar la lectura. Va en una línea y no en un
-  // párrafo, porque es un dato y no una explicación.
+  // Un comprobante SIN_TOTAL se verificó con la suma de sus renglones, no
+  // contra un total impreso, y quien controla tiene que saber cuál de las dos
+  // fue. Va en una línea y no en un párrafo, porque es un dato y no una
+  // explicación.
   // ── Y ACÁ SE ESCAPABA "MAL_LEIDO" A LA PANTALLA ──────────────────────
   //
   // El último `||` devolvía el ESTADO CRUDO del enum, así que un comprobante
@@ -174,7 +174,7 @@ export default function ListaDeLaFactura({
   // caía al enum.
   const avisoDelComprobante =
     comprobante?.estado === "SIN_TOTAL"
-      ? "Sin total impreso: controlá el papel producto por producto."
+      ? "Sin total impreso: verificada con la suma de los productos."
       : comprobante?.estado === "CARGADO"
         ? "Lectura verificada contra el total del papel."
         : comprobante?.estado
@@ -262,7 +262,8 @@ export default function ListaDeLaFactura({
             <span className="font-semibold sunmi-text-strong truncate">
               {comprobante?.identidad || `Factura #${comprobante?.id}`}
             </span>
-            <SunmiPill color={comprobante?.estado === "SIN_TOTAL" ? "amber" : "slate"}>
+            {/* Gris, no ámbar: sin total ya no es algo que revisar (Mauro #298). */}
+            <SunmiPill color="slate">
               {comprobante?.estado === "SIN_TOTAL" ? "Sin total" : "Leída"}
             </SunmiPill>
           </div>
