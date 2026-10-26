@@ -582,6 +582,8 @@ export async function POST(req, { params }) {
       where: {
         comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
         pedidoDetalleId: { not: null },
+        // Lo que una persona dijo que no vino no es del papel.
+        noVino: false,
       },
       select: {
         pedidoDetalleId: true,

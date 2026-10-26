@@ -144,6 +144,14 @@ const limpio = (n) => {
   return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
 };
 
+/** El precio de la unidad que sale de lo puesto: importe ÷ cantidad. Se muestra, no se escribe. */
+function precioDeLaUnidad(cantidad, importe) {
+  const c = Number(cantidad);
+  const i = Number(importe);
+  const precio = cantidad !== "" && importe !== "" && c > 0 && i >= 0 ? formatearMoneda(i / c) : "—";
+  return `Precio de la unidad: ${precio}`;
+}
+
 /**
  * UN BLOQUE DE LA HOJA: línea fina arriba, título, y su contenido.
  *
@@ -331,6 +339,11 @@ export default function HojaCorregirLinea({
    * registrado quién puso qué, y vuelve a hacer la cuenta del papel.
    */
   onCorregirPapel = null,
+  /**
+   * «No vino» y su deshacer: `(fila, noVino)`. Saca el producto del papel —ni
+   * stock ni costo— por la misma ruta que lo corregido, que lo registra.
+   */
+  onNoVino = null,
 }) {
   // La fila la armó `filaSinPapel`: es una línea del pedido que llegó sin
   // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
@@ -426,11 +439,11 @@ export default function HojaCorregirLinea({
   // cierre terminaba calculando 3 × el peso de referencia, 1,65 kg, en vez de
   // los 2,100 que el proveedor facturó.
   const [kilos, setKilos] = useState("");
-  // Lo que dice el papel en este renglón, cuando el papel no cierra: arranca en
-  // lo que leyó el lector y la persona lo cambia mirando la foto.
+  // Lo que dice el papel de este producto: arranca en lo que leyó el lector y
+  // la persona lo cambia mirando la foto. Dos números —cantidad e importe—; el
+  // precio de la unidad sale de los dos (2026-10-26).
   const [papelCantidad, setPapelCantidad] = useState("");
-  const [papelPrecio, setPapelPrecio] = useState("");
-  const [papelTotal, setPapelTotal] = useState("");
+  const [papelImporte, setPapelImporte] = useState("");
 
   // Al abrir se arranca de lo que ya hay: lo contado antes si lo hubo, y si no
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
@@ -495,11 +508,7 @@ export default function HojaCorregirLinea({
     setDetalleMotivo(fila.motivoDetalle ?? "");
     const delPapel = fila.correccionDelPapel;
     setPapelCantidad(delPapel?.cantidad != null ? String(delPapel.cantidad) : "");
-    setPapelPrecio(delPapel?.netoUnitario != null ? String(delPapel.netoUnitario) : "");
-    // En la lectura interpretada el campo es el costo final del renglón, que es
-    // con lo que se costea y lo que suma contra el total.
-    const totalDelPapel = delPapel?.interpretado ? delPapel?.costoFinal : delPapel?.subtotal;
-    setPapelTotal(totalDelPapel != null ? String(totalDelPapel) : "");
+    setPapelImporte(delPapel?.importe != null ? String(delPapel.importe) : "");
     // La opción marcada arranca en lo que se decidió la vez pasada, si sigue
     // valiendo. Sin esto, "Cambiar" mostraría "Aceptar el precio nuevo"
     // seleccionado sobre una línea donde se había dicho lo contrario, y un
@@ -680,20 +689,15 @@ export default function HojaCorregirLinea({
     //
     // Primero, y si falla no se sigue: el renglón corregido es la base de
     // todo lo demás. Solo viaja lo que cambió respecto de lo leído.
+    // Viajan los DOS números juntos si cambió alguno: el precio y el costo se
+    // rehacen con los dos (`productoPuestoAMano`).
     const delPapel = fila?.correccionDelPapel;
-    if (delPapel && onCorregirPapel) {
+    if (delPapel && onCorregirPapel && !fila.noVino) {
       const aNumero = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
-      const cambiado = {};
-      for (const [campo, valor] of [
-        ["cantidad", papelCantidad],
-        ["netoUnitario", papelPrecio],
-        [delPapel.interpretado ? "costoFinal" : "subtotal", papelTotal],
-      ]) {
-        const puesto = aNumero(valor);
-        if (puesto !== null && Number.isFinite(puesto) && puesto !== aNumero(delPapel[campo])) cambiado[campo] = puesto;
-      }
-      if (Object.keys(cambiado).length) {
-        const r = await onCorregirPapel({ comprobanteId: delPapel.comprobanteId, orden: delPapel.orden, ...cambiado });
+      const cantidad = aNumero(papelCantidad);
+      const importe = aNumero(papelImporte);
+      if (cantidad !== aNumero(delPapel.cantidad) || importe !== aNumero(delPapel.importe)) {
+        const r = await onCorregirPapel({ comprobanteId: delPapel.comprobanteId, orden: delPapel.orden, cantidad, importe });
         if (!r?.ok) {
           setError(r?.error || "No se pudo guardar lo que dice el papel.");
           return;
@@ -912,17 +916,20 @@ export default function HojaCorregirLinea({
           </div>
           )}
 
-          {/* ── CUANDO EL PAPEL NO CIERRA: LO QUE DICE ESTE RENGLÓN ────────
-              Secco #256. Lo que leyó el lector, para corregirlo a mano mirando
-              la foto. Al guardar se rehace la cuenta del papel; si cierra, el
-              papel pasa a cerrado y vuelve a proponer costos. Los tres campos
-              son el de kilos de abajo, el mismo armado. */}
+          {/* ── LO QUE DICE EL PAPEL DE ESTE PRODUCTO ──────────────────────
+              La salida a mano cuando la lectura falla (Emanuel, 2026-10-26):
+              en cualquier papel que no se recibió, no solo en el que no cerró.
+              Cantidad e importe, mirando la foto; el precio de la unidad sale
+              de los dos y se muestra, no se escribe. Al guardar se rehace la
+              cuenta del papel con las mismas reglas; si cierra, propone costos.
+              Y «No vino» lo saca del papel: ni stock ni costo, y se deshace con
+              el mismo botón. El bloque tiene siempre las mismas filas: tocar
+              no agrega ni saca nada. */}
           {fila.correccionDelPapel && onCorregirPapel && (
             <Bloque titulo="Lo que dice el papel">
               {[
                 ["Cantidad", papelCantidad, setPapelCantidad, 3],
-                ["Precio", papelPrecio, setPapelPrecio, 3],
-                [fila.correccionDelPapel.interpretado ? "Costo final" : "Total", papelTotal, setPapelTotal, 2],
+                ["Importe", papelImporte, setPapelImporte, 2],
               ].map(([rotulo, valor, onCambiar, decimales]) => (
                 <div key={rotulo} className="w-full">
                   <div className="text-sm2 sunmi-text-muted truncate">{rotulo}</div>
@@ -935,9 +942,23 @@ export default function HojaCorregirLinea({
                     tipo="number"
                     claseMarco="flex-1"
                     claseInput="text-lg"
+                    deshabilitado={guardando || fila.noVino}
                   />
                 </div>
               ))}
+              <span className="text-sm3 sunmi-text-muted truncate">
+                {precioDeLaUnidad(papelCantidad, papelImporte)}
+              </span>
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={guardando}
+                aria-pressed={fila.noVino === true}
+                onClick={() => onNoVino?.(fila, !fila.noVino)}
+                className="w-full min-h-toque justify-center text-sm3"
+              >
+                {fila.noVino ? "Vino: deshacer «No vino»" : "No vino"}
+              </SunmiButton>
             </Bloque>
           )}
 

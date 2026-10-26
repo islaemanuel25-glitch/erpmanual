@@ -16,8 +16,14 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **91 migraciones**, las mismas que el árbol, la
-última `20261026030000_comprobante_linea_acomodo`.
+Producción está en **91 migraciones**, la última
+`20261026030000_comprobante_linea_acomodo`. Falta una:
+
+- `20261026032827_renglon_no_vino_y_corregido` — ADITIVA: dos columnas en
+  `ComprobanteLinea`, `noVino` (booleana, falso por defecto) y
+  `corregidoAManoEn` (fecha nula). No rellena ninguna fila. **Va ANTES de la
+  imagen**: la conciliación, la corrección a mano y el recibir leen las dos
+  columnas, y con la imagen nueva sobre la base vieja se caen.
 
 La `20261026030000_comprobante_linea_acomodo` se aplicó con el despliegue de
 `7a50f0e5` (2026-10-26): el contenedor descartable informó las **91** del

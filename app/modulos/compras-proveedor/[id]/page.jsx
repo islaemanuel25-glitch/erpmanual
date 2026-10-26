@@ -1708,6 +1708,17 @@ export default function DetallePedidoProveedorPage({ params }) {
               onDejarMiPrecio={dejarMiPrecioDeLinea}
               onGuardar={guardarCorreccion}
               onCorregirPapel={corregirPapel}
+              // «No vino»: lo saca del papel por la misma corrección, que lo
+              // registra, y queda revisado —es una decisión sobre el producto—.
+              onNoVino={async (fila, noVino) => {
+                const delPapel = fila?.correccionDelPapel;
+                if (!delPapel) return;
+                const r = await corregirPapel({ comprobanteId: delPapel.comprobanteId, orden: delPapel.orden, noVino });
+                if (r?.ok) {
+                  marcarRevisada(fila, true);
+                  setLineaACorregir(null);
+                }
+              }}
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}
               onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}

@@ -258,10 +258,15 @@ test("LA CORRECCIÓN SE GUARDA, Y EL PAPEL VUELVE A PASAR POR LA MISMA PUERTA", 
   // no puede haber es un segundo criterio para decidir si cierra.
   const r = codigoDe(RUTA_CORREGIR);
   assert.match(r, /comprobanteLinea\.updateMany/);
-  assert.match(r, /pasarPorLaPuerta\(\{ lectura, receta: c\.recetaUsada/);
+  assert.match(r, /pasarPorLaPuerta\(\{ lectura: lecturaDesdeLoGuardado\(\{ \.\.\.c, lineas: comoQuedan \}\), receta: c\.recetaUsada/);
   assert.match(r, /estado: puerta\.estado/);
-  // Solo se corrige lo que no cerró: un CARGADO ya tiene costos propuestos.
-  assert.match(r, /c\.estado !== ESTADO\.MAL_LEIDO/);
+  // Desde el 2026-10-26 se corrige cualquier papel que no se haya recibido (el
+  // lector puede fallar con cualquiera). Lo que ya se aplicó, no.
+  // El comprobante no tiene relación con el pedido, solo `pedidoId`: pedir
+  // `pedido` en el select se cae contra Postgres. El estado se lee aparte.
+  assert.match(r, /prisma\.pedidoProveedor\.findFirst\(\{ where: \{ id: c\.pedidoId, grupoId \}/);
+  assert.match(r, /c\.confirmadoEn != null \|\| pedido\?\.estado === "RECIBIDO"/);
+  assert.doesNotMatch(r, /pedido: \{ select/);
   // Y no reescribe la lectura: el modelo, el consumo y el pie son de la
   // llamada de IA que ya pasó y no cambian porque alguien corrija un número.
   for (const campo of ["modeloLectura", "recetaUsada", "totalLeido", "tokensEntrada", "leidoEn"]) {

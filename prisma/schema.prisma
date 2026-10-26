@@ -5990,6 +5990,18 @@ model ComprobanteLinea {
   /// revisado: es una decisión sobre el renglón, no un número del papel.
   subtotalCorregido Decimal? @db.Decimal(12, 2)
 
+  /// "NO VINO" (Emanuel, 2026-10-26): el lector puede leer un producto que no
+  /// está —una fila corrida del papel de Mauro #298—. Una persona lo saca desde
+  /// la hoja de Corregir: no entra stock ni costo y no suma a la cuenta del
+  /// papel. Se puede deshacer antes de recibir. Lo que había leído queda en
+  /// `CorreccionManualRenglon`.
+  noVino            Boolean   @default(false)
+  /// CUÁNDO LO TOCÓ UNA PERSONA desde la hoja de Corregir: cantidad, importe o
+  /// "No vino". Con esto puesto, el recálculo automático al abrir el pedido no
+  /// lo vuelve a pisar —ni completar el costo, ni acomodar filas corridas—: lo
+  /// que tocó una persona manda.
+  corregidoAManoEn  DateTime?
+
   /// LO QUE INTERPRETÓ EL MODELO (2026-10-10, "seguimos de parche en parche").
   ///
   /// El costo del renglón ENTERO con todo adentro según ese papel —IVA,

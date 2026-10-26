@@ -86,6 +86,8 @@ export async function GET(req, { params }) {
       lineasDeComprobantes: [
         ...analizados.flatMap((c) =>
           (c.lineas ?? [])
+            // Lo que una persona dijo que no vino no llegó.
+            .filter((l) => l.noVino !== true)
             .map((l) => ({
               productoBaseId: l.pedidoDetalle?.productoBaseId ?? l.productoBaseId ?? null,
               comprobanteId: c.id,

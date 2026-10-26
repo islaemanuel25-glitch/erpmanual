@@ -153,9 +153,18 @@ export default function TarjetaLineaFactura({
           {/* El MISMO número que el pie de la tarjeta abierta: es la misma
               tarjeta, y decir el neto acá y el total con impuestos allá haría
               que el renglón cambiara de valor al tocarlo. */}
+          {/* «No vino» (2026-10-26): una persona lo sacó del papel desde la
+              hoja de Corregir. El mismo renglón, con la palabra en lugar del
+              número: ni stock ni costo. Tocarlo abre la hoja, que lo deshace. */}
           <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
-            {fmtCant(cantidad)}
-            {renglones.total === null ? "" : ` · ${formatearMoneda(renglones.total)}`}
+            {fila?.noVino ? (
+              "No vino"
+            ) : (
+              <>
+                {fmtCant(cantidad)}
+                {renglones.total === null ? "" : ` · ${formatearMoneda(renglones.total)}`}
+              </>
+            )}
           </span>
         </div>
         </SunmiLinkButton>
