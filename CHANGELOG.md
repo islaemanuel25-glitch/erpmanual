@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-26] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
+- **transferencias**: fix(compras): un papel leído corrido una fila se detecta con el pedido y se acomoda solo; el % del papel baja en rojo
+- **transferencias**: feat(compras): recibir lo que llega sin ningún papel — SIN VERIFICAR en pantalla
+
+
 ## [2026-10-25] - Actualización: transferencias
 
 ### Modificado

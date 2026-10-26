@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-25 23:49
+**Última actualización:** 2026-10-26 03:44
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,9 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-26: feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
+- 2026-10-26: fix(compras): un papel leído corrido una fila se detecta con el pedido y se acomoda solo; el % del papel baja en rojo
+- 2026-10-26: feat(compras): recibir lo que llega sin ningún papel — SIN VERIFICAR en pantalla
 - 2026-10-25: fix(transferencias): correcciones del detalle recibido en el teléfono tras probarlo con la 504 — SIN VERIFICAR en pantalla
 - 2026-10-25: feat(transferencias): detalle recibido en el teléfono con filtros y tarjeta de alto fijo — SIN VERIFICAR en pantalla
 - 2026-10-24: feat: listas de proveedor en dos paquetes, "Tus productos de X" y "Pueden ser de X" — SIN VERIFICAR EN PANTALLA

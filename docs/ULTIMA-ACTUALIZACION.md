@@ -1,17 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-25 23:49
+**Fecha:** 2026-10-26 03:44
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- fix(transferencias): correcciones del detalle recibido en el teléfono tras probarlo con la 504 — SIN VERIFICAR en pantalla, feat(transferencias): detalle recibido en el teléfono con filtros y tarjeta de alto fijo — SIN VERIFICAR en pantalla
-- Archivos: 2 nuevos, 3 modificados (5 total)
+- feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla), fix(compras): un papel leído corrido una fila se detecta con el pedido y se acomoda solo; el % del papel baja en rojo, feat(compras): recibir lo que llega sin ningún papel — SIN VERIFICAR en pantalla
+- Archivos: 1 modificados (1 total)
 
 
-## Archivos nuevos desde última sincronización
-- components/transferencias/DetalleRecibidoMovil.jsx
-- components/transferencias/detalleRecibidoMovil.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
