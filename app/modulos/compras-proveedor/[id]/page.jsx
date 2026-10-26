@@ -1642,6 +1642,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               // comprobante activo y no de sumar renglones: sumar solo puede
               // dar el total de los que se pudieron comparar.
               totalDelPapel={totalDeLasFacturas}
+              // De cualquiera de los papeles del pedido: el primero que lo tenga.
+              avisoDeImpuestos={
+                (conciliacion?.grupos || []).map((g) => g?.comprobante?.avisoDeImpuestos).find(Boolean) ?? null
+              }
               filas={filasDeLaRecepcion}
               onCorregir={setLineaACorregir}
               onCoincide={aceptarLoQueDiceLaFactura}

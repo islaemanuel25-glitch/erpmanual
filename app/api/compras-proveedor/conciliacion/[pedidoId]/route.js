@@ -37,6 +37,7 @@ import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSu
 import { elCatalogoSeMovio } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { LLEGADA, llegada } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import { totalAPagarDelComprobante } from "@/lib/compras-proveedor/pagoDelCierre";
+import { avisoDeImpuestos } from "@/lib/compras-proveedor/comprobante/pantalla";
 
 export async function GET(req, { params }) {
   try {
@@ -246,13 +247,39 @@ export async function GET(req, { params }) {
     // pregunta necesita la variación del proveedor, y ésta es la ruta que la
     // conoce. Es la misma regla con la que frena el cierre.
     const porId = new Map(comprobantes.map((c) => [c.id, c]));
+    // ── LOS ÚLTIMOS PAPELES CERRADOS DEL PROVEEDOR, PARA EL AVISO ─────────
+    //
+    // "Este papel no trae impuestos y este proveedor suele traerlos"
+    // (`avisoDeImpuestos`): se compara contra los suyos de otras compras, no
+    // contra los de este pedido.
+    const anteriores = proveedorId
+      ? await prisma.comprobanteProveedor.findMany({
+          where: {
+            grupoId,
+            proveedorId,
+            estado: "CARGADO",
+            leidoEn: { not: null },
+            OR: [{ pedidoId: null }, { pedidoId: { not: pedidoId } }],
+          },
+          orderBy: { leidoEn: "desc" },
+          take: 10,
+          select: {
+            tipo: true, ivaLeido: true, internoLeido: true, conceptosDelPieLeidos: true, recetaUsada: true,
+            lineas: { select: { ivaPct: true, internoUnitario: true } },
+          },
+        })
+      : [];
     const gruposConCatalogo = grupos.map((g) => ({
       ...g,
       // Lo que se le paga por este papel: el total impreso, o en un papel sin
       // total la suma de sus productos. La MISMA función que usa el cierre en
       // el servidor, para que la hoja no pida escribir lo que ya se sabe.
       comprobante: g.comprobante
-        ? { ...g.comprobante, totalAPagar: totalAPagarDelComprobante(porId.get(g.comprobante.id)) }
+        ? {
+            ...g.comprobante,
+            totalAPagar: totalAPagarDelComprobante(porId.get(g.comprobante.id)),
+            avisoDeImpuestos: avisoDeImpuestos({ papel: porId.get(g.comprobante.id), anteriores }),
+          }
         : g.comprobante,
       filas: (g.filas ?? []).map((f) => ({
         ...f,

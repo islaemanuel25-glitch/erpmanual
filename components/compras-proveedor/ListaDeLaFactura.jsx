@@ -86,6 +86,8 @@ export default function ListaDeLaFactura({
   filas: filasDelPapel = [],
   /** El total IMPRESO del papel. Es lo que muestra el rótulo "Factura". */
   totalDelPapel = null,
+  /** "Este papel no trae impuestos y este proveedor suele traerlos", o null. */
+  avisoDeImpuestos = null,
   onCorregir,
   onCoincide,
   /** Qué líneas marcó la persona como controladas. `{ pedidoDetalleId: true }` */
@@ -271,6 +273,9 @@ export default function ListaDeLaFactura({
           {/* El estado del papel en criollo, que es lo que hay que saber antes
               de empezar a controlar. */}
           <p className="text-sm2 sunmi-text-muted truncate">{avisoDelComprobante}</p>
+          {/* Un papel sin impuestos de un proveedor que suele traerlos: se
+              costea igual con el importe, y se dice (`avisoDeImpuestos`). */}
+          {avisoDeImpuestos && <p className="text-sm2 sunmi-text-warning break-words">{avisoDeImpuestos}</p>}
 
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-sm2 sunmi-text-muted">
