@@ -94,7 +94,7 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({
       ok: true,
       queHacer:
-        `Comprobante borrado, con sus ${lineas === 1 ? "1 línea" : `${lineas} líneas`} y ` +
+        `Comprobante borrado, con sus ${lineas === 1 ? "1 producto" : `${lineas} productos`} y ` +
         `${rutas.length === 1 ? "su foto" : `sus ${rutas.length} fotos`}.` +
         (huerfanos ? " Quedó un archivo sin borrar en el servidor; avisá para que lo limpien." : ""),
       lineas,

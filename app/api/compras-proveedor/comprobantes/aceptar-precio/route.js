@@ -75,7 +75,7 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
     const lineaId = Number(body?.lineaId);
     if (!Number.isFinite(lineaId)) {
-      return NextResponse.json({ ok: false, error: "Falta la línea." }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Falta el producto." }, { status: 400 });
     }
 
     // Sin `decision` es aceptar, que es lo que esta ruta hacía siempre.
@@ -275,7 +275,7 @@ export async function POST(req) {
     // Descuento del 100 %: entra al stock y el producto conserva su costo. Un
     // cero escrito acá le rompería el margen.
     if (analisis?.bonificado) {
-      const bonificado = "Este renglón vino bonificado: entra al stock y el producto conserva su costo.";
+      const bonificado = "Este producto vino bonificado: entra al stock y el producto conserva su costo.";
       return NextResponse.json({ ok: false, error: bonificado, queHacer: bonificado }, { status: 409 });
     }
 
@@ -414,7 +414,7 @@ export async function POST(req) {
         where: { id: delPedido.detalle.id },
         select: { id: true, precioCosto: true },
       });
-      if (!detalle) throw new Error("La línea del pedido ya no existe.");
+      if (!detalle) throw new Error("El producto ya no está en el pedido.");
 
       // EL PRECIO ANTERIOR SE GUARDA ANTES DE PISARLO, en su columna propia.
       // Sin esto no se puede ver a qué se pidió y a qué terminó facturando, que
@@ -473,14 +473,14 @@ export async function POST(req) {
       precioAnterior: resultado.anterior,
       precioNuevo: resultado.nuevo,
       queHacer:
-        "Precio aceptado y escrito en la línea del pedido. El costo del producto se actualiza " +
+        "Precio aceptado y escrito en el pedido. El costo del producto se actualiza " +
         "cuando recibas la mercadería, con la regla de siempre.",
     });
   } catch (err) {
     console.error("Error comprobantes/aceptar-precio:", err);
     return NextResponse.json({ ok: false, error: errorInesperado({
         operacion: "aceptar el precio",
-        quedo: "Puede que el precio haya quedado escrito en la línea del pedido: fijate en el pedido antes de aceptarlo de nuevo.",
+        quedo: "Puede que el precio haya quedado escrito en el pedido: fijate en el pedido antes de aceptarlo de nuevo.",
       }) }, { status: 500 });
   }
 }

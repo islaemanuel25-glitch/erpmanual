@@ -49,7 +49,7 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
     const lineaId = Number(body?.lineaId);
     if (!Number.isFinite(lineaId)) {
-      return NextResponse.json({ ok: false, error: "Falta la línea." }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Falta el producto." }, { status: 400 });
     }
     // Sin `revisada` es marcar, que es el gesto de todos los días. Desmarcar
     // llega explícito.
@@ -170,8 +170,8 @@ export async function POST(req) {
       revisada: actualizada.revisadoEnRecepcion,
       revisadaEn: actualizada.revisadoEnRecepcionAt,
       queHacer: revisada
-        ? "Renglón marcado como controlado. Queda guardado aunque cierres la pantalla."
-        : "Renglón devuelto a pendiente.",
+        ? "Producto marcado como controlado. Queda guardado aunque cierres la pantalla."
+        : "Producto devuelto a pendiente.",
     });
   } catch (err) {
     console.error("Error comprobantes/marcar-revisada:", err);
@@ -179,7 +179,7 @@ export async function POST(req) {
       {
         ok: false,
         error: errorInesperado({
-          operacion: "marcar el renglón como revisado",
+          operacion: "marcar el producto como revisado",
           quedo: "La marca puede no haberse guardado: volvé a tocarla y fijate si queda.",
         }),
       },

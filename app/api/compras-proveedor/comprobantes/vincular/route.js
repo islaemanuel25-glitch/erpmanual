@@ -45,7 +45,7 @@ export async function POST(req) {
 
     if (!Number.isFinite(lineaId) || !Number.isFinite(productoBaseId)) {
       return NextResponse.json(
-        { ok: false, error: "Faltan la línea o el producto.", queHacer: "Elegí un producto de la lista." },
+        { ok: false, error: "Faltan el producto del papel o el tuyo.", queHacer: "Elegí un producto de la lista." },
         { status: 400 }
       );
     }
@@ -313,7 +313,7 @@ export async function POST(req) {
       queHacer: [
         resultado.aliasGuardado
           ? `Vinculado. La próxima factura de este proveedor va a reconocer "${linea.textoCrudo}" sola.`
-          : "Vinculado. No se pudo guardar el alias porque la línea no trae ni código ni descripción.",
+          : "Vinculado. No se pudo guardar el alias porque el producto del papel no trae ni código ni descripción.",
         // Sin el nombre del proveedor: esta ruta no lo trae, y pedirlo solo
         // para el texto sería una consulta más por cada vínculo. El default
         // dice "este proveedor", que en la pantalla del pedido no es ambiguo.
@@ -328,7 +328,7 @@ export async function POST(req) {
   } catch (err) {
     console.error("Error comprobantes/vincular:", err);
     return NextResponse.json({ ok: false, error: errorInesperado({
-        operacion: "vincular la línea con el producto",
+        operacion: "vincular el producto del papel con el tuyo",
         quedo: "Puede que el vínculo haya quedado hecho: volvé a abrir el detalle y fijate antes de repetirlo.",
       }) }, { status: 500 });
   }

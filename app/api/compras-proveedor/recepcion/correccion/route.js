@@ -73,8 +73,8 @@ export async function POST(req) {
       return NextResponse.json(
         {
           ok: false,
-          error: "Ese renglón no es de este pedido. Volvé a la lista y abrilo de nuevo.",
-          queHacer: "Ese renglón no es de este pedido. Volvé a la lista y abrilo de nuevo.",
+          error: "Ese producto no es de este pedido. Volvé a la lista y abrilo de nuevo.",
+          queHacer: "Ese producto no es de este pedido. Volvé a la lista y abrilo de nuevo.",
         },
         { status: 409 }
       );
@@ -198,7 +198,7 @@ export async function POST(req) {
       {
         ok: false,
         error: errorInesperado({
-          operacion: "guardar lo que corregiste en este renglón",
+          operacion: "guardar lo que corregiste en este producto",
           quedo: "Puede no haberse guardado: volvé a abrirlo y fijate si quedó.",
         }),
       },

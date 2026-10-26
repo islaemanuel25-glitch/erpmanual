@@ -330,7 +330,7 @@ export async function POST(req, { params }) {
         {
           ok: false,
           error:
-            "Hay líneas con cantidad negativa. Este módulo todavía no acepta notas de crédito ni devoluciones: " +
+            "Hay productos con cantidad negativa. Este módulo todavía no acepta notas de crédito ni devoluciones: " +
             "convertirlas en cero perdería el dato sin avisar, así que se frena.",
           detallesConNegativo: negativos.ids,
         },

@@ -124,7 +124,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         setMensaje({
           tipo: "aviso",
           texto:
-            `Se volvió a leer: el lector dice ver ${dice} renglones y transcribió ${trajo}. ` +
+            `Se volvió a leer: el lector dice ver ${dice} productos y transcribió ${trajo}. ` +
             "Probá otra vez; si vuelve a salir corta, revisá la explicación del proveedor." +
             (d?.escalada?.texto ? ` ${d.escalada.texto}` : ""),
         });

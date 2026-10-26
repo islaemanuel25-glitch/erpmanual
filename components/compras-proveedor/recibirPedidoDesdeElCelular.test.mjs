@@ -72,8 +72,8 @@ test("1 · LA CONFIRMACIÓN ES LA QUE YA EXISTÍA: con números, ámbar aparte, 
   const html = renderToStaticMarkup(
     React.createElement(ConfirmarConNumeros, {
       titulo: "¿Borrar este comprobante?",
-      texto: "Vas a borrar el comprobante A 0011-00794708. Se van sus 17 líneas leídas y su foto. No se puede deshacer.",
-      aviso: "3 líneas ya están vinculadas al pedido.",
+      texto: "Vas a borrar el comprobante A 0011-00794708. Se van sus 17 productos leídos y su foto. No se puede deshacer.",
+      aviso: "3 productos ya están vinculados al pedido.",
       textoNo: "No, dejarlo",
       textoSi: "Sí, borrarlo",
       textoHaciendo: "Borrando…",
@@ -82,7 +82,7 @@ test("1 · LA CONFIRMACIÓN ES LA QUE YA EXISTÍA: con números, ámbar aparte, 
     })
   );
   assert.ok(html.indexOf("No, dejarlo") < html.indexOf("Sí, borrarlo"), "el rojo quedó arriba del que cancela");
-  assert.match(html, /sunmi-text-warning[^>]*>3 líneas ya están vinculadas/);
+  assert.match(html, /sunmi-text-warning[^>]*>3 productos ya están vinculados/);
   // El panel la usa con su ruta de siempre: no hay otra.
   const c = codigoDe(PANEL);
   assert.match(c, /<ConfirmarConNumeros\s+titulo="¿Borrar este comprobante\?"/);

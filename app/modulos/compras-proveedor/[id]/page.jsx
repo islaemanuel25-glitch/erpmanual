@@ -566,7 +566,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
     const lineaId = typeof renglon === "object" ? renglon?.lineaId : renglon;
     const textoCrudo = typeof renglon === "object" ? renglon?.textoCrudo ?? null : null;
-    if (!lineaId) return { ok: false, error: "Falta la línea." };
+    if (!lineaId) return { ok: false, error: "Falta el producto." };
     setRevisadas((prev) => ({ ...prev, [lineaId]: revisada }));
     try {
       const r = await fetch("/api/compras-proveedor/comprobantes/marcar-revisada", {
