@@ -16,39 +16,36 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261024204758_lista_pueden_ser` — **Aditiva, sin backfill.** Agrega
-  `ImportacionListaProveedor.puedenSerCalculadoEn` (nula) y crea la tabla
-  `ProductoQuePuedeSerDeLaLista` VACÍA, donde se guarda el paquete 2 de una
-  lista ("Pueden ser de…"). No toca ninguna fila existente: las listas de antes
-  quedan con la marca en null y la primera lectura las calcula. **Va ANTES de la
-  imagen:** el resultado y el listado de listas leen la tabla y la columna, así
-  que la imagen nueva sin la migración rompe esas dos pantallas. Ejercida
-  contra `erpazul_al` con `prisma migrate dev`.
-- `20261026005002_detalle_llego_sin_papel` — **Aditiva, sin backfill.** Agrega
-  `PedidoProveedorDetalle.llegoSinPapel` (booleana nula): "Llegó sin papel" /
-  "No llegó" de los productos del pedido que no están en ninguna boleta. No
-  toca ninguna fila: los pedidos de antes quedan en null, que es "nadie
-  contestó". **Va ANTES de la imagen:** la conciliación, la corrección y el
-  cierre de la recepción leen la columna. Ejercida contra `erpazul_al` con
-  `prisma migrate dev`.
+Ninguna. Producción está en **90 migraciones**, las mismas que el árbol, la
+última `20261026005002_detalle_llego_sin_papel`.
 
-Producción está en **88 migraciones**, la última
-`20261024193235_lista_sumados_de_antes`.
+**Verificado en código contra la base de producción el 2026-10-26**, después
+del despliegue de `21fe528e`, de solo lectura: las 90 carpetas de
+`prisma/migrations` figuran todas como terminadas y no revertidas en
+`_prisma_migrations`, y `migrate status` cerró con "Database schema is up to
+date!".
 
-**De dónde sale el 88.** Emanuel informó el 2026-10-24 que el despliegue de
-`8a6dd2bb` dejó producción en 88, con
-`20261024190123_lista_producto_sumado` y
-`20261024193235_lista_sumados_de_antes` aplicadas. Las migraciones se aplican
-en orden y sin saltear. *Sin verificar desde esta sesión*, que es de nube y no ve el VPS.
-Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy` (mismo usuario
-y base que el backup del skill):
-`ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `88|20261024193235_lista_sumados_de_antes`. Si dice otra
-cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
-descripción de las que salieron está en el `git log` de este archivo.
+- La `20261024204758_lista_pueden_ser` **ya estaba aplicada** antes de este
+  despliegue —figuraba acá como pendiente por error—: el despliegue de
+  `bc334204` la encontró aplicada y su `migrate deploy` informó 89 y nada
+  pendiente.
+- La `20261026005002_detalle_llego_sin_papel` se aplicó con el despliegue de
+  `21fe528e`: el contenedor descartable informó las **90** del árbol e imprimió
+  "Applying migration". Comprobada contra la base: la columna
+  `PedidoProveedorDetalle.llegoSinPapel` existe, booleana y nula, con cero filas
+  distintas de null.
+
+**Cómo se comprueba, y por qué NO con `count(*)`.** `_prisma_migrations` tiene
+**195** filas terminadas y no revertidas, no 90: guarda migraciones que ya no
+están en el árbol. Contar filas de esa tabla no dice nada sobre el árbol. Lo
+que vale es comparar NOMBRES: listar `migration_name` de las filas con
+`finished_at` no nulo y `rolled_back_at` nulo, y comprobar que cada carpeta de
+`prisma/migrations` esté en esa lista. La consulta que este archivo pedía antes
+—`count(*)` contra un número esperado— no podía dar nunca el número que
+esperaba.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261024193235_lista_sumados_de_antes`— salieron de acá: la historia de cuándo
+`20261026005002_detalle_llego_sin_papel`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los
