@@ -108,6 +108,12 @@ export async function POST(req) {
     if ("kgRecibidos" in body) aGuardar.kgRecibidos = numeroONull(body.kgRecibidos);
     if ("motivoPrincipal" in body) aGuardar.motivoPrincipal = body.motivoPrincipal || null;
     if ("motivoDetalle" in body) aGuardar.motivoDetalle = body.motivoDetalle || null;
+    // "Llegó sin papel" / "No llegó" en el grupo de lo que no está en ninguna
+    // boleta (Mauro, 2026-10-26). Solo true o false: cualquier otra cosa es
+    // "nadie contestó", que cuenta como no llegó.
+    if ("llegoSinPapel" in body) {
+      aGuardar.llegoSinPapel = typeof body.llegoSinPapel === "boolean" ? body.llegoSinPapel : null;
+    }
 
     if (detalle && Object.keys(aGuardar).length) {
       await prisma.pedidoProveedorDetalle.update({ where: { id: detalle.id }, data: aGuardar });

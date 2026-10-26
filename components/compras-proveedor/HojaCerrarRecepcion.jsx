@@ -12,10 +12,10 @@
 //
 // ── DOS BLOQUES, Y SOLO UNO PIDE RESPUESTA ────────────────────────────────
 //
-// Arriba, LAS QUE NADIE VIO: una por una, "llegó" o "no llegó", con "no llegó"
-// marcado de entrada. Ahí no hay nada que interpretar —la pregunta es binaria y
-// la respuesta por omisión es la que no inventa mercadería—, y es el único
-// bloque que pide una respuesta.
+// Arriba, LAS QUE NADIE VIO. Se preguntaban acá, una por una; desde el
+// 2026-10-26 se contestan en la pantalla, en el grupo "No están en ninguna
+// boleta", con la cantidad que llegó, y la hoja dice qué entra y cuánto suma.
+// Sin respuesta sigue valiendo "no llegó", que es la que no inventa mercadería.
 //
 // Abajo, LO QUE QUEDA A MEDIAS: cuántos renglones van sin mirar, cuántos
 // precios sin contestar, cuántas líneas sin vincular. Se DICE y no bloquea. Un
@@ -27,13 +27,13 @@
 // El armado es el de `HojaCorregirLinea`: mismos bloques con línea fina, mismo
 // pie de un botón ancho. No se eligió ninguna medida acá.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { formatearMoneda } from "@/lib/moneda";
 import {
-  LLEGADA,
+  llegaronSinPapel,
   recibidosDelCierre,
   resumenDelCierre,
   textoDeLoQueQueda,
@@ -41,6 +41,7 @@ import {
 import {
   ESTADO_PAGO_CIERRE,
   estadoSacaPlata,
+  importeSinPapelCentavos,
   pagoDelCierreEnPantalla,
   totalDeLasFacturasDelCierre,
 } from "@/lib/compras-proveedor/pagoDelCierre";
@@ -90,6 +91,9 @@ export default function HojaCerrarRecepcion({
   onConfirmar,
   filas = [],
   sinComprobante = [],
+  // Lo elegido en el grupo "No están en ninguna boleta" que todavía no volvió
+  // de la base. Lo guardado viaja en cada elemento de `sinComprobante`.
+  llegadas = {},
   contados = {},
   guardando = false,
   // ── EL MOTIVO POR EL QUE EL CIERRE NO ENTRÓ ──────────────────────────
@@ -128,8 +132,14 @@ export default function HojaCerrarRecepcion({
   // prop aparte porque serían dos formas de saber lo mismo, y el día que no
   // coincidan la hoja diría "sin factura" mientras pide el total de una.
   const sinPapel = facturas.cantidad === 0;
+  // Lo que llegó sin ningún papel suma al total a pagar, a costo del ERP: la
+  // misma cuenta que el renglón "Sin papel" de la pantalla y que el servidor.
+  const sinPapelCentavos = importeSinPapelCentavos(
+    llegaronSinPapel({ sinComprobante, llegadas, contados })
+  );
   const enPantalla = pagoDelCierreEnPantalla({
     totales: totalesDeFacturas,
+    sinPapelCentavos,
     totalEscrito: pago.totalEscrito,
     totalConfirmado: pago.totalConfirmado,
     estado: pago.estado,
@@ -159,26 +169,9 @@ export default function HojaCerrarRecepcion({
   const [avisoDelSaldo, setAvisoDelSaldo] = useState(null);
   const avisando = Boolean(saldo?.pideConfirmacion) && avisoDelSaldo === saldo.saldoCentavos;
 
-  // ── LA RESPUESTA POR OMISIÓN ES "NO LLEGÓ" ─────────────────────────────
-  //
-  // No es pesimismo: es la única que no escribe nada. Si alguien cierra sin
-  // mirar este bloque, el stock queda como estaba y la mercadería que sí llegó
-  // se puede cargar después; al revés —dar por recibido lo que nadie vio— el
-  // error entra al stock y no se ve hasta que alguien cuenta el depósito.
-  const [llegadas, setLlegadas] = useState({});
-
-  useEffect(() => {
-    if (!abierta) return;
-    const inicial = {};
-    for (const d of sinComprobante) {
-      if (d?.pedidoDetalleId != null) inicial[d.pedidoDetalleId] = LLEGADA.NO_LLEGO;
-    }
-    setLlegadas(inicial);
-  }, [abierta, sinComprobante]);
-
   const resumen = useMemo(
-    () => resumenDelCierre({ filas, sinComprobante, llegadas }),
-    [filas, sinComprobante, llegadas]
+    () => resumenDelCierre({ filas, sinComprobante, llegadas, contados }),
+    [filas, sinComprobante, llegadas, contados]
   );
   const loQueQueda = textoDeLoQueQueda(resumen, { sinPapel });
 
@@ -273,60 +266,20 @@ export default function HojaCerrarRecepcion({
       }
     >
       {/* ── 1 · LO QUE NINGÚN COMPROBANTE TRAJO ─────────────────────────── */}
+      {/* Ya no se pregunta acá: se contestó en el grupo "No están en ninguna
+          boleta" de la pantalla (Mauro, 2026-10-26). La hoja dice qué entra. */}
       {sinComprobante.length > 0 ? (
         <div className="flex flex-col gap-renglon">
           <span className="text-sm3 font-medium sunmi-text-strong">
             {sinComprobante.length === 1
-              ? "Un producto del pedido que ningún comprobante trajo"
-              : `${sinComprobante.length} productos del pedido que ningún comprobante trajo`}
+              ? "Un producto del pedido no está en ninguna boleta"
+              : `${sinComprobante.length} productos del pedido no están en ninguna boleta`}
           </span>
           <span className="text-sm3 sunmi-text-muted break-words">
-            Pueden haber llegado sin papel o no haber llegado. Lo que digas que no llegó no entra
+            Entran sin papel {resumen.llegaron} de {resumen.sinComprobante}:{" "}
+            {limpio(resumen.unidadesQueEntran)} {resumen.unidadesQueEntran === 1 ? "bulto" : "bultos"},
+            por {formatearMoneda(sinPapelCentavos / 100)} a costo del ERP. Los que no llegaron no entran
             al stock.
-          </span>
-
-          {sinComprobante.map((d) => {
-            const id = d.pedidoDetalleId;
-            const llego = llegadas[id] === LLEGADA.LLEGO;
-            return (
-              <div key={id} className="flex flex-col gap-dato">
-                <span className="flex items-baseline justify-between gap-renglon">
-                  <span className="min-w-0 text-sm3 sunmi-text-strong truncate">
-                    {d.producto || "Sin nombre"}
-                  </span>
-                  <span className="shrink-0 text-sm2 sunmi-text-muted tabular-nums">
-                    pediste {limpio(d.cantidadPedida)} · {formatearMoneda(d.costoCatalogo)}
-                  </span>
-                </span>
-                <div className="flex gap-dentroFiltro">
-                  <SunmiButton
-                    color={llego ? "primary" : "slate"}
-                    type="button"
-                    aria-pressed={llego}
-                    disabled={guardando}
-                    onClick={() => setLlegadas((p) => ({ ...p, [id]: LLEGADA.LLEGO }))}
-                    className="flex-1 min-h-toque justify-center rounded-control text-sm3"
-                  >
-                    Llegó
-                  </SunmiButton>
-                  <SunmiButton
-                    color={!llego ? "primary" : "slate"}
-                    type="button"
-                    aria-pressed={!llego}
-                    disabled={guardando}
-                    onClick={() => setLlegadas((p) => ({ ...p, [id]: LLEGADA.NO_LLEGO }))}
-                    className="flex-1 min-h-toque justify-center rounded-control text-sm3"
-                  >
-                    No llegó
-                  </SunmiButton>
-                </div>
-              </div>
-            );
-          })}
-
-          <span className="text-sm3 sunmi-text-muted break-words">
-            Entran {resumen.llegaron} de {resumen.sinComprobante}: {limpio(resumen.unidadesQueEntran)}{" "}
-            {resumen.unidadesQueEntran === 1 ? "bulto" : "bultos"} de lo pedido.
           </span>
         </div>
       ) : sinPapel ? (

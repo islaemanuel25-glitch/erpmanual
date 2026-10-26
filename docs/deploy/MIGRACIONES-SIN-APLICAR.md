@@ -24,6 +24,13 @@ Si la lista está vacía, el despliegue es solo de código.
   imagen:** el resultado y el listado de listas leen la tabla y la columna, así
   que la imagen nueva sin la migración rompe esas dos pantallas. Ejercida
   contra `erpazul_al` con `prisma migrate dev`.
+- `20261026005002_detalle_llego_sin_papel` — **Aditiva, sin backfill.** Agrega
+  `PedidoProveedorDetalle.llegoSinPapel` (booleana nula): "Llegó sin papel" /
+  "No llegó" de los productos del pedido que no están en ninguna boleta. No
+  toca ninguna fila: los pedidos de antes quedan en null, que es "nadie
+  contestó". **Va ANTES de la imagen:** la conciliación, la corrección y el
+  cierre de la recepción leen la columna. Ejercida contra `erpazul_al` con
+  `prisma migrate dev`.
 
 Producción está en **88 migraciones**, la última
 `20261024193235_lista_sumados_de_antes`.

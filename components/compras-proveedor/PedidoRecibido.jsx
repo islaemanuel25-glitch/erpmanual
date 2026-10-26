@@ -146,7 +146,18 @@ export default function PedidoRecibido({
   // del pedido, que es exactamente lo que hay que mostrar. La lista que esta
   // pantalla armaba por su cuenta con `pedido.detalles` se fue: era una segunda
   // fuente para el mismo dato, y solo la alcanzaba la rama equivocada.
-  const { delPapel, sinPapel } = loQueEntro({ filas, sinComprobante });
+  // ── CON PAPEL, DE LOS QUE NO VENÍAN EN ÉL SE MUESTRAN LOS QUE ENTRARON ──
+  //
+  // Desde el 2026-10-26 (Mauro) se elige por producto "Llegó sin papel" o "No
+  // llegó", y el cierre deja `llegoSinPapel` en true SOLO en los que entraron
+  // así: es lo que la segunda revisión tiene que ver. Los que no llegaron
+  // entraron en cero y no son "esto entró". Un pedido cerrado antes no tiene la
+  // columna, y ahí el cierre viejo los metía con lo pedido: se muestran los que
+  // tienen algo recibido, como antes.
+  const entraronSinPapel = (Array.isArray(sinComprobante) ? sinComprobante : []).filter(
+    (d) => d?.llegoSinPapel === true || (d?.llegoSinPapel == null && Number(d?.cantidadRecibida) > 0)
+  );
+  const { delPapel, sinPapel } = loQueEntro({ filas, sinComprobante: hayPapel ? entraronSinPapel : sinComprobante });
   const productosDelPapel = cuantosProductos(filas);
 
   return (
@@ -333,13 +344,13 @@ export default function PedidoRecibido({
             {!hayPapel
               ? "Entró esto"
               : sinPapel.length === 1
-                ? "Este no venía en el papel"
-                : `Estos ${sinPapel.length} no venían en el papel`}
+                ? "Este entró sin papel"
+                : `Estos ${sinPapel.length} entraron sin papel`}
           </span>
           <SunmiCard className="p-3 space-y-renglon">
             {hayPapel && (
               <p className="text-sm2 sunmi-text-muted break-words">
-                Entraron con la cantidad que habías pedido. Si alguno no llegó, hay que corregirlo.
+                No estaban en ninguna boleta y se recibieron igual, al costo que ya tenía el ERP.
               </p>
             )}
             {sinPapel.map((r, i) => (

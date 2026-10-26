@@ -38,6 +38,8 @@ import {
   planDelPagoInicial,
   resolverTotalDelCierre,
   estadoSacaPlata,
+  importeSinPapelCentavos,
+  totalAPagarDelComprobante,
 } from "@/lib/compras-proveedor/pagoDelCierre";
 import { errorPagadoDeMas, loYaPagadoAlRecibir } from "@/lib/compras-proveedor/compraPorCargar";
 import { PERMISO_REGISTRAR_PAGOS, PERMISO_VER_FINANZAS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
@@ -272,6 +274,24 @@ export async function POST(req, { params }) {
     const costosAceptados = new Set(
       (Array.isArray(body.costosAceptados) ? body.costosAceptados : []).map(Number).filter(Number.isFinite)
     );
+
+    // ── LO QUE LLEGÓ SIN NINGÚN PAPEL ────────────────────────────────────
+    //
+    // Mauro, 2026-10-26. La pantalla dice cuáles de las que no están en ninguna
+    // boleta llegaron igual, y vale SOLO si la línea lo tiene guardado: la
+    // elección se escribe en `llegoSinPapel` al tocar el botón, así que un id
+    // que viaje sin eso no cuenta. Entran al costo del ERP: ningún costo
+    // maestro se escribe desde ellas, y suman al total a pagar.
+    const pedidosSinPapel = new Set(
+      (Array.isArray(body.llegaronSinPapel) ? body.llegaronSinPapel : []).map(Number).filter(Number.isFinite)
+    );
+    const llegaronSinPapel = pedido.detalles.filter(
+      (d) => d.llegoSinPapel === true && pedidosSinPapel.has(d.id)
+    );
+    for (const d of llegaronSinPapel) {
+      costosExcluidos.add(d.id);
+      costosAceptados.delete(d.id);
+    }
     const decisionesDeCosto = []; // para informar qué se escribió y qué no
 
     // ── LOS UMBRALES, Y QUIÉN GOBIERNA A QUIÉN ───────────────────────────
@@ -436,7 +456,12 @@ export async function POST(req, { params }) {
     // anulados.
     const facturasDelPedido = await prisma.comprobanteProveedor.findMany({
       where: { grupoId, pedidoId, estado: { not: "ANULADO" } },
-      select: { totalLeido: true, estado: true, diferenciaCentavos: true, numero: true },
+      select: {
+        totalLeido: true, estado: true, diferenciaCentavos: true, numero: true,
+        // Para el papel sin total: lo que se le paga es la suma de sus
+        // productos (`totalAPagarDelComprobante`).
+        lineas: { select: { costoFinalRenglon: true } },
+      },
     });
 
     // ── CON UN PAPEL QUE NO CIERRA SE RECIBE IGUAL, SIN TOCAR COSTOS ──────
@@ -454,9 +479,13 @@ export async function POST(req, { params }) {
       }
     }
     const deuda = resolverTotalDelCierre({
-      totales: facturasDelPedido.map((c) => c.totalLeido),
+      totales: facturasDelPedido.map(totalAPagarDelComprobante),
       totalConfirmado: pagoAlProveedor.totalAPagar,
       confirmado: pagoAlProveedor.totalConfirmado === true,
+      // Lo que llegó sin papel, con lo que entra y al costo de su línea.
+      sinPapelCentavos: importeSinPapelCentavos(
+        llegaronSinPapel.map((d) => ({ cantidad: recibidos[d.id], costo: d.precioCosto }))
+      ),
     });
     if (deuda.error) {
       return NextResponse.json(
@@ -698,6 +727,16 @@ export async function POST(req, { params }) {
         select: { estado: true },
       });
       if (vigente?.estado !== "ENVIADO") throw new CierreYaHecho();
+
+      // ── EL REGISTRO DE LO QUE ENTRÓ SIN PAPEL QUEDA EXACTO ──────────────
+      //
+      // `llegoSinPapel` en true queda SOLO en las que entraron así: una línea
+      // que alguien marcó y después apareció en una boleta leída ya no entró sin
+      // papel, y la segunda revisión no tiene que verla como si lo hubiera hecho.
+      await tx.pedidoProveedorDetalle.updateMany({
+        where: { pedidoId, llegoSinPapel: true, id: { notIn: llegaronSinPapel.map((d) => d.id) } },
+        data: { llegoSinPapel: null },
+      });
 
       let totalFacturaComputed = 0;
 

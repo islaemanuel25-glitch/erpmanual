@@ -36,7 +36,14 @@ import {
   filaSinPapel,
   claveDeFila,
 } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
-import { costosQueNoSeTocan, kilosDelCierre } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import {
+  LLEGADA,
+  cantidadSinPapel,
+  costosQueNoSeTocan,
+  kilosDelCierre,
+  llegaronSinPapel,
+} from "@/lib/compras-proveedor/cierreDeRecepcion";
+import ProductosSinBoleta from "@/components/compras-proveedor/ProductosSinBoleta";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -800,6 +807,52 @@ export default function DetallePedidoProveedorPage({ params }) {
     setLineaACorregir(null);
   }, [marcarRevisada]);
 
+  // ── LO QUE NO ESTÁ EN NINGUNA BOLETA: LLEGÓ SIN PAPEL O NO LLEGÓ ───────
+  //
+  // Mauro, 2026-10-26. Se escribe apenas se toca, por la misma ruta que lo
+  // corregido —`recepcion/correccion`, que no mueve stock ni escribe costos—,
+  // y solo con los campos de este grupo: mandar el resto en null borraría lo
+  // que la hoja de corregir hubiera guardado en esa línea. Después se vuelve a
+  // pedir la conciliación, que es la que cuenta «N de M llegaron».
+  //
+  // Lo elegido acá manda mientras la conciliación no vuelva con lo guardado. Y
+  // si no se pudo guardar se dice en el grupo, donde se tocó: un botón que no
+  // guarda y no avisa se ve igual que uno que anduvo.
+  const [llegadasSinPapel, setLlegadasSinPapel] = useState({});
+  const [falloSinPapel, setFalloSinPapel] = useState(null);
+  const guardarSinPapel = useCallback(async (pedidoDetalleId, datos, { recargar = true } = {}) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/recepcion/correccion", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId: Number(id), pedidoDetalleId, ...datos }),
+      });
+      const d = await r.json().catch(() => null);
+      setFalloSinPapel(d?.ok ? null : d?.queHacer || d?.error || "No se pudo guardar lo que llegó sin papel.");
+      if (recargar) setRecargarConciliacion((n) => n + 1);
+    } catch {
+      setFalloSinPapel("No se pudo guardar lo que llegó sin papel. Revisá la conexión y volvé a tocarlo.");
+    }
+  }, [id]);
+  const elegirSinPapel = useCallback((d, valor) => {
+    const detId = d.pedidoDetalleId;
+    setLlegadasSinPapel((p) => ({ ...p, [detId]: valor }));
+    guardarSinPapel(detId, {
+      llegoSinPapel: valor === LLEGADA.LLEGO,
+      cantidadRecibida: cantidadSinPapel(d, recibidos),
+    });
+  }, [guardarSinPapel, recibidos]);
+  const cantidadDeSinPapel = useCallback((d, valor) => {
+    const detId = d.pedidoDetalleId;
+    setRecibidos((p) => ({ ...p, [detId]: valor }));
+    // Vacío mientras se escribe no se guarda: no es un número.
+    if (valor !== "" && Number.isFinite(Number(valor))) {
+      // La cuenta de llegados no cambia con la cantidad: no hace falta recargar.
+      guardarSinPapel(detId, { cantidadRecibida: Number(valor) }, { recargar: false });
+    }
+  }, [guardarSinPapel]);
+
   // ── VINCULAR: LA LÍNEA PASA A SABER QUÉ PRODUCTO ES ────────────────────
   //
   // La ruta resuelve sola a qué línea del pedido corresponde, así que después
@@ -874,6 +927,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         // `costosQueNoSeTocan`. Con papel no viaja, y el cuerpo queda igual
         // que siempre.
         if (extra?.costosExcluidos?.length) bodyData.costosExcluidos = extra.costosExcluidos;
+        if (extra?.llegaronSinPapel?.length) bodyData.llegaronSinPapel = extra.llegaronSinPapel;
       }
 
       setMotivoDelFallo(null);
@@ -1143,6 +1197,12 @@ export default function DetallePedidoProveedorPage({ params }) {
   const filasDelCierre = sinPapel
     ? filasSinPapel.map((f) => ({ ...f, revisada: revisadas[claveDeFila(f)] === true }))
     : filasDeFactura;
+  // ── LOS QUE NO ESTÁN EN NINGUNA BOLETA ───────────────────────────────────
+  //
+  // Los mismos para el grupo de la pantalla y para la hoja de cierre. Sin
+  // pedido previo NO HAY: todo sale del papel. Sin papel tampoco: esas líneas
+  // YA son las filas, contadas una por una, y su "No llegó" las pondría en cero.
+  const huerfanas = sinPedidoPrevio || sinPapel ? [] : conciliacion?.sinComprobante || [];
 
   // ── LO QUE VINO SIN PEDIRSE: EL "AGREGAR PRODUCTO" QUE YA EXISTÍA ─────────
   //
@@ -1589,7 +1649,24 @@ export default function DetallePedidoProveedorPage({ params }) {
               // Lo que vino sin pedirse, sin papel: el "Agregar producto" de la
               // recepción, que ya existía y se muda acá con su búsqueda y su
               // ruta. Con papel lo que no se pidió lo trae el papel.
-              despuesDeLista={sinPapel ? panelAgregarProducto : null}
+              // Con papel: los productos del pedido que no están en ninguna
+              // boleta, en su grupo, debajo de los de los comprobantes. Sin
+              // pedido previo no hay ninguno: todo sale del papel.
+              despuesDeLista={
+                sinPapel ? (
+                  panelAgregarProducto
+                ) : (
+                  <ProductosSinBoleta
+                    productos={huerfanas}
+                    llegadas={llegadasSinPapel}
+                    contados={recibidos}
+                    onElegir={elegirSinPapel}
+                    onCantidad={cantidadDeSinPapel}
+                    deshabilitado={acting}
+                    fallo={falloSinPapel}
+                  />
+                )
+              }
               accionDelPie={
                 <SunmiButton
                   color="amber"
@@ -1645,18 +1722,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               abierta={cerrandoRecepcion}
               onCerrar={() => setCerrandoRecepcion(false)}
               filas={filasDelCierre}
-              // Sin pedido previo NO HAY "productos que el papel no trajo":
-              // todo sale del papel. Se le pasa vacío en vez de esconder el
-              // bloque adentro de la hoja, para que la hoja siga contestando
-              // una sola pregunta —qué llegó de lo que nadie facturó— y no
-              // tenga que saber de dónde nació el pedido.
-              //
-              // Sin papel tampoco: esas líneas YA son las filas, contadas una
-              // por una. Pasarlas de nuevo las haría preguntar "¿llegó?" sobre
-              // lo que se acaba de contar, y su "no llegó" las pondría en cero.
-              sinComprobante={
-                sinPedidoPrevio || sinPapel ? [] : conciliacion?.sinComprobante || []
-              }
+              // Los mismos del grupo "No están en ninguna boleta", con lo que
+              // se eligió ahí: la hoja ya no pregunta, dice qué entra.
+              sinComprobante={huerfanas}
+              llegadas={llegadasSinPapel}
               contados={recibidos}
               guardando={acting}
               motivoDelFallo={motivoDelFallo}
@@ -1665,8 +1734,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               // lo trae—, de la misma conciliación: la hoja decide con eso si
               // el total se conoce o hay que escribirlo, igual que el servidor.
               proveedor={pedido?.proveedor?.nombre || "el proveedor"}
+              // Lo que se le paga por cada papel: el total impreso o, en uno
+              // sin total, la suma de sus productos (`totalAPagarDelComprobante`).
               totalesDeFacturas={(conciliacion?.grupos || []).map(
-                (g) => g?.comprobante?.totalDelPapel ?? null
+                (g) => g?.comprobante?.totalAPagar ?? null
               )}
               puedeRegistrarPago={puedeRegistrarPago}
               ubicacionDuena={ubicacionDuena}
@@ -1682,6 +1753,13 @@ export default function DetallePedidoProveedorPage({ params }) {
                   kgRecibidos: kilosDelCierre({ filas: filasDelCierre, kgRecibidos }),
                   pagoAlProveedor,
                   costosExcluidos: costosQueNoSeTocan(filasDelCierre),
+                  // Las que entraron sin papel: el servidor les excluye el
+                  // costo y las suma al total a pagar, si las tiene guardadas así.
+                  llegaronSinPapel: llegaronSinPapel({
+                    sinComprobante: huerfanas,
+                    llegadas: llegadasSinPapel,
+                    contados: recibidos,
+                  }).map((d) => d.pedidoDetalleId),
                 });
               }}
             />

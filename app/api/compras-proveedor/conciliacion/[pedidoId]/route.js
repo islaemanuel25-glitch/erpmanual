@@ -35,6 +35,8 @@ import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/co
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { elCatalogoSeMovio } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import { LLEGADA, llegada } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import { totalAPagarDelComprobante } from "@/lib/compras-proveedor/pagoDelCierre";
 
 export async function GET(req, { params }) {
   try {
@@ -72,6 +74,9 @@ export async function GET(req, { params }) {
         // anotaron y por qué la cantidad no coincide. Sin esto la hoja se abre
         // en blanco cada vez y la corrección de ayer se pierde de vista.
         unidadesSueltas: true, motivoPrincipal: true, motivoDetalle: true,
+        // "Llegó sin papel" o "No llegó", para las que no están en ninguna
+        // boleta: se contesta antes de recibir y tiene que sobrevivir al refresco.
+        llegoSinPapel: true,
         // `modoCompraProveedor` es lo que decide si la línea es fiambre, y de eso
         // depende que aparezca la columna de kilos. El fiambre entra por PIEZA en
         // el depósito y se mide en KILOS en los locales: si esa columna
@@ -198,14 +203,21 @@ export async function GET(req, { params }) {
         productoBaseId: d.productoBaseId,
         nombre: d.nombre,
       })),
-      lineasDeComprobantes: analizados.flatMap((c) =>
-        (c.lineas ?? [])
-          .map((l) => ({
-            productoBaseId: l.pedidoDetalle?.productoBaseId ?? l.productoBaseId ?? null,
-            comprobanteId: c.id,
-          }))
-          .filter((l) => l.productoBaseId != null)
-      ),
+      lineasDeComprobantes: [
+        ...analizados.flatMap((c) =>
+          (c.lineas ?? [])
+            .map((l) => ({
+              productoBaseId: l.pedidoDetalle?.productoBaseId ?? l.productoBaseId ?? null,
+              comprobanteId: c.id,
+            }))
+            .filter((l) => l.productoBaseId != null)
+        ),
+        // Lo que no está en ninguna boleta y alguien dijo "Llegó sin papel"
+        // también llegó (Mauro, 2026-10-26). Sin comprobante que lo respalde.
+        ...sinComprobante
+          .filter((d) => llegada(d) === LLEGADA.LLEGO && d.productoBaseId != null)
+          .map((d) => ({ productoBaseId: d.productoBaseId, comprobanteId: null })),
+      ],
     });
     const sinLeer = comprobantes.filter((c) => !c.leidoEn).length;
 
@@ -233,8 +245,15 @@ export async function GET(req, { params }) {
     // Se marca acá y no en `filasDeConciliacion`, que no clasifica precios: la
     // pregunta necesita la variación del proveedor, y ésta es la ruta que la
     // conoce. Es la misma regla con la que frena el cierre.
+    const porId = new Map(comprobantes.map((c) => [c.id, c]));
     const gruposConCatalogo = grupos.map((g) => ({
       ...g,
+      // Lo que se le paga por este papel: el total impreso, o en un papel sin
+      // total la suma de sus productos. La MISMA función que usa el cierre en
+      // el servidor, para que la hoja no pida escribir lo que ya se sabe.
+      comprobante: g.comprobante
+        ? { ...g.comprobante, totalAPagar: totalAPagarDelComprobante(porId.get(g.comprobante.id)) }
+        : g.comprobante,
       filas: (g.filas ?? []).map((f) => ({
         ...f,
         catalogoMovido: elCatalogoSeMovio(f, { variacionPct: variacionNormalPct }),

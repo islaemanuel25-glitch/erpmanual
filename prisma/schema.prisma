@@ -4019,6 +4019,13 @@ model PedidoProveedorDetalle {
   motivoPrincipal  String?
   /// El texto libre cuando el motivo es "Otro".
   motivoDetalle    String?
+  /// LLEGÓ SIN NINGÚN PAPEL (Mauro, 2026-10-26). Solo para las líneas que no
+  /// están en ninguna boleta leída: true = "Llegó sin papel", false = "No
+  /// llegó", NULL = nadie contestó, que cuenta como no llegó. Se escribe al
+  /// tocar el botón, antes de recibir, y el cierre lo deja en true SOLO en las
+  /// que entraron así: es el registro que mira la segunda revisión. Entra al
+  /// costo que ya tenía el ERP y nunca escribe costo maestro.
+  llegoSinPapel    Boolean?
   // Costo por unidad de pedido (BULTO/UNIDAD). Alta precisión (6 decimales) para
   // no perder el costo unitario derivado de packs con factor no divisor
   // (ej. 1480/18 = 82,222222). Los TOTALES/montos siguen en 2 decimales; la
