@@ -33,7 +33,7 @@
 // —Productos— pasa la misma función en los dos, y queda dicho en el llamado.
 
 import { useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Camera, Search } from "lucide-react";
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
@@ -83,6 +83,12 @@ export default function SunmiCampoBusquedaVoz({
   // "nunca", y la regla de la extracción es que la pantalla de origen quede
   // idéntica, no parecida.
   avisoDeEstado = null,
+  // El botón de la cámara, APAGADO salvo que la pantalla lo pida. Recibe el
+  // toque y nada más: abrir la cámara y qué hacer con lo leído es de la
+  // pantalla, igual que la búsqueda. Va a la izquierda del micrófono para que
+  // el micrófono no se mueva, y el campo no cambia de tamaño: solo se corre
+  // dónde termina el texto.
+  onCamara = null,
 }) {
   const refPropia = useRef(null);
   const ref = inputRef || refPropia;
@@ -97,6 +103,10 @@ export default function SunmiCampoBusquedaVoz({
   };
 
   const puedeEscuchar = soportaVoz();
+  const conCamara = typeof onCamara === "function";
+  // El hueco a la derecha del texto: uno por botón.
+  const huecoDerecho =
+    puedeEscuchar && conCamara ? "!pr-20" : puedeEscuchar || conCamara ? "!pr-12" : "";
 
   const iniciarVoz = () => {
     const SpeechRecognition =
@@ -146,9 +156,7 @@ export default function SunmiCampoBusquedaVoz({
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           onKeyDown={onKeyDown}
-          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 !pl-9 !border-2 pulse-neon ${
-            puedeEscuchar ? "!pr-12" : ""
-          } ${className}`}
+          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 !pl-9 !border-2 pulse-neon ${huecoDerecho} ${className}`}
           style={{ borderColor: "var(--pos-link)" }}
           autoFocus={autoFocus}
           // Sin historial/autocompletado nativo del navegador (no afecta el
@@ -158,6 +166,17 @@ export default function SunmiCampoBusquedaVoz({
           autoCapitalize="none"
           spellCheck={false}
         />
+        {conCamara && (
+          <button
+            onClick={onCamara}
+            className={`absolute ${puedeEscuchar ? "right-12" : "right-2"} top-1/2 -translate-y-1/2 p-2 rounded transition-colors pos-control`}
+            title="Leer el código con la cámara"
+            aria-label="Leer el código con la cámara"
+            type="button"
+          >
+            <Camera size={16} aria-hidden="true" />
+          </button>
+        )}
         {puedeEscuchar && (
           <button
             onClick={iniciarVoz}

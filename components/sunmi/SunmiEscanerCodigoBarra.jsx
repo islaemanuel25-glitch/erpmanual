@@ -23,6 +23,16 @@
 //
 // Donde no está, la recepción NO se rompe: ver el fallback abajo.
 //
+// ── EL RESPALDO, PEDIDO Y NO DE OFICIO ────────────────────────────────────
+//
+// En iPhone/Safari `BarcodeDetector` no existe. Una pantalla que tiene que leer
+// ahí igual pide `conRespaldo`, y entonces el paquete `barcode-detector` —un
+// ponyfill sobre zxing en WebAssembly— **se carga recién al abrir la cámara**,
+// con un `import()` dinámico: no entra al bundle de la pantalla ni se baja si
+// nadie toca el botón. Donde el navegador trae el detector, el respaldo ni se
+// pide. Sin `conRespaldo` todo queda como estaba: las pantallas que no lo piden
+// siguen preguntando `hayEscanerDisponible()` y no ofrecen el botón.
+//
 // ── LA CÁMARA SE LIBERA SIEMPRE ───────────────────────────────────────────
 //
 // Un `MediaStream` que queda abierto deja el LED prendido, come batería y en
@@ -58,6 +68,9 @@ export const FORMATOS_CODIGO = Object.freeze([
 export const MOTIVO_SIN_CAMARA = Object.freeze({
   NO_SOPORTADO: "noSoportado",
   SIN_PERMISO: "sinPermiso",
+  // El equipo no tiene cámara. Antes caía en FALLO y decía "no respondió",
+  // que hace pensar en reintentar algo que no va a aparecer.
+  NO_HAY_CAMARA: "noHayCamara",
   FALLO: "fallo",
 });
 
@@ -66,15 +79,32 @@ export const MENSAJES_SIN_CAMARA = Object.freeze({
     "Este navegador no puede leer códigos con la cámara. Escribí el código o usá el lector.",
   [MOTIVO_SIN_CAMARA.SIN_PERMISO]:
     "No se pudo usar la cámara: falta el permiso. Escribí el código o usá el lector.",
+  [MOTIVO_SIN_CAMARA.NO_HAY_CAMARA]:
+    "Este equipo no tiene cámara. Escribí el código o usá el lector.",
   [MOTIVO_SIN_CAMARA.FALLO]:
     "La cámara no respondió. Escribí el código o usá el lector.",
 });
 
-/** ¿Este navegador puede leer códigos con la cámara? Se pregunta antes de ofrecerlo. */
-export function hayEscanerDisponible() {
+/** Cuánto vibra el teléfono al leer, con `vibrar`. Un toque, no una alarma. */
+export const VIBRACION_LECTURA_MS = 80;
+
+/**
+ * ¿Este navegador puede leer códigos con la cámara? Se pregunta antes de
+ * ofrecerlo. Con `conRespaldo` alcanza con la cámara: el detector lo pone el
+ * paquete si el navegador no lo trae.
+ */
+export function hayEscanerDisponible({ conRespaldo = false } = {}) {
   if (typeof window === "undefined") return false;
-  if (typeof window.BarcodeDetector !== "function") return false;
+  if (!conRespaldo && typeof window.BarcodeDetector !== "function") return false;
   return Boolean(navigator?.mediaDevices?.getUserMedia);
+}
+
+/** El detector del navegador o, si se pidió y no está, el del paquete. */
+async function claseDelDetector(conRespaldo) {
+  if (typeof window.BarcodeDetector === "function") return window.BarcodeDetector;
+  if (!conRespaldo) return null;
+  const { BarcodeDetector } = await import("barcode-detector/ponyfill");
+  return BarcodeDetector;
 }
 
 export default function SunmiEscanerCodigoBarra({
@@ -90,6 +120,17 @@ export default function SunmiEscanerCodigoBarra({
   // etiqueta del pallet"—. Un default que hable de productos le metería una
   // suposición de dominio al kit.
   ayuda = "Apuntá al código de barras.",
+  /** Los formatos a leer; sin declarar, todos los de `FORMATOS_CODIGO`. */
+  formatos = FORMATOS_CODIGO,
+  /** Carga el paquete de respaldo donde el navegador no trae el detector. */
+  conRespaldo = false,
+  /** Vibra un toque al leer, donde el teléfono sabe vibrar. */
+  vibrar = false,
+  /**
+   * La cámara a toda la pantalla, con un recuadro guía en el centro y "Cerrar"
+   * fijo abajo. Sin declarar, la hoja de siempre.
+   */
+  pantallaCompleta = false,
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -125,7 +166,7 @@ export default function SunmiEscanerCodigoBarra({
       return undefined;
     }
 
-    if (!hayEscanerDisponible()) {
+    if (!hayEscanerDisponible({ conRespaldo })) {
       fallar(MOTIVO_SIN_CAMARA.NO_SOPORTADO);
       return undefined;
     }
@@ -136,13 +177,15 @@ export default function SunmiEscanerCodigoBarra({
     (async () => {
       let detector;
       try {
+        const Detector = await claseDelDetector(conRespaldo);
+        if (!Detector) throw new Error("sin detector");
         // `getSupportedFormats` evita pedirle al detector un formato que este
         // navegador no tiene: con uno solo desconocido, el constructor tira.
-        const soportados = await window.BarcodeDetector.getSupportedFormats?.();
+        const soportados = await Detector.getSupportedFormats?.();
         const formats = Array.isArray(soportados)
-          ? FORMATOS_CODIGO.filter((f) => soportados.includes(f))
-          : FORMATOS_CODIGO;
-        detector = new window.BarcodeDetector(formats.length ? { formats } : undefined);
+          ? formatos.filter((f) => soportados.includes(f))
+          : formatos;
+        detector = new Detector(formats.length ? { formats } : undefined);
       } catch {
         if (!detenido) fallar(MOTIVO_SIN_CAMARA.NO_SOPORTADO);
         return;
@@ -158,7 +201,14 @@ export default function SunmiEscanerCodigoBarra({
       } catch (e) {
         if (detenido) return;
         const negado = e?.name === "NotAllowedError" || e?.name === "SecurityError";
-        fallar(negado ? MOTIVO_SIN_CAMARA.SIN_PERMISO : MOTIVO_SIN_CAMARA.FALLO);
+        const noHay = e?.name === "NotFoundError" || e?.name === "OverconstrainedError";
+        fallar(
+          negado
+            ? MOTIVO_SIN_CAMARA.SIN_PERMISO
+            : noHay
+              ? MOTIVO_SIN_CAMARA.NO_HAY_CAMARA
+              : MOTIVO_SIN_CAMARA.FALLO
+        );
         return;
       }
 
@@ -191,6 +241,9 @@ export default function SunmiEscanerCodigoBarra({
             if (valor) {
               // Se apaga ANTES de avisar: el consumidor va a cerrar el modal y
               // navegar, y no puede quedar una cámara viva detrás.
+              if (vibrar) {
+                try { navigator.vibrate?.(VIBRACION_LECTURA_MS); } catch {}
+              }
               apagar();
               onCodigo?.(String(valor));
               return;
@@ -209,10 +262,56 @@ export default function SunmiEscanerCodigoBarra({
       detenido = true;
       apagar();
     };
-  }, [abierto, apagar, fallar, onCodigo]);
+  }, [abierto, apagar, fallar, onCodigo, formatos, conRespaldo, vibrar]);
 
   // Y por si el componente se desmonta sin pasar por `abierto = false`.
   useEffect(() => apagar, [apagar]);
+
+  if (pantallaCompleta) {
+    // El cajón a todo el ancho es la pantalla completa: la forma ya trae el alto
+    // entero, las esquinas rectas y la columna con el pie fijo abajo. Sin
+    // encabezado: lo que se ve es la cámara, y la salida es "Cerrar".
+    return (
+      <SunmiModalLayout
+        open={abierto}
+        title={titulo}
+        onClose={onCerrar}
+        z={NIVEL_MODAL_GLOBAL}
+        forma="cajon"
+        className="max-w-none"
+        encabezado="ninguno"
+        paddingTarjeta="p-3"
+        espacioCuerpo="gap-3"
+        footer={
+          <SunmiButton color="slate" onClick={onCerrar} className="w-full min-h-toque">
+            Cerrar
+          </SunmiButton>
+        }
+      >
+        {error ? (
+          <SunmiAviso tono="warning">{error}</SunmiAviso>
+        ) : (
+          <>
+            <p className="shrink-0 text-sm3 sunmi-text-muted text-center">{ayuda}</p>
+            <div className="relative flex-1 sunmi-surface-soft rounded-lg overflow-hidden">
+              <video
+                ref={videoRef}
+                className="absolute inset-0 w-full h-full object-cover"
+                playsInline
+                muted
+                aria-label={ayuda}
+              />
+              {/* El recuadro guía: dónde apuntar. Proporción de código de barras
+                  —más ancho que alto— sacada de la escala, no medida a ojo. */}
+              <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-3/4 aspect-video rounded-lg border-2 sunmi-border-accent" />
+              </div>
+            </div>
+          </>
+        )}
+      </SunmiModalLayout>
+    );
+  }
 
   return (
     <SunmiModalLayout

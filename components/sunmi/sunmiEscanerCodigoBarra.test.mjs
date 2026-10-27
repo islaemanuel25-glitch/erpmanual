@@ -11,6 +11,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,8 +86,11 @@ test("apaga ANTES de avisar el código", () => {
   assert.ok(posApagar > 0, "avisa el código antes de apagar la cámara");
 });
 
-test("el fallback distingue los tres motivos y NO rompe nada", () => {
-  assert.deepEqual(Object.values(MOTIVO_SIN_CAMARA).sort(), ["fallo", "noSoportado", "sinPermiso"]);
+test("el fallback distingue los cuatro motivos y NO rompe nada", () => {
+  // El cuarto —el equipo no tiene cámara— caía en "fallo", que dice "no
+  // respondió" e invita a reintentar algo que no va a aparecer.
+  assert.deepEqual(Object.values(MOTIVO_SIN_CAMARA).sort(), ["fallo", "noHayCamara", "noSoportado", "sinPermiso"]);
+  assert.match(src, /e\?\.name === "NotFoundError"/, "sin cámara se confunde con una que falló");
   for (const motivo of Object.values(MOTIVO_SIN_CAMARA)) {
     const msg = MENSAJES_SIN_CAMARA[motivo];
     assert.ok(msg, `falta el mensaje de ${motivo}`);
@@ -106,7 +110,7 @@ test("`hayEscanerDisponible` se puede preguntar antes de ofrecer el botón", () 
   assert.match(src, /navigator\?\.mediaDevices\?\.getUserMedia/);
 });
 
-test("no se agregó ninguna dependencia de escaneo", () => {
+test("la única dependencia de escaneo es el respaldo, y no viaja en el bundle", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
   const todas = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
   for (const sospechosa of ["quagga", "zxing", "@zxing/library", "html5-qrcode", "jsqr", "scandit"]) {
@@ -115,8 +119,40 @@ test("no se agregó ninguna dependencia de escaneo", () => {
       `entró ${sospechosa}: son cientos de kB para algo que el navegador ya hace`
     );
   }
-  // La lectura la hace el navegador.
+  // La lectura la hace el navegador cuando puede.
   assert.match(src, /window\.BarcodeDetector/);
+
+  // `barcode-detector` es el respaldo de iPhone/Safari, decidido así, fijado a
+  // una versión exacta y cargado SOLO con `import()` al abrir la cámara: un
+  // `import` estático lo metería en el bundle de cada pantalla que use el kit.
+  assert.match(pkg.dependencies?.["barcode-detector"] ?? "", /^\d+\.\d+\.\d+$/, "el respaldo no está fijado a una versión exacta");
+  assert.match(src, /await import\("barcode-detector\/ponyfill"\)/, "el respaldo no se carga al abrir");
+  let estaticos = "";
+  try {
+    estaticos = execFileSync(
+      "git",
+      ["grep", "--untracked", "-lE", "^import[^(]*[\"']barcode-detector", "--", "*.js", "*.jsx", "*.mjs"],
+      { cwd: RAIZ, encoding: "utf8" }
+    );
+  } catch (e) {
+    // `git grep` sale con 1 cuando no encuentra nada, que es lo esperado.
+    if (e.status !== 1) throw e;
+  }
+  assert.equal(estaticos.trim(), "", `import estático del respaldo en: ${estaticos}`);
+});
+
+test("el respaldo y la pantalla completa son opciones APAGADAS", () => {
+  // Las pantallas que no lo piden quedan como estaban: sin respaldo no se
+  // ofrece el botón donde no hay detector, y la hoja de siempre.
+  assert.match(src, /conRespaldo = false/);
+  assert.match(src, /pantallaCompleta = false/);
+  assert.match(src, /vibrar = false/);
+  assert.match(src, /if \(!conRespaldo\) return null;/, "sin pedirlo, el respaldo se carga igual");
+  // La pantalla completa es el cajón del kit a todo el ancho, con "Cerrar" abajo.
+  assert.match(src, /forma="cajon"[\s\S]{0,200}className="max-w-none"/);
+  assert.match(src, /footer=\{\s*<SunmiButton[^>]*>\s*Cerrar\s*<\/SunmiButton>/);
+  // Vibra antes de apagar y de avisar, y solo si se pidió.
+  assert.match(src, /if \(vibrar\) \{\s*try \{ navigator\.vibrate\?\.\(VIBRACION_LECTURA_MS\); \} catch \{\}\s*\}\s*apagar\(\);/);
 });
 
 test("pide la cámara TRASERA y formatos que el navegador soporte", () => {
