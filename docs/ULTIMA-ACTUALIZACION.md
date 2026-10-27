@@ -1,19 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-26 15:19
+**Fecha:** 2026-10-27 17:48
 
 ## Módulos modificados recientemente
 
-### pos-ventas
-- fix(transferencias): cada línea del ticket sale como Posventa imprime esa venta —bultos en bultos, sueltas aparte, sin prefijo—, fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
-- Archivos: 2 modificados (2 total)
-
-### transferencias
-- fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado, refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida, feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
-- Archivos: 7 modificados (7 total)
-
-### pos-transferencias
-- fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado, refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
+### stock
+- revert: se saca la lectura con cámara del Control de stock — vuelve a 78c98a2, fix(escaner): la cámara lee — zxing en todos los equipos, con el .wasm servido desde el sitio, feat(stock): leer el código de barras con la cámara en Control de stock
 - Archivos: 2 modificados (2 total)
 
 
