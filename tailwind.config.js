@@ -217,6 +217,13 @@ module.exports = {
         contextoPedido: "70px",
         bloqueFactura: "236px",
         botonFoto: "48px",
+        // ── EL RÓTULO DE DOS RENGLONES ────────────────────────────────────
+        //
+        // El nombre de una herramienta en la grilla móvil del panel de
+        // herramientas reserva dos renglones aunque ocupe uno, así las celdas
+        // miden todas lo mismo. En `lh` y no en px: sigue al `leading` y al
+        // tamaño de letra del propio rótulo, sin repetirlos acá.
+        dosRenglones: "2lh",
         // La barra de "Entra al stock" en la hoja de corregir. 32 tampoco cae.
         barraStock: "32px",
       },

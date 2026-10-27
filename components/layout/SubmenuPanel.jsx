@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { paginarHerramientas, llevaPuntitos } from "@/lib/menu/grillaSubmenu";
 
 function getModalMaxWidth(count) {
   if (count <= 2) return 380;
@@ -32,6 +33,58 @@ function getRows(items) {
   return rows;
 }
 
+// Abajo de `md`: tres por fila, doce por página. Con una sola página es una
+// grilla quieta; con más, carrusel que encaja página por página. El alto no
+// cambia al pasar de página porque las páginas son hijas de la misma pista
+// flex: se estiran a la más alta —la primera, que siempre está llena— y cada
+// una reparte ese alto en cuatro filas iguales, aunque tenga una herramienta.
+function GrillaMovil({ items, renderTile }) {
+  const [paginaVisible, setPaginaVisible] = useState(0);
+  const paginas = paginarHerramientas(items);
+
+  if (!llevaPuntitos(paginas)) {
+    return (
+      <div className="grid grid-cols-3 gap-x-1 gap-y-2">
+        {paginas[0].map(renderTile)}
+      </div>
+    );
+  }
+
+  const alDesplazar = (e) => {
+    const ancho = e.currentTarget.clientWidth || 1;
+    const indice = Math.round(e.currentTarget.scrollLeft / ancho);
+    if (indice !== paginaVisible) setPaginaVisible(indice);
+  };
+
+  return (
+    <div>
+      <div
+        onScroll={alDesplazar}
+        className="flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {paginas.map((pagina, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-3 grid-rows-4 gap-x-1 gap-y-2 shrink-0 w-full snap-start snap-always"
+          >
+            {pagina.map(renderTile)}
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-center gap-1.5 mt-3" aria-hidden="true">
+        {paginas.map((_, i) => (
+          <span
+            key={i}
+            className={`block w-1.5 h-1.5 rounded-full ${
+              i === paginaVisible ? "sunmi-bg-accent" : "sunmi-bg-borde"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function SubmenuPanel({ group, isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -52,14 +105,18 @@ export default function SubmenuPanel({ group, isOpen, onClose }) {
   const isScrollable = count > 12;
   const rows = getRows(items);
 
-  const renderTile = (item) => {
+  // `enGrilla`: la celda ocupa su columna de la grilla móvil y el nombre
+  // reserva dos renglones. En escritorio la celda tiene su ancho fijo de antes.
+  const renderTile = (item, enGrilla) => {
     const ItemIcon = item.icon;
     return (
       <Link
         key={item.href}
         href={item.href}
         onClick={onClose}
-        className="flex flex-col items-center gap-2 p-2.5 rounded-xl hover:bg-[color:var(--hover-bg)] transition w-28"
+        className={`flex flex-col items-center gap-2 rounded-xl hover:bg-[color:var(--hover-bg)] transition ${
+          enGrilla ? "w-full min-w-0 py-2.5" : "p-2.5 w-28"
+        }`}
       >
         <div
           className="w-[52px] h-[52px] rounded-full flex items-center justify-center"
@@ -70,7 +127,11 @@ export default function SubmenuPanel({ group, isOpen, onClose }) {
         >
           {ItemIcon && <ItemIcon size={22} />}
         </div>
-        <span className="text-[13px] font-medium text-[color:var(--app-fg)] text-center leading-tight">
+        <span
+          className={`text-sm3 font-medium text-[color:var(--app-fg)] text-center leading-tight ${
+            enGrilla ? "w-full line-clamp-2 min-h-dosRenglones break-words" : ""
+          }`}
+        >
           {item.label}
         </span>
       </Link>
@@ -83,8 +144,8 @@ export default function SubmenuPanel({ group, isOpen, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-[color:var(--card-bg)] border border-[color:var(--card-border)] rounded-3xl p-6 shadow-2xl w-full sm:w-auto"
-        style={{ maxWidth: `min(${modalMax}px, 90vw)` }}
+        className="bg-[color:var(--card-bg)] border border-[color:var(--card-border)] rounded-3xl p-6 shadow-2xl w-full md:w-auto"
+        style={{ maxWidth: `min(${modalMax}px, 100%)` }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
@@ -116,11 +177,15 @@ export default function SubmenuPanel({ group, isOpen, onClose }) {
           </button>
         </div>
 
-        <div className={isScrollable ? "max-h-[60vh] overflow-y-auto pr-1" : ""}>
+        <div className="md:hidden">
+          <GrillaMovil items={items} renderTile={(item) => renderTile(item, true)} />
+        </div>
+
+        <div className={`hidden md:block ${isScrollable ? "max-h-[60vh] overflow-y-auto pr-1" : ""}`}>
           <div className="space-y-4">
             {rows.map((row, index) => (
               <div key={index} className="flex justify-center gap-4">
-                {row.map(renderTile)}
+                {row.map((item) => renderTile(item, false))}
               </div>
             ))}
           </div>

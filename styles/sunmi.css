@@ -534,6 +534,9 @@
    ahí habría traído un color de texto que nadie va a ver y habría dejado el
    nombre de una pieza donde no hay ninguna. */
 .sunmi-bg-accent      { background: var(--pos-accent); }
+/* El mismo caso con el color de borde: los puntitos de página del panel de
+   herramientas que no son la página actual. */
+.sunmi-bg-borde       { background: var(--app-border); }
 
 /* EL FONDO DE UNA TARJETA, y solo el fondo.
 
