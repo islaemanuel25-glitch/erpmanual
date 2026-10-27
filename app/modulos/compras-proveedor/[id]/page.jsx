@@ -42,6 +42,7 @@ import {
   costosQueNoSeTocan,
   kilosDelCierre,
   llegaronSinPapel,
+  sueltasDelCierre,
 } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import ProductosSinBoleta from "@/components/compras-proveedor/ProductosSinBoleta";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
@@ -918,7 +919,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         bodyData = {
           recibidos: extra?.recibidos ?? recibidos,
           kgRecibidos: extra?.kgRecibidos ?? kgRecibidos,
-          sueltas,
+          sueltas: extra?.sueltas ?? sueltas,
           fisicas,
           motivos,
           costos,
@@ -1773,6 +1774,15 @@ export default function DetallePedidoProveedorPage({ params }) {
                   // Lo que el papel dice del fiambre que viene en kilos son
                   // kilos, y viajan en su mapa: ver `kilosDelCierre`.
                   kgRecibidos: kilosDelCierre({ filas: filasDelCierre, kgRecibidos }),
+                  // Lo que no completa un bulto viaja como sueltas, nunca
+                  // como bultos con decimales: ver `sueltasDelCierre`.
+                  sueltas: sueltasDelCierre({
+                    filas: filasDelCierre,
+                    sinComprobante: huerfanas,
+                    llegadas: llegadasSinPapel,
+                    contados: recibidos,
+                    sueltas,
+                  }),
                   pagoAlProveedor,
                   costosExcluidos: costosQueNoSeTocan(filasDelCierre),
                   // Las que entraron sin papel: el servidor les excluye el

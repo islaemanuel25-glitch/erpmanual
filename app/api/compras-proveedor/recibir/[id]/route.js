@@ -21,6 +21,7 @@ import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
+import { textoNumero } from "@/lib/stock/control/controlStock";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
@@ -361,6 +362,15 @@ export async function POST(req, { params }) {
       fechaFactura = ff;
     }
 
+    // ── LO QUE NO SIRVE SE DICE CON EL NOMBRE DEL PRODUCTO ────────────────
+    //
+    // Arcor, 2026-10-27: el cierre frenó con "cantidad debe ser un entero >= 0
+    // (detalleId: 3270)". Un número de línea no le dice a nadie qué abrir: el
+    // texto nombra el producto como se ve en la pantalla y dice qué tiene mal.
+    const nombreDeLinea = (detId) =>
+      pedido.detalles.find((d) => String(d.id) === String(detId))?.producto?.base?.nombre || "Un producto";
+    const frenar = (texto) => NextResponse.json({ ok: false, error: texto }, { status: 400 });
+
     // --- Costos editados por ítem (opcionales) ---
     const costosMap = body.costos || {}; // { detalleId: precioCosto }
 
@@ -368,43 +378,39 @@ export async function POST(req, { params }) {
       if (costo === "" || costo === null) continue;
       const c = Number(costo);
       if (!Number.isFinite(c) || c < 0) {
-        return NextResponse.json(
-          { ok: false, error: `precioCosto debe ser un número >= 0 (detalleId: ${detId})` },
-          { status: 400 }
-        );
+        return frenar(`${nombreDeLinea(detId)}: el costo tiene que ser un número, cero o más.`);
       }
     }
 
-    // Validar cantidades recibidas: entero finito >= 0
+    // Cantidades recibidas: enteras, porque son bultos o unidades. Lo que no
+    // completa un bulto viaja aparte, como sueltas (`sueltasDelCierre`). No se
+    // redondea acá: redondear sería entrar al stock algo que nadie dijo.
     for (const [detId, cant] of Object.entries(recibidos)) {
       const c = Number(cant);
-      if (!Number.isFinite(c) || !Number.isInteger(c) || c < 0) {
-        return NextResponse.json(
-          { ok: false, error: `cantidad debe ser un entero >= 0 (detalleId: ${detId})` },
-          { status: 400 }
+      if (!Number.isFinite(c) || c < 0) {
+        return frenar(`${nombreDeLinea(detId)}: la cantidad recibida no es un número válido.`);
+      }
+      if (!Number.isInteger(c)) {
+        return frenar(
+          `${nombreDeLinea(detId)}: la cantidad recibida es ${textoNumero(c)}, con decimales, y se ` +
+            `recibe en bultos o unidades enteras. Abrí Corregir y cargá los bultos enteros y, aparte, ` +
+            `las unidades sueltas.`
         );
       }
     }
 
-    // Validar kg recibidos para fiambres
     for (const [detId, sueltas] of Object.entries(sueltasMap)) {
       if (sueltas === "" || sueltas === null || sueltas === undefined) continue;
       const sv = Number(sueltas);
       if (!Number.isInteger(sv) || sv < 0) {
-        return NextResponse.json(
-          { ok: false, error: `unidadesSueltas debe ser un entero >= 0 (detalleId: ${detId})` },
-          { status: 400 }
-        );
+        return frenar(`${nombreDeLinea(detId)}: las unidades sueltas tienen que ser un número entero, cero o más.`);
       }
     }
 
     for (const [detId, kg] of Object.entries(kgRecibidosMap)) {
       const k = Number(kg);
       if (!Number.isFinite(k) || k < 0) {
-        return NextResponse.json(
-          { ok: false, error: `kgRecibidos debe ser un numero >= 0 (detalleId: ${detId})` },
-          { status: 400 }
-        );
+        return frenar(`${nombreDeLinea(detId)}: los kilos recibidos tienen que ser un número, cero o más.`);
       }
     }
 
