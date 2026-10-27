@@ -322,11 +322,11 @@ test("la cámara del buscador entra por el MISMO camino que el lector y no guard
   assert.match(alLeer, /setCamara\(false\);\s*c\.escanear\(codigo\);/, "la cámara no entra como el lector");
   // Y nada más: ni guardar, ni contar, ni aceptar.
   assert.doesNotMatch(alLeer, /guardar|Total|aceptar|estaBien/i, "leer con la cámara no puede guardar un conteo");
-  // Los cuatro formatos pedidos, el respaldo de iPhone, la vibración y la
-  // pantalla completa.
+  // Los cuatro formatos pedidos, la vibración y la pantalla completa. El lector
+  // es zxing en todos los equipos: ya no hay respaldo que pedir.
   assert.match(pantalla, /FORMATOS_CAMARA = Object\.freeze\(\["ean_13", "ean_8", "upc_a", "code_128"\]\)/);
   const escaner = pantalla.match(/<SunmiEscanerCodigoBarra\b[\s\S]*?\/>/)?.[0] ?? "";
-  for (const prop of ["formatos={FORMATOS_CAMARA}", "conRespaldo", "vibrar", "pantallaCompleta", "onSinCamara={alNoPoder}"]) {
+  for (const prop of ["formatos={FORMATOS_CAMARA}", "vibrar", "pantallaCompleta", "onSinCamara={alNoPoder}"]) {
     assert.ok(escaner.includes(prop), `al escáner le falta ${prop}`);
   }
   // Sin cámara o sin permiso: se cierra y el aviso queda en la pantalla.

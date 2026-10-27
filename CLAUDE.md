@@ -943,14 +943,16 @@ que hace falta para elegir una pieza y para dibujarla.
   `onChangeDesde`, `onChangeHasta`, `onApply`, `placeholder`, `maxDate`,
   `className`. Calendario propio, semana de lunes a domingo.
 - `SunmiEscanerCodigoBarra` — 3 / 2. Props: `abierto`, `onCerrar`, `onCodigo`,
-  `onSinCamara`, `titulo`, `ayuda`, `formatos`, y tres opciones apagadas:
-  `conRespaldo` (carga `barcode-detector` con `import()` al abrir, para
-  iPhone/Safari), `vibrar` y `pantallaCompleta` (el cajón a todo el ancho con
-  recuadro guía y "Cerrar" abajo). Exporta `hayEscanerDisponible({ conRespaldo })`,
-  `FORMATOS_CODIGO`, `MOTIVO_SIN_CAMARA`, `MENSAJES_SIN_CAMARA` y
-  `VIBRACION_LECTURA_MS`. El texto de ayuda es neutral a propósito: la pieza no
-  sabe qué se escanea. Con `conRespaldo`, el núcleo WASM del paquete (~1 MB) lo
-  baja el navegador de jsDelivr la primera vez.
+  `onSinCamara`, `titulo`, `ayuda`, `formatos`, y dos opciones apagadas:
+  `vibrar` y `pantallaCompleta` (el cajón a todo el ancho con recuadro guía y
+  "Cerrar" abajo). Exporta `hayEscanerDisponible()`, `FORMATOS_CODIGO`,
+  `MOTIVO_SIN_CAMARA`, `MENSAJES_SIN_CAMARA`, `VIBRACION_LECTURA_MS`,
+  `RESOLUCION_CAMARA` e `INTERVALO_LECTURA_MS`. El texto de ayuda es neutral a
+  propósito: la pieza no sabe qué se escanea. **Lee siempre con zxing**
+  (`lib/sunmi/lectorCodigoBarra.js`, paquete `barcode-detector`), nunca con el
+  `BarcodeDetector` nativo, que en varios Android devuelve vacío sin error; el
+  `.wasm` se sirve desde `public/zxing/` y su candado lo compara contra el
+  SHA-256 del paquete.
 
 **Tabla**
 

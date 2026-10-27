@@ -422,7 +422,6 @@ function BuscadorDelControl({ c }) {
         onSinCamara={alNoPoder}
         titulo="Leer código"
         formatos={FORMATOS_CAMARA}
-        conRespaldo
         vibrar
         pantallaCompleta
       />
