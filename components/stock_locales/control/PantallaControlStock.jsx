@@ -22,7 +22,7 @@
 // Los resúmenes cuentan PRODUCTOS, nunca suman unidades de productos distintos.
 // La plata sí se suma: es lo único que tiene la misma unidad en todos.
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
 import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
@@ -30,10 +30,6 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
-import SunmiEscanerCodigoBarra, {
-  MENSAJES_SIN_CAMARA,
-  MOTIVO_SIN_CAMARA,
-} from "@/components/sunmi/SunmiEscanerCodigoBarra";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
@@ -354,40 +350,15 @@ function ControlAbierto({ c, local, puedeGestionar }) {
   );
 }
 
-/** Lo que se lee con la cámara: los de góndola y el de etiqueta propia. */
-const FORMATOS_CAMARA = Object.freeze(["ean_13", "ean_8", "upc_a", "code_128"]);
-
 /**
  * EL BUSCADOR, CON EL ASPECTO DEL DE TRANSFERENCIAS: `SunmiCampoBusquedaVoz`,
  * lupa, campo y micrófono. El lector se reconoce con la regla de la caja
  * (teclas muy seguidas y un Enter: `esLecturaDeEscaner`) y va como lectura; lo
  * tecleado se busca a los 300 ms.
- *
- * La cámara entra por el MISMO `c.escanear` que el lector físico: desde ahí es
- * idéntico —solo ese producto, o el aviso del código que no es de nadie—, y no
- * guarda ningún conteo. Sin cámara o sin permiso, se cierra y lo dice acá.
  */
 function BuscadorDelControl({ c }) {
-  const [camara, setCamara] = useState(false);
-  const [sinCamara, setSinCamara] = useState(null);
   const ultima = useRef(0);
   const rafaga = useRef("");
-  const abrirCamara = () => {
-    setSinCamara(null);
-    setCamara(true);
-  };
-  const cerrarCamara = useCallback(() => setCamara(false), []);
-  const alLeer = useCallback(
-    (codigo) => {
-      setCamara(false);
-      c.escanear(codigo);
-    },
-    [c.escanear]
-  );
-  const alNoPoder = useCallback((motivo) => {
-    setCamara(false);
-    setSinCamara(MENSAJES_SIN_CAMARA[motivo] ?? MENSAJES_SIN_CAMARA[MOTIVO_SIN_CAMARA.FALLO]);
-  }, []);
   const alTeclear = (e) => {
     const ahora = Date.now();
     const ms = ahora - ultima.current;
@@ -404,28 +375,14 @@ function BuscadorDelControl({ c }) {
     }
   };
   return (
-    <>
-      <SunmiCampoBusquedaVoz
-        value={c.texto}
-        onChange={c.setTexto}
-        onVoz={c.setTexto}
-        onKeyDown={alTeclear}
-        onCamara={abrirCamara}
-        placeholder={PLACEHOLDER_BUSCADOR}
-        ariaLabel="Buscar producto del control"
-        avisoDeEstado={sinCamara ? <AvisoDeEstado tono="warning">{sinCamara}</AvisoDeEstado> : null}
-      />
-      <SunmiEscanerCodigoBarra
-        abierto={camara}
-        onCerrar={cerrarCamara}
-        onCodigo={alLeer}
-        onSinCamara={alNoPoder}
-        titulo="Leer código"
-        formatos={FORMATOS_CAMARA}
-        vibrar
-        pantallaCompleta
-      />
-    </>
+    <SunmiCampoBusquedaVoz
+      value={c.texto}
+      onChange={c.setTexto}
+      onVoz={c.setTexto}
+      onKeyDown={alTeclear}
+      placeholder={PLACEHOLDER_BUSCADOR}
+      ariaLabel="Buscar producto del control"
+    />
   );
 }
 

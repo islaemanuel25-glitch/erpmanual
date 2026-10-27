@@ -19,7 +19,6 @@
     "@prisma/client": "^6.19.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.78.0",
-    "barcode-detector": "3.2.2",
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.1.0",

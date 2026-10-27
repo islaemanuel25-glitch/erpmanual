@@ -13,21 +13,15 @@
 // —el POS, una auditoría de stock— tiene que poder usar esto sin arrastrar media
 // recepción atrás.
 //
-// ── EL LECTOR ES ZXING EN TODOS LOS EQUIPOS ───────────────────────────────
+// ── POR QUÉ `BarcodeDetector` Y NO UNA DEPENDENCIA ────────────────────────
 //
-// Decía "`BarcodeDetector` del navegador, cero bytes". En producción la cámara
-// del Control de stock se abría y no leía nada: en varios Android el nativo
-// existe, no soporta todos los formatos y devuelve vacío sin error. El lector
-// es `lib/sunmi/lectorCodigoBarra.js` —zxing en WebAssembly, con el `.wasm`
-// servido desde el sitio y cargado recién al abrir—, el mismo en todos los
-// equipos y el mismo que su candado ejerce con imágenes.
+// `BarcodeDetector` es del navegador: cero bytes que bajar, cero árbol de
+// dependencias, y en los Sunmi —Android con WebView moderno— está. Meter una
+// librería de decodificación para esto sería agregar cientos de kilobytes al
+// bundle de una aplicación que se usa en un teléfono de tienda, para resolver
+// algo que la plataforma ya resuelve.
 //
-// ── CÓMO SE LEE ───────────────────────────────────────────────────────────
-//
-// Cámara trasera pidiendo 1280×720 y enfoque continuo donde se pueda. Cada
-// `INTERVALO_LECTURA_MS`, con el video ya reproduciéndose, el cuadro se copia a
-// un canvas del tamaño REAL del video —no del que ocupa en pantalla— y se lee.
-// Un cuadro que falla no corta el bucle: se prueba con el siguiente.
+// Donde no está, la recepción NO se rompe: ver el fallback abajo.
 //
 // ── LA CÁMARA SE LIBERA SIEMPRE ───────────────────────────────────────────
 //
@@ -48,7 +42,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
-import { crearLector, leerCuadro } from "@/lib/sunmi/lectorCodigoBarra";
 
 /** Los formatos que se piden. Los de góndola argentina más los de etiqueta propia. */
 export const FORMATOS_CODIGO = Object.freeze([
@@ -65,9 +58,6 @@ export const FORMATOS_CODIGO = Object.freeze([
 export const MOTIVO_SIN_CAMARA = Object.freeze({
   NO_SOPORTADO: "noSoportado",
   SIN_PERMISO: "sinPermiso",
-  // El equipo no tiene cámara. Antes caía en FALLO y decía "no respondió",
-  // que hace pensar en reintentar algo que no va a aparecer.
-  NO_HAY_CAMARA: "noHayCamara",
   FALLO: "fallo",
 });
 
@@ -76,38 +66,15 @@ export const MENSAJES_SIN_CAMARA = Object.freeze({
     "Este navegador no puede leer códigos con la cámara. Escribí el código o usá el lector.",
   [MOTIVO_SIN_CAMARA.SIN_PERMISO]:
     "No se pudo usar la cámara: falta el permiso. Escribí el código o usá el lector.",
-  [MOTIVO_SIN_CAMARA.NO_HAY_CAMARA]:
-    "Este equipo no tiene cámara. Escribí el código o usá el lector.",
   [MOTIVO_SIN_CAMARA.FALLO]:
     "La cámara no respondió. Escribí el código o usá el lector.",
 });
 
-/** Cuánto vibra el teléfono al leer, con `vibrar`. Un toque, no una alarma. */
-export const VIBRACION_LECTURA_MS = 80;
-
-/** La resolución que se le pide a la cámara: con menos, un EAN chico no se lee. */
-export const RESOLUCION_CAMARA = Object.freeze({ ancho: 1280, alto: 720 });
-
-/** Cada cuánto se lee un cuadro. Leer los 60 por segundo solo calienta el teléfono. */
-export const INTERVALO_LECTURA_MS = 150;
-
-/**
- * ¿Se puede leer con la cámara? Se pregunta antes de ofrecer el botón. El
- * lector lo trae el sitio, así que alcanza con que haya cámara.
- */
+/** ¿Este navegador puede leer códigos con la cámara? Se pregunta antes de ofrecerlo. */
 export function hayEscanerDisponible() {
   if (typeof window === "undefined") return false;
+  if (typeof window.BarcodeDetector !== "function") return false;
   return Boolean(navigator?.mediaDevices?.getUserMedia);
-}
-
-/** Enfoque continuo, si la cámara lo ofrece. Si no, queda como venía. */
-async function enfocarContinuo(stream) {
-  const pista = stream.getVideoTracks?.()[0];
-  const modos = pista?.getCapabilities?.().focusMode;
-  if (!Array.isArray(modos) || !modos.includes("continuous")) return;
-  try {
-    await pista.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-  } catch {}
 }
 
 export default function SunmiEscanerCodigoBarra({
@@ -123,15 +90,6 @@ export default function SunmiEscanerCodigoBarra({
   // etiqueta del pallet"—. Un default que hable de productos le metería una
   // suposición de dominio al kit.
   ayuda = "Apuntá al código de barras.",
-  /** Los formatos a leer; sin declarar, todos los de `FORMATOS_CODIGO`. */
-  formatos = FORMATOS_CODIGO,
-  /** Vibra un toque al leer, donde el teléfono sabe vibrar. */
-  vibrar = false,
-  /**
-   * La cámara a toda la pantalla, con un recuadro guía en el centro y "Cerrar"
-   * fijo abajo. Sin declarar, la hoja de siempre.
-   */
-  pantallaCompleta = false,
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -176,9 +134,15 @@ export default function SunmiEscanerCodigoBarra({
     vivoRef.current = true;
 
     (async () => {
-      let lector;
+      let detector;
       try {
-        lector = await crearLector(formatos);
+        // `getSupportedFormats` evita pedirle al detector un formato que este
+        // navegador no tiene: con uno solo desconocido, el constructor tira.
+        const soportados = await window.BarcodeDetector.getSupportedFormats?.();
+        const formats = Array.isArray(soportados)
+          ? FORMATOS_CODIGO.filter((f) => soportados.includes(f))
+          : FORMATOS_CODIGO;
+        detector = new window.BarcodeDetector(formats.length ? { formats } : undefined);
       } catch {
         if (!detenido) fallar(MOTIVO_SIN_CAMARA.NO_SOPORTADO);
         return;
@@ -187,26 +151,14 @@ export default function SunmiEscanerCodigoBarra({
       let stream;
       try {
         // La cámara TRASERA: quien escanea apunta al producto, no a su cara.
-        // `ideal` y no `min`: una cámara que no llega a 1280×720 igual abre.
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: RESOLUCION_CAMARA.ancho },
-            height: { ideal: RESOLUCION_CAMARA.alto },
-          },
+          video: { facingMode: { ideal: "environment" } },
           audio: false,
         });
       } catch (e) {
         if (detenido) return;
         const negado = e?.name === "NotAllowedError" || e?.name === "SecurityError";
-        const noHay = e?.name === "NotFoundError";
-        fallar(
-          negado
-            ? MOTIVO_SIN_CAMARA.SIN_PERMISO
-            : noHay
-              ? MOTIVO_SIN_CAMARA.NO_HAY_CAMARA
-              : MOTIVO_SIN_CAMARA.FALLO
-        );
+        fallar(negado ? MOTIVO_SIN_CAMARA.SIN_PERMISO : MOTIVO_SIN_CAMARA.FALLO);
         return;
       }
 
@@ -220,47 +172,32 @@ export default function SunmiEscanerCodigoBarra({
       }
 
       streamRef.current = stream;
-      await enfocarContinuo(stream);
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
         try { await video.play(); } catch {}
       }
 
-      // El cuadro se copia a un canvas del tamaño real del video.
-      const lienzo = document.createElement("canvas");
-      const contexto = lienzo.getContext("2d", { willReadFrequently: true });
-      let ultima = 0;
-
-      // El bucle de lectura. `requestAnimationFrame` y no un `setInterval`: se
-      // detiene solo cuando la pestaña pasa a segundo plano, que es exactamente
-      // lo que se quiere con la cámara abierta. Se lee uno cada
-      // `INTERVALO_LECTURA_MS`, y nunca dos a la vez.
-      const mirar = async (ahora) => {
+      // El bucle de detección. `requestAnimationFrame` y no un `setInterval`:
+      // se detiene solo cuando la pestaña pasa a segundo plano, que es
+      // exactamente lo que se quiere con la cámara abierta.
+      const mirar = async () => {
         if (detenido || !vivoRef.current) return;
         const v = videoRef.current;
-        // Recién cuando el video se está reproduciendo y ya sabe su tamaño.
-        const listo = v && v.readyState >= v.HAVE_CURRENT_DATA && v.videoWidth > 0;
-        if (listo && ahora - ultima >= INTERVALO_LECTURA_MS) {
-          ultima = ahora;
-          let valor = null;
+        if (v && v.readyState >= 2) {
           try {
-            if (lienzo.width !== v.videoWidth) lienzo.width = v.videoWidth;
-            if (lienzo.height !== v.videoHeight) lienzo.height = v.videoHeight;
-            contexto.drawImage(v, 0, 0, lienzo.width, lienzo.height);
-            valor = await leerCuadro(lector, contexto.getImageData(0, 0, lienzo.width, lienzo.height));
-          } catch {
-            // Un cuadro que no se pudo copiar no corta el bucle: va el siguiente.
-          }
-          if (valor && !detenido && vivoRef.current) {
-            if (vibrar) {
-              try { navigator.vibrate?.(VIBRACION_LECTURA_MS); } catch {}
+            const encontrados = await detector.detect(v);
+            const valor = encontrados?.[0]?.rawValue;
+            if (valor) {
+              // Se apaga ANTES de avisar: el consumidor va a cerrar el modal y
+              // navegar, y no puede quedar una cámara viva detrás.
+              apagar();
+              onCodigo?.(String(valor));
+              return;
             }
-            // Se apaga ANTES de avisar: el consumidor va a cerrar el modal y
-            // navegar, y no puede quedar una cámara viva detrás.
-            apagar();
-            onCodigo?.(valor);
-            return;
+          } catch {
+            // Un frame que no se pudo decodificar no es un error del escáner:
+            // se sigue mirando.
           }
         }
         if (!detenido && vivoRef.current) requestAnimationFrame(mirar);
@@ -272,57 +209,10 @@ export default function SunmiEscanerCodigoBarra({
       detenido = true;
       apagar();
     };
-  }, [abierto, apagar, fallar, onCodigo, formatos, vibrar]);
+  }, [abierto, apagar, fallar, onCodigo]);
 
   // Y por si el componente se desmonta sin pasar por `abierto = false`.
   useEffect(() => apagar, [apagar]);
-
-  if (pantallaCompleta) {
-    // El cajón a todo el ancho es la pantalla completa: la forma ya trae el alto
-    // entero, las esquinas rectas y la columna con el pie fijo abajo. Sin
-    // encabezado: lo que se ve es la cámara, y la salida es "Cerrar".
-    return (
-      <SunmiModalLayout
-        open={abierto}
-        title={titulo}
-        onClose={onCerrar}
-        z={NIVEL_MODAL_GLOBAL}
-        forma="cajon"
-        className="max-w-none"
-        encabezado="ninguno"
-        paddingTarjeta="p-3"
-        espacioCuerpo="gap-3"
-        footer={
-          <SunmiButton color="slate" onClick={onCerrar} className="w-full min-h-toque">
-            Cerrar
-          </SunmiButton>
-        }
-      >
-        {error ? (
-          <SunmiAviso tono="warning">{error}</SunmiAviso>
-        ) : (
-          <>
-            <p className="shrink-0 text-sm3 sunmi-text-muted text-center">{ayuda}</p>
-            <div className="relative flex-1 sunmi-surface-soft rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                className="absolute inset-0 w-full h-full object-cover"
-                playsInline
-                muted
-                autoPlay
-                aria-label={ayuda}
-              />
-              {/* El recuadro guía: dónde apuntar. Proporción de código de barras
-                  —más ancho que alto— sacada de la escala, no medida a ojo. */}
-              <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-3/4 aspect-video rounded-lg border-2 sunmi-border-accent" />
-              </div>
-            </div>
-          </>
-        )}
-      </SunmiModalLayout>
-    );
-  }
 
   return (
     <SunmiModalLayout
@@ -359,7 +249,6 @@ export default function SunmiEscanerCodigoBarra({
             className="w-full aspect-video object-cover"
             playsInline
             muted
-            autoPlay
             aria-label={ayuda}
           />
         </div>

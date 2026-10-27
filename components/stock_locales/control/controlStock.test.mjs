@@ -312,28 +312,6 @@ test("control abierto: armado con las piezas de recibir transferencia, y sin lo 
   assert.doesNotMatch(t, /QUIÉN ESTÁ CONTANDO|Guardar|Ajustar|Límites|Más filtros|Limpiar/);
 });
 
-test("la cámara del buscador entra por el MISMO camino que el lector y no guarda nada", () => {
-  const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
-  // El botón se prende acá: la opción del buscador viene apagada.
-  assert.match(pantalla, /<SunmiCampoBusquedaVoz\b[^>]*onCamara=\{abrirCamara\}/);
-  // Lo leído va a `c.escanear`, que es lo que hace el lector físico con su
-  // ráfaga: desde ahí, solo ese producto o el aviso del código desconocido.
-  const alLeer = pantalla.match(/const alLeer = useCallback\(([\s\S]*?)\n  \);/)?.[1] ?? "";
-  assert.match(alLeer, /setCamara\(false\);\s*c\.escanear\(codigo\);/, "la cámara no entra como el lector");
-  // Y nada más: ni guardar, ni contar, ni aceptar.
-  assert.doesNotMatch(alLeer, /guardar|Total|aceptar|estaBien/i, "leer con la cámara no puede guardar un conteo");
-  // Los cuatro formatos pedidos, la vibración y la pantalla completa. El lector
-  // es zxing en todos los equipos: ya no hay respaldo que pedir.
-  assert.match(pantalla, /FORMATOS_CAMARA = Object\.freeze\(\["ean_13", "ean_8", "upc_a", "code_128"\]\)/);
-  const escaner = pantalla.match(/<SunmiEscanerCodigoBarra\b[\s\S]*?\/>/)?.[0] ?? "";
-  for (const prop of ["formatos={FORMATOS_CAMARA}", "vibrar", "pantallaCompleta", "onSinCamara={alNoPoder}"]) {
-    assert.ok(escaner.includes(prop), `al escáner le falta ${prop}`);
-  }
-  // Sin cámara o sin permiso: se cierra y el aviso queda en la pantalla.
-  assert.match(pantalla, /const alNoPoder = useCallback\(\(motivo\) => \{\s*setCamara\(false\);\s*setSinCamara\(MENSAJES_SIN_CAMARA\[motivo\]/);
-  assert.match(pantalla, /avisoDeEstado=\{sinCamara \?/);
-});
-
 test("el chip de entrada es Sin contar", () => {
   const src = fuente("components/stock_locales/control/useControlStock.js");
   assert.match(src, /const \[chip, setChipCrudo\] = useState\(FILTRO_CONTROL\.SIN_CONTAR\)/);

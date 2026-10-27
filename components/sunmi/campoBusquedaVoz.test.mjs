@@ -15,7 +15,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -209,22 +208,4 @@ test("EL CAMPO DEL POS NO SE MOVIÓ: LAS CLASES SON LAS QUE TENÍA", () => {
   }
   // El borde toma el color del acento del POS, no uno escrito a mano.
   assert.match(PIEZA, /borderColor: "var\(--pos-link\)"/);
-});
-
-test("LA CÁMARA ES UNA OPCIÓN APAGADA, Y AL PRENDERLA NADA SE MUEVE", () => {
-  // Apagada por defecto: las pantallas que no la piden —Stock Locales, el POS,
-  // Productos, Transferencias— quedan exactamente como estaban.
-  assert.match(PIEZA, /onCamara = null,/);
-  assert.match(PIEZA, /\{conCamara && \(/, "el botón se dibuja sin que nadie lo pida");
-  // Sin cámara el hueco es el de siempre: `!pr-12` con micrófono, nada sin él.
-  assert.match(PIEZA, /puedeEscuchar && conCamara \? "!pr-20" : puedeEscuchar \|\| conCamara \? "!pr-12" : ""/);
-  // El micrófono no se corre: sigue en `right-2`, y la cámara va a su izquierda.
-  assert.match(PIEZA, /className=\{`absolute right-2 top-1\/2 -translate-y-1\/2 p-2 rounded transition-colors \$\{\s*escuchando/);
-  assert.match(PIEZA, /absolute \$\{puedeEscuchar \? "right-12" : "right-2"\} top-1\/2/);
-
-  // Quién la prende HOY: solo el Control de stock.
-  const quienes = execFileSync("git", ["grep", "--untracked", "-l", "onCamara=", "--", "*.jsx"], { cwd: RAIZ, encoding: "utf8" })
-    .trim()
-    .split("\n");
-  assert.deepEqual(quienes, ["components/stock_locales/control/PantallaControlStock.jsx"]);
 });

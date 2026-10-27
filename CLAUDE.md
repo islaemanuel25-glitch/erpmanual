@@ -930,10 +930,8 @@ que hace falta para elegir una pieza y para dibujarla.
   cuatro.
 - `SunmiCampoBusquedaVoz` — 5 / 5. Props: `value`, `onChange`, `onVoz`,
   `inputRef`, `placeholder`, `id`, `ariaLabel`, `onKeyDown`, `autoFocus`,
-  `className`, `onEscuchandoChange`, `avisoDeEstado`, `onCamara`. Exporta
-  `soportaVoz()`, `IDIOMA_VOZ` (`es-AR`) y `TEXTO_ESCUCHANDO`. `onCamara` viene
-  apagado: con él aparece el botón de cámara a la izquierda del micrófono, sin
-  mover nada; hoy lo prende solo el Control de stock.
+  `className`, `onEscuchandoChange`, `avisoDeEstado`. Exporta `soportaVoz()`,
+  `IDIOMA_VOZ` (`es-AR`) y `TEXTO_ESCUCHANDO`.
 - `SunmiToggle` — 12 / 14. Props: `value`, `onChange`, `label`, `disabled`. Track
   8×4, thumb 4×4, texto 12 px. **Guarda estado propio con `useState`**, así que un
   `value` que cambie de afuera no lo mueve.
@@ -942,17 +940,10 @@ que hace falta para elegir una pieza y para dibujarla.
 - `SunmiDateRangePicker` — 1 / 1. Props: `valueDesde`, `valueHasta`,
   `onChangeDesde`, `onChangeHasta`, `onApply`, `placeholder`, `maxDate`,
   `className`. Calendario propio, semana de lunes a domingo.
-- `SunmiEscanerCodigoBarra` — 3 / 2. Props: `abierto`, `onCerrar`, `onCodigo`,
-  `onSinCamara`, `titulo`, `ayuda`, `formatos`, y dos opciones apagadas:
-  `vibrar` y `pantallaCompleta` (el cajón a todo el ancho con recuadro guía y
-  "Cerrar" abajo). Exporta `hayEscanerDisponible()`, `FORMATOS_CODIGO`,
-  `MOTIVO_SIN_CAMARA`, `MENSAJES_SIN_CAMARA`, `VIBRACION_LECTURA_MS`,
-  `RESOLUCION_CAMARA` e `INTERVALO_LECTURA_MS`. El texto de ayuda es neutral a
-  propósito: la pieza no sabe qué se escanea. **Lee siempre con zxing**
-  (`lib/sunmi/lectorCodigoBarra.js`, paquete `barcode-detector`), nunca con el
-  `BarcodeDetector` nativo, que en varios Android devuelve vacío sin error; el
-  `.wasm` se sirve desde `public/zxing/` y su candado lo compara contra el
-  SHA-256 del paquete.
+- `SunmiEscanerCodigoBarra` — 2 / 1. Props: `abierto`, `onCerrar`, `onCodigo`,
+  `onSinCamara`, `titulo`, `ayuda`. Exporta `hayEscanerDisponible()`,
+  `FORMATOS_CODIGO`, `MOTIVO_SIN_CAMARA` y `MENSAJES_SIN_CAMARA`. El texto de ayuda
+  es neutral a propósito: la pieza no sabe qué se escanea.
 
 **Tabla**
 

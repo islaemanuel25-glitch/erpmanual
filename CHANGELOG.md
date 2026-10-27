@@ -1,22 +1,5 @@
 # Changelog
 
-## [2026-10-27] - Actualización: stock, pos-ventas, transferencias, pos-transferencias
-
-### Modificado
-- **stock**: feat(stock): leer el código de barras con la cámara en Control de stock
-- **pos-ventas**: revert: el ticket de posventa no se toca — vuelve a 841ed16 (revierte d006e58 y 490fad9)
-- **pos-ventas**: fix(tickets): una venta por peso se imprime "3,615 kg x $11.018,49" y la fila parte el renglón en vez de cortar el número —en Posventa y en Transferencias—
-- **pos-ventas**: fix(transferencias): cada línea del ticket sale como Posventa imprime esa venta —bultos en bultos, sueltas aparte, sin prefijo—
-- **pos-ventas**: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
-- **transferencias**: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
-- **transferencias**: refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
-- **transferencias**: feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
-- **transferencias**: fix(compras): un papel leído corrido una fila se detecta con el pedido y se acomoda solo; el % del papel baja en rojo
-- **transferencias**: feat(compras): recibir lo que llega sin ningún papel — SIN VERIFICAR en pantalla
-- **pos-transferencias**: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
-- **pos-transferencias**: refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
-
-
 ## [2026-10-26] - Actualización: transferencias
 
 ### Modificado
