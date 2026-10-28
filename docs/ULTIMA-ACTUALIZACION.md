@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-28 17:48
+**Fecha:** 2026-10-28 18:02
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19, fix(pedidos): «No hay» baja a la fila de Corregir, a la derecha, y el nombre recupera su ancho, feat(pedidos): los dos depósitos de la empresa arman el mismo pedido, y cada renglón sale del stock del que lo resolvió
+- feat(pedidos): un «solo por bulto» de bulto 1 sale aunque se haya preparado por unidad, fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19, fix(pedidos): «No hay» baja a la fila de Corregir, a la derecha, y el nombre recupera su ancho
 - Archivos: 1 nuevos, 12 modificados (13 total)
 
 ### transferencias
