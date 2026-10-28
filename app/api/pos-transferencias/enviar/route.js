@@ -66,6 +66,23 @@ const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
  */
 const MENSAJE_YA_SE_ENVIO = "Este pedido ya se envió.";
 
+/**
+ * Lo que lee el depósito cuando el envío falla por algo que no se sabe nombrar
+ * (2026-10-28): nunca "POS" ni "interno". Lo de adentro va al log.
+ */
+const MENSAJE_NO_SE_PUDO = "No se pudo enviar el pedido. Probá de nuevo.";
+
+/**
+ * Un renglón que no se puede enviar como se preparó: "GASEOSA: solo se puede
+ * enviar por bulto." Sale con 409 y nombrando el producto, y como se lanza
+ * antes de la transacción no se escribe nada.
+ */
+class ProductoQueNoSeEnvia extends Error {
+  constructor(producto, motivo) {
+    super(`${producto}: ${String(motivo).replace(/^Este producto /, "")}.`);
+  }
+}
+
 /** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
 function firmaDeLineas(lineas) {
   return (lineas || [])
@@ -95,7 +112,7 @@ export async function POST(req) {
 
     if (!posId) {
       return NextResponse.json(
-        { ok: false, error: "posId requerido" },
+        { ok: false, error: MENSAJE_NO_SE_PUDO },
         { status: 400 }
       );
     }
@@ -127,7 +144,7 @@ export async function POST(req) {
         return NextResponse.json({ ok: false, error: MENSAJE_SE_CANCELO }, { status: 409 });
       }
       return NextResponse.json(
-        { ok: false, error: "POS no encontrada" },
+        { ok: false, error: "No se encontró el pedido." },
         { status: 404 }
       );
     }
@@ -209,10 +226,12 @@ export async function POST(req) {
           modoEnvio,
           unidadElegida: unidadPreparada,
         });
+        // Un producto que no se puede enviar en la unidad en que se preparó: se
+        // dice CUÁL y por qué (incidente del pedido #19, 2026-10-28). Salía como
+        // error suelto y el `catch` lo convertía en "Error interno al enviar
+        // POS", sin nombre: el depósito no tenía cómo saber qué renglón tocar.
         if (!validacion.ok) {
-          throw new Error(
-            `Producto ${base?.nombre || "N/A"}: ${validacion.error}`
-          );
+          throw new ProductoQueNoSeEnvia(detalle.producto?.nombre || base?.nombre || "Un producto", validacion.error);
         }
 
         toUnidades({
@@ -445,10 +464,10 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+    if (err instanceof ProductoQueNoSeEnvia) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
+    }
     console.error("Error enviar POS:", err);
-    return NextResponse.json(
-      { ok: false, error: "Error interno al enviar POS" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: MENSAJE_NO_SE_PUDO }, { status: 500 });
   }
 }

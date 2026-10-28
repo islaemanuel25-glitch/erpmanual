@@ -1757,6 +1757,116 @@ try {
     const rechazados = [e1, e2].filter((e) => e.status === 409 && e.cuerpo.error === "Este pedido ya se envió.");
     ok("16c: a la vez, sale uno y el otro lee \"Este pedido ya se envió.\"", salieron.length === 1 && rechazados.length === 1, json([e1.status, e1.cuerpo.error, e2.status, e2.cuerpo.error]));
     ok("16c: y hay una sola transferencia", (await c.transferencia.count({ where: { posTransferenciaId: p16c } })) === 1);
+
+    // ── 17. EL PEDIDO #19 (incidente del 2026-10-28) ─────────────────────────
+    // "Error interno al enviar POS" con todo resuelto. Un pedido con todo
+    // mezclado: renglones resueltos SIN DUEÑO —como los de antes de la columna;
+    // acá los arma la ruta de la computadora (`detalle/agregar`), que no lo
+    // escribe—, renglones de los dos depósitos, "No hay", uno pesado con tres
+    // decimales y uno agregado por el depósito.
+    //
+    // Lo sin dueño NO era la causa: con el código del incidente esto salía
+    // igual. Lo que da el 500 es un producto que no se puede enviar en la unidad
+    // en que se preparó (`validarEnvio`): la ruta lo tiraba como error suelto y
+    // el `catch` lo convertía en "Error interno". GASEOSA es el caso que la
+    // pantalla del celular produce sola: "solo por bulto" con factor 1, que el
+    // local pide —y el depósito prepara— por unidad.
+    //
+    // Lo que se afirma: el envío dice QUÉ producto y por qué, no escribe nada
+    // —ninguna transferencia, ningún stock, el pedido igual—, y con ese renglón
+    // en "No hay" el pedido sale entero.
+    seccion("17. El pedido #19");
+    const agregarCompu = await import("../../app/api/pos-transferencias/detalle/agregar/route.js");
+    const agregarItem17 = await import("../../app/api/pos-transferencias/agregarItem/route.js");
+    const N = await armarLocal("Grupo pedido 19", [
+      "ACEITE", "HELADO", "YERBA", "AZUCAR", "YOGURT",
+      { nombre: "LECHE", extra: { unidad_medida: "pack", factor_pack: 12, modo_envio: "SOLO_BULTO" } },
+      { nombre: "QUESO", extra: { unidad_medida: "kg" } },
+      { nombre: "GASEOSA", extra: { modo_envio: "SOLO_BULTO", factor_pack: 1 } },
+    ]);
+    for (const id of Object.values(N.ids)) await c.stockLocal.create({ data: { localId: N.deposito.id, productoId: id, cantidad: 1000 } });
+    const grupoN = (await c.grupoLocal.findFirst({ where: { localId: N.local.id }, select: { grupoId: true } })).grupoId;
+    await c.cliente.create({ data: { grupoId: grupoN, localId: N.deposito.id, nombre: `${N.local.nombre} (interno)`, localVinculadoId: N.local.id } });
+    const frio17 = await c.local.create({ data: { nombre: `Depósito Frío 19 ${marca}`, es_deposito: true } });
+    await c.grupoDeposito.create({ data: { grupoId: grupoN, localId: frio17.id } });
+    await c.configuracionLocal.create({ data: { localId: frio17.id } });
+    const baseDe = async (id) => (await c.productoLocal.findUnique({ where: { id }, select: { baseId: true } })).baseId;
+    const heladoFrio17 = await c.productoLocal.create({ data: { localId: frio17.id, baseId: await baseDe(N.ids.HELADO), activo: true, precio_costo: 700, precio_venta: 1100 } });
+    await c.stockLocal.create({ data: { localId: frio17.id, productoId: heladoFrio17.id, cantidad: 500 } });
+    // El local ya recibió yogurt antes: tiene su producto, que es lo que pide la
+    // ruta de la computadora para agregarlo.
+    const yogurtLocal = await c.productoLocal.create({ data: { localId: N.local.id, baseId: await baseDe(N.ids.YOGURT), activo: true, precio_costo: 600, precio_venta: 1000 } });
+    const sMerca17 = await deDeposito16("Merca 19", N.deposito);
+    const sFrio17 = await deDeposito16("Frío 19", frio17);
+    const editar17 = (s, body) => pedir(R16.editar, "POST", `${B}/pos-transferencias/detalle/editar`, s, body);
+
+    for (const [nombre, cantidad, unidad] of [["ACEITE", 2], ["HELADO", 3], ["YERBA", 1], ["QUESO", 2], ["LECHE", 2, "BULTO"], ["GASEOSA", 4]]) {
+      ok(`17: el local pide ${cantidad} ${nombre}`, (await N.fijar(N.ids[nombre], cantidad, unidad)).cuerpo.ok === true);
+    }
+    const carrito17 = await carrito(N.sPin);
+    ok("17: el local lo envía", (await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, N.sPin, { posId: carrito17.cuerpo.posId })).cuerpo.ok === true);
+    const p17 = carrito17.cuerpo.posId;
+    const det17 = await detalle16(sMerca17, p17);
+    const l17 = (n) => det17.cuerpo.item.detalles.find((d) => d.productoNombre === n);
+
+    ok("17: mercadería: aceite completo", (await editar17(sMerca17, { detalleId: l17("ACEITE").detalleId, ...vaCompleto(l17("ACEITE")) })).cuerpo.ok === true);
+    ok("17: mercadería: leche completa, por bulto", (await editar17(sMerca17, { detalleId: l17("LECHE").detalleId, ...vaCompleto(l17("LECHE")) })).cuerpo.ok === true);
+    ok("17: mercadería: no hay yerba", (await editar17(sMerca17, { detalleId: l17("YERBA").detalleId, ...NO_HAY })).cuerpo.ok === true);
+    ok("17: mercadería: queso pesado, 1,853", (await editar17(sMerca17, { detalleId: l17("QUESO").detalleId, preparado: 1.853, unidadPreparada: "UNIDAD" })).cuerpo.item?.preparado === 1.853);
+    ok("17: frío: helado completo", (await editar17(sFrio17, { detalleId: l17("HELADO").detalleId, ...vaCompleto(l17("HELADO")) })).cuerpo.item?.resueltoPorDepositoId === frio17.id);
+    const azucar17 = await pedir(agregarItem17, "POST", `${B}/pos-transferencias/agregarItem`, sMerca17, { posId: p17, productoLocalId: N.ids.AZUCAR, cantidad: 1, tipo: "manual" });
+    ok("17: mercadería agrega azúcar", azucar17.cuerpo.ok === true, json(azucar17));
+    const yogurt17 = await pedir(agregarCompu, "POST", `${B}/pos-transferencias/detalle/agregar`, sMerca17, { posId: p17, productoLocalId: yogurtLocal.id, preparado: 2, unidad: "UNIDAD", tipo: "manual" });
+    ok("17: la computadora agrega yogurt preparado", yogurt17.cuerpo.ok === true, json(yogurt17));
+    const filas17 = await c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: p17 }, include: { producto: { include: { base: { select: { nombre: true } } } } } });
+    const sinDueno = filas17.filter((f) => Number(f.preparado) > 0 && f.resueltoPorDepositoId == null).map((f) => f.producto.base.nombre);
+    ok("17: hay renglones resueltos sin dueño, como los del #19", sinDueno.length > 0, json(sinDueno));
+
+    ok("17: mercadería: gaseosa completa, por unidad, como la pidió el local", (await editar17(sMerca17, { detalleId: l17("GASEOSA").detalleId, ...vaCompleto(l17("GASEOSA")) })).cuerpo.item?.unidadPreparada === "UNIDAD");
+
+    const stockAntes17 = await c.stockLocal.findMany({ where: { OR: [{ localId: N.deposito.id }, { localId: frio17.id }] } });
+    // El envío del incidente: dice qué producto, y no escribe NADA.
+    const falla17 = await enviar16(sMerca17, p17);
+    guardar("depositoEnviarProductoNoSeEnvia", falla17);
+    ok("17: el envío nombra el producto que no se puede enviar (409, sin «POS» ni «interno»)",
+      falla17.status === 409 && falla17.cuerpo.error === "GASEOSA: solo se puede enviar por bulto.", json(falla17));
+    const stockTrasFalla = await c.stockLocal.findMany({ where: { OR: [{ localId: N.deposito.id }, { localId: frio17.id }] } });
+    ok("17: todo o nada: ninguna transferencia", (await c.transferencia.count({ where: { posTransferenciaId: p17 } })) === 0);
+    ok("17: todo o nada: ningún stock se movió", json(stockTrasFalla.map((s) => [s.id, String(s.cantidad)]).sort()) === json(stockAntes17.map((s) => [s.id, String(s.cantidad)]).sort()));
+    ok("17: todo o nada: el pedido sigue preparándose", (await c.posTransferencia.findUnique({ where: { id: p17 } })).estado === "Solicitado");
+    ok("17: no hay gaseosa", (await editar17(sMerca17, { detalleId: l17("GASEOSA").detalleId, ...NO_HAY })).cuerpo.ok === true);
+
+    const envio17 = await enviar16(sMerca17, p17);
+    guardar("depositoEnviarPedido19", envio17);
+    ok("17: EL #19 SALE", envio17.cuerpo.ok === true, json(envio17).slice(0, 500));
+    const transf17 = await c.transferencia.findMany({
+      where: { posTransferenciaId: p17 },
+      include: { detalle: { include: { producto: { include: { base: { select: { nombre: true } } } } } } },
+      orderBy: { id: "asc" },
+    });
+    const stockDespues17 = await c.stockLocal.findMany({ where: { OR: [{ localId: N.deposito.id }, { localId: frio17.id }] } });
+    const delta17 = Object.fromEntries(
+      stockAntes17.map((a) => {
+        const d = stockDespues17.find((x) => x.id === a.id);
+        const nombre = filas17.find((f) => f.productoId === a.productoId)?.producto.base.nombre ?? (a.productoId === heladoFrio17.id ? "HELADO" : a.productoId);
+        return [`${a.localId === frio17.id ? "frio" : "merca"}:${nombre}`, Math.round((Number(a.cantidad) - Number(d.cantidad)) * 1000) / 1000];
+      })
+    );
+    const viaje17 = {
+      transferencias: transf17.map((t) => ({
+        origen: t.origenId === frio17.id ? "frio" : t.origenId === N.deposito.id ? "merca" : t.origenId,
+        lineas: t.detalle.map((d) => [d.producto.base.nombre, Number(d.cantidad), d.unidadEnviada]).sort((a, b) => a[0].localeCompare(b[0])),
+      })),
+      bajaDelStock: delta17,
+    };
+    guardar("depositoViajePedido19", viaje17);
+    ok("17: dos transferencias: lo sin dueño sale de mercadería, el origen", json(viaje17.transferencias) === json([
+      { origen: "merca", lineas: [["ACEITE", 2, "UNIDAD"], ["AZUCAR", 1, "UNIDAD"], ["LECHE", 2, "BULTO"], ["QUESO", 1.853, "UNIDAD"], ["YOGURT", 2, "UNIDAD"]] },
+      { origen: "frio", lineas: [["HELADO", 3, "UNIDAD"]] },
+    ]), json(viaje17.transferencias));
+    ok("17: el stock baja en cada depósito solo por lo suyo; la yerba no baja", json(Object.entries(delta17).filter(([, v]) => v !== 0).sort()) === json([
+      ["frio:HELADO", 3], ["merca:ACEITE", 2], ["merca:AZUCAR", 1], ["merca:LECHE", 24], ["merca:QUESO", 1.853], ["merca:YOGURT", 2],
+    ]), json(delta17));
   }
 
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
