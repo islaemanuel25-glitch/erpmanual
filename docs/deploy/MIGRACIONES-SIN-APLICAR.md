@@ -16,8 +16,17 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **92 migraciones**, las mismas que el árbol, la
-última `20261026032827_renglon_no_vino_y_corregido`.
+Producción está en **92 migraciones**, la última
+`20261026032827_renglon_no_vino_y_corregido`. Falta una:
+
+- `20261028120000_arcor_362_pie_leido` — **de datos, un solo comprobante.**
+  Guarda en el comprobante 38 (Arcor, pedido 362) el neto, el IVA y la PERC. IVA
+  que imprime su pie y que el lector interpretado no pedía. El clasificador la
+  marca NO ADITIVA por el `UPDATE`: va con `DEPLOY_MIGRACION_AUTORIZADA=1`
+  porque la tanda trae el pedido explícito de Emanuel de corregir esa lectura.
+  Idempotente —el WHERE exige el pie vacío— y con su vuelta atrás escrita en el
+  propio archivo. Quinto chequeo del backup: el comprobante 38 tiene que estar
+  en el dump con `ivaLeido` vacío.
 
 La `20261026032827_renglon_no_vino_y_corregido` se aplicó con el despliegue de
 `26b0fb2d` (2026-10-26), antes de levantar la imagen: el contenedor
