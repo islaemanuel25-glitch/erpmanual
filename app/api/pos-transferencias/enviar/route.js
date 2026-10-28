@@ -10,7 +10,8 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
-import { cantidadQueViaja } from "@/lib/pedidos/revisionDeLinea";
+import { cantidadQueViaja, estaRevisada } from "@/lib/pedidos/revisionDeLinea";
+import { esDepositoDelPedido, mensajeNoEstaEnElCatalogo, productoDelDeposito } from "@/lib/pedidos/depositosDelPedido";
 import {
   PRESENTACION,
   agrupa,
@@ -58,10 +59,17 @@ function snapshotDeEnvioManual(item) {
 /** Lo que lee el que envía cuando el depósito canceló el pedido antes que él. */
 const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
 
+/**
+ * Lo que lee el que envía cuando OTRO ya lo envió (2026-10-28): los dos
+ * depósitos de la empresa pueden tocar "Enviar al local" y el pedido sale una
+ * sola vez. Con 409, como las otras carreras.
+ */
+const MENSAJE_YA_SE_ENVIO = "Este pedido ya se envió.";
+
 /** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
 function firmaDeLineas(lineas) {
   return (lineas || [])
-    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada, d.revisadoEn ? new Date(d.revisadoEn).getTime() : ""].join(":"))
+    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada, d.revisadoEn ? new Date(d.revisadoEn).getTime() : "", d.resueltoPorDepositoId ?? ""].join(":"))
     .sort()
     .join("|");
 }
@@ -115,7 +123,7 @@ export async function POST(req) {
         select: { origenId: true, destinoId: true },
       });
       const local = Number(session.localId);
-      if (cancelado && (session.esAdmin || local === cancelado.origenId || local === cancelado.destinoId)) {
+      if (cancelado && (session.esAdmin || local === cancelado.destinoId || (await esDepositoDelPedido(prisma, local, cancelado)))) {
         return NextResponse.json({ ok: false, error: MENSAJE_SE_CANCELO }, { status: 409 });
       }
       return NextResponse.json(
@@ -126,10 +134,12 @@ export async function POST(req) {
 
     // Scope: no-admin solo puede operar sobre POS de su local (origen o destino).
     // ESCRITURA/ENVÍO sobre recurso ajeno → 403.
+    // Los depósitos de la empresa del local también: cualquiera de los dos manda
+    // el pedido que arman juntos (`lib/pedidos/depositosDelPedido.js`).
     if (
       !session.esAdmin &&
-      Number(session.localId) !== pos.origenId &&
-      Number(session.localId) !== pos.destinoId
+      Number(session.localId) !== pos.destinoId &&
+      !(await esDepositoDelPedido(prisma, session.localId, pos))
     ) {
       return NextResponse.json(
         { ok: false, error: "No autorizado para esta transferencia" },
@@ -159,10 +169,7 @@ export async function POST(req) {
 
     // E1: Permitir Solicitado además de Borrador/Preparando
     if (!["Borrador", "Preparando", "Solicitado"].includes(pos.estado)) {
-      return NextResponse.json(
-        { ok: false, error: "La POS ya fue enviada" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: MENSAJE_YA_SE_ENVIO }, { status: 409 });
     }
 
     if (!pos.detalles || pos.detalles.length === 0) {
@@ -233,6 +240,32 @@ export async function POST(req) {
     }
 
     // --------------------------------------------------
+    // DE QUÉ DEPÓSITO SALE CADA LÍNEA (2026-10-28)
+    // --------------------------------------------------
+    // Dos depósitos de la empresa arman el mismo pedido, cada uno su parte, y
+    // cada línea descuenta del stock del que la resolvió, nunca del otro. Lo que
+    // nadie resolvió —el flujo de la computadora, las líneas de antes— sale del
+    // origen del pedido, como siempre. Las líneas son del catálogo del origen:
+    // las del otro depósito salen de SU producto para la misma base.
+    for (const item of items) {
+      const resolvio = estaRevisada(item.detalle) ? item.detalle.resueltoPorDepositoId : null;
+      item.depositoId = resolvio ?? pos.origenId;
+      if (item.depositoId === pos.origenId) continue;
+      const propio = await productoDelDeposito(prisma, item.depositoId, item.baseId);
+      if (!propio) {
+        const deposito = await prisma.local.findUnique({ where: { id: item.depositoId }, select: { nombre: true } });
+        return NextResponse.json(
+          { ok: false, error: mensajeNoEstaEnElCatalogo(item.productoLocalOrigen?.base?.nombre || item.productoLocalOrigen?.nombre || "Un producto", deposito?.nombre ?? "un depósito") },
+          { status: 409 }
+        );
+      }
+      item.productoLocalOrigen = propio;
+    }
+    // El origen primero: su transferencia es la que la respuesta devuelve en
+    // `item`, como cuando había una sola.
+    const depositos = [...new Set([pos.origenId, ...items.map((i) => i.depositoId)])].filter((id) => items.some((i) => i.depositoId === id));
+
+    // --------------------------------------------------
     // E3: Validación de stock del depósito
     // --------------------------------------------------
     const grupoId = await getGrupoIdDeLocal(pos.origenId);
@@ -245,19 +278,17 @@ export async function POST(req) {
       allowNegativeStock = configGrupo?.allowNegativeStock === true;
     }
 
-    const productoIds = items.map((i) => i.detalle.productoId);
+    // El stock de cada línea es el de SU depósito.
     const stocks = await prisma.stockLocal.findMany({
-      where: {
-        localId: pos.origenId,
-        productoId: { in: productoIds },
-      },
+      where: { OR: items.map((i) => ({ localId: i.depositoId, productoId: i.productoLocalOrigen.id })) },
     });
 
-    const stockMap = new Map(stocks.map((s) => [s.productoId, Number(s.cantidad)]));
+    const claveStock = (localId, productoId) => `${localId}:${productoId}`;
+    const stockMap = new Map(stocks.map((s) => [claveStock(s.localId, s.productoId), Number(s.cantidad)]));
 
     const faltantes = [];
     for (const item of items) {
-      const stockDisp = stockMap.get(item.detalle.productoId) || 0;
+      const stockDisp = stockMap.get(claveStock(item.depositoId, item.productoLocalOrigen.id)) || 0;
       const unidadesNecesarias = toUnidades({
         cantidad: item.cantidadRaw,
         unidad: item.unidadEnviada,
@@ -296,7 +327,7 @@ export async function POST(req) {
     // --------------------------------------------------
     // TRANSACCIÓN REAL
     // --------------------------------------------------
-    const transferencia = await prisma.$transaction(async (tx) => {
+    const transferencias = await prisma.$transaction(async (tx) => {
       // ── EL MISMO BLOQUEO QUE EL LOCAL, Y LAS LÍNEAS DE AHORA ──────────────
       // Despachar EMPIEZA el pedido (`depositoEmpezo`), y mientras el pedido
       // enviado espera, el local le puede sumar productos con `set-cantidad`.
@@ -315,9 +346,14 @@ export async function POST(req) {
       if (fila?.estado === ESTADO_PEDIDO.CANCELADO) {
         throw new Error("PEDIDO_CANCELADO");
       }
+      // Lo mismo si el otro depósito lo envió mientras éste esperaba el bloqueo
+      // (2026-10-28): es eso lo que se dice, y no que el local lo cambió.
+      if (fila?.estado === "Enviado" || fila?.estado === "Enviando") {
+        throw new Error("ALREADY_SENT");
+      }
       const ahora = await tx.posTransferenciaDetalle.findMany({
         where: { posTransferenciaId: pos.id, pos: sinCancelados() },
-        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true },
+        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true, resueltoPorDepositoId: true },
       });
       if (firmaDeLineas(ahora) !== firmaDeLineas(pos.detalles)) {
         throw new Error("PEDIDO_CAMBIO");
@@ -339,16 +375,23 @@ export async function POST(req) {
       // Creación de la transferencia + política de stock del origen: servicio
       // compartido (lib/transferencias/crearTransferencia). El flujo manual usa
       // DESCONTAR_Y_TRANSITO, que es el comportamiento histórico de esta ruta.
-      const { transferencia: nuevaTransferencia } = await crearTransferencia({
+      //
+      // UNA POR DEPÓSITO (2026-10-28): cada una sale del stock de su depósito y
+      // las dos quedan ligadas al mismo pedido. La recepción del local trabaja
+      // por transferencia con su propio origen, así que recibe las dos como
+      // recibe cualquiera.
+      const nuevas = [];
+      for (const depositoId of depositos) {
+        const { transferencia: nuevaTransferencia } = await crearTransferencia({
         tx,
-        origenId: pos.origenId,
+        origenId: depositoId,
         destinoId: pos.destinoId,
         creadoPorId: pos.usuarioId,
         posTransferenciaId: pos.id,
         politicaStockOrigen: DESCONTAR_Y_TRANSITO,
-        items: items.map((item) => ({
+        items: items.filter((item) => item.depositoId === depositoId).map((item) => ({
           baseId: item.baseId,
-          productoLocalOrigenId: item.detalle.productoId,
+          productoLocalOrigenId: item.productoLocalOrigen.id,
           cantidad: item.cantidadRaw,
           unidadEnviada: item.unidadEnviada,
           factorPack: item.factorPack,
@@ -362,19 +405,23 @@ export async function POST(req) {
           // producto, y se congela junto con el factor.
           presentacion: snapshotDeEnvioManual(item),
         })),
-      });
+        });
+        nuevas.push(nuevaTransferencia);
+      }
 
       await tx.posTransferencia.update({
         where: { id: pos.id },
         data: { estado: "Enviado" },
       });
 
-      return nuevaTransferencia;
+      return nuevas;
     });
+    const [transferencia] = transferencias;
 
     return NextResponse.json({
       ok: true,
       item: transferencia,
+      transferencias,
       posId,
       totalItems: items.length,
       error: null,
@@ -390,10 +437,7 @@ export async function POST(req) {
       );
     }
     if (err.message === "ALREADY_SENT") {
-      return NextResponse.json(
-        { ok: false, error: "Esta transferencia ya fue enviada." },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: MENSAJE_YA_SE_ENVIO }, { status: 409 });
     }
     if (err.message === "COMBO_NO_TRANSFERIBLE") {
       return NextResponse.json(

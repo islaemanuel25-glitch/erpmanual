@@ -84,11 +84,13 @@ test("la forma de enviar: el cancelado se pregunta adentro del bloqueo, antes de
   assert.match(enviar, /const MENSAJE_SE_CANCELO = "Este pedido se canceló\.";/);
 });
 
-test("la forma: el depósito ORIGEN, con el permiso de enviar, adentro del mismo bloqueo", () => {
+test("la forma: un depósito DEL PEDIDO, con el permiso de enviar, adentro del mismo bloqueo", () => {
   assert.match(ruta, /const PERMISO_DEL_DEPOSITO = "pos_transferencias\.enviar";/);
   assert.match(ruta, /checkPerm\(session, PERMISO_DEL_DEPOSITO\)\.ok/);
-  // Es el origen de ESTE pedido y es un depósito.
-  assert.match(ruta, /localDeSesion === pos\.origenId && puedeComoDeposito/);
+  // Es un depósito de ESTE pedido y es un depósito. Decía "el origen": desde el
+  // 2026-10-28 los depósitos de la empresa del local arman el mismo pedido y
+  // cualquiera lo cancela; uno de otra empresa sigue en el 403 (sección 15b).
+  assert.match(ruta, /localDeSesion && puedeComoDeposito && \(await esDepositoDelPedido\(prisma, localDeSesion, pos\)\)/);
   assert.match(ruta, /esDelDeposito = !!local\?\.es_deposito;/);
   // El local sigue pidiendo pedidos.editar: el permiso del depósito no le alcanza.
   assert.match(ruta, /if \(!esAdmin && !esDelDeposito\) \{[\s\S]*?permisos\.includes\("pedidos\.editar"\)/);

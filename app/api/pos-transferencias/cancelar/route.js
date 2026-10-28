@@ -6,6 +6,7 @@ import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido, depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
+import { esDepositoDelPedido } from "@/lib/pedidos/depositosDelPedido";
 import { checkPerm } from "@/lib/authorize";
 
 /** El permiso con que el depósito cancela: el mismo que pide `enviar` para despachar. */
@@ -90,9 +91,14 @@ export async function POST(req) {
     // Es el depósito de ESTE pedido: su local es el origen y es un depósito, y
     // tiene el mismo permiso que `enviar` pide para despachar. Uno de otro
     // depósito no es el origen y cae en el control del local de abajo (403).
+    //
+    // Desde el 2026-10-28 "el depósito de este pedido" es cualquiera de los de
+    // la empresa del local: los dos arman el mismo pedido, y cualquiera lo
+    // cancela (`lib/pedidos/depositosDelPedido.js`). Uno de otra empresa sigue
+    // cayendo en el 403.
     const localDeSesion = Number(session.localId) || null;
     let esDelDeposito = false;
-    if (!esAdmin && localDeSesion && localDeSesion === pos.origenId && puedeComoDeposito) {
+    if (!esAdmin && localDeSesion && puedeComoDeposito && (await esDepositoDelPedido(prisma, localDeSesion, pos))) {
       const local = await prisma.local.findUnique({ where: { id: localDeSesion }, select: { es_deposito: true } });
       esDelDeposito = !!local?.es_deposito;
     }

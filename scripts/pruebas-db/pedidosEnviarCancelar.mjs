@@ -1604,6 +1604,161 @@ try {
     }
   }
 
+  // ── 16. DOS DEPÓSITOS ARMAN EL MISMO PEDIDO (2026-10-28) ──────────────────
+  // Regla de Emanuel: la empresa tiene un depósito de mercadería —el origen del
+  // pedido— y uno de frío. Los dos lo ven y lo preparan, cada uno su parte; el
+  // de frío termina primero, el de mercadería manda, y el pedido sale UNA vez.
+  // Cada renglón descuenta del depósito que lo resolvió, en su transferencia, y
+  // "No hay" no descuenta de nadie. Un segundo envío se rechaza.
+  if (!ANTES) {
+    seccion("16. Dos depósitos, un pedido");
+    const R16 = {
+      detalle: await import("../../app/api/pos-transferencias/detalle/route.js"),
+      solicitados: await import("../../app/api/pos-transferencias/solicitados/route.js"),
+      opciones: await import("../../app/api/pos-transferencias/opciones/route.js"),
+      editar: await import("../../app/api/pos-transferencias/detalle/editar/route.js"),
+      enviar: await import("../../app/api/pos-transferencias/enviar/route.js"),
+      buscar: await import("../../app/api/pos-transferencias/buscarProductos/route.js"),
+      recepcion: await import("../../app/api/transferencias/detalle/route.js"),
+    };
+    const { vaCompleto, NO_HAY } = await import("../../lib/pedidos/revisionDeLinea.js");
+    // El local y su depósito de mercadería, que es el origen: el catálogo del
+    // pedido tiene los tres productos.
+    const M = await armarLocal("Grupo dos depósitos", ["ACEITE", "HELADO", "YERBA"]);
+    for (const id of Object.values(M.ids)) await c.stockLocal.create({ data: { localId: M.deposito.id, productoId: id, cantidad: 1000 } });
+    const grupoM = (await c.grupoLocal.findFirst({ where: { localId: M.local.id }, select: { grupoId: true } })).grupoId;
+    await c.cliente.create({ data: { grupoId: grupoM, localId: M.deposito.id, nombre: `${M.local.nombre} (interno)`, localVinculadoId: M.local.id } });
+    // El de frío, en la MISMA empresa, con el helado en su propio catálogo.
+    const frio = await c.local.create({ data: { nombre: `Depósito Frío ${marca}`, es_deposito: true } });
+    await c.grupoDeposito.create({ data: { grupoId: grupoM, localId: frio.id } });
+    // Sin ficha de cliente propia: el vínculo con el local es uno por local
+    // (`Cliente.localVinculadoId` es único) y se lee por empresa.
+    await c.configuracionLocal.create({ data: { localId: frio.id } });
+    const baseHelado = (await c.productoLocal.findUnique({ where: { id: M.ids.HELADO }, select: { baseId: true } })).baseId;
+    const heladoFrio = await c.productoLocal.create({ data: { localId: frio.id, baseId: baseHelado, activo: true, precio_costo: 700, precio_venta: 1100 } });
+    await c.stockLocal.create({ data: { localId: frio.id, productoId: heladoFrio.id, cantidad: 500 } });
+    const deDeposito16 = async (nombre, deposito) => {
+      const u = await c.usuario.create({
+        data: { nombre, email: `${nombre.toLowerCase().replace(/\W+/g, "-")}-16-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: deposito.id },
+      });
+      const op = await c.operadorLocal.create({ data: { nombre, pinHash: "x", localId: deposito.id } });
+      return `${sesionDe(u, deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: op.id, nombre: op.nombre, localId: deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+    };
+    const sMerca = await deDeposito16("Mercadería prepara", M.deposito);
+    const sFrio = await deDeposito16("Frío prepara", frio);
+    // Uno de OTRA empresa: no lo ve ni lo toca.
+    const O16 = await armarLocal("Grupo ajeno 16", ["ACEITE"]);
+    const sAjeno = await deDeposito16("Ajeno 16", O16.deposito);
+    const editar16 = (s, body) => pedir(R16.editar, "POST", `${B}/pos-transferencias/detalle/editar`, s, body);
+    const detalle16 = (s, posId) => pedir(R16.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, s);
+    const enviar16 = (s, posId) => pedir(R16.enviar, "POST", `${B}/pos-transferencias/enviar`, s, { posId });
+    const stock16 = async () => {
+      const filas = await c.stockLocal.findMany({ where: { OR: [{ localId: M.deposito.id }, { localId: frio.id }] }, include: { producto: { include: { base: { select: { nombre: true } } } } } });
+      return Object.fromEntries(filas.map((f) => [`${f.localId === frio.id ? "frio" : "merca"}:${f.producto.base.nombre}`, Number(f.cantidad)]));
+    };
+
+    for (const [nombre, cantidad] of [["ACEITE", 2], ["HELADO", 3], ["YERBA", 1]]) {
+      ok(`16: el local pide ${cantidad} ${nombre}`, (await M.fijar(M.ids[nombre], cantidad)).cuerpo.ok === true);
+    }
+    const carrito16 = await carrito(M.sPin);
+    ok("16: el local lo envía", (await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, M.sPin, { posId: carrito16.cuerpo.posId })).cuerpo.ok === true);
+    const p16 = carrito16.cuerpo.posId;
+
+    const enLista = async (s) => ((await pedir(R16.solicitados, "GET", `${B}/pos-transferencias/solicitados`, s)).cuerpo.items || []).some((i) => i.id === p16);
+    ok("16: el pedido está en la lista de los DOS depósitos", (await enLista(sMerca)) && (await enLista(sFrio)));
+    ok("16: y no en la de un depósito de otra empresa", !(await enLista(sAjeno)));
+    ok("16: el de otra empresa no lo puede leer (404)", (await detalle16(sAjeno, p16)).status === 404);
+    const det0 = await detalle16(sFrio, p16);
+    ok("16: el de frío lo lee", det0.status === 200 && det0.cuerpo.item.detalles.length === 3, json(det0).slice(0, 300));
+    const lineaDe16 = (det, n) => det.cuerpo.item.detalles.find((d) => d.productoNombre === n);
+    const busqueda = await pedir(R16.buscar, "GET", `${B}/pos-transferencias/buscarProductos?q=ACEI&origenId=${M.deposito.id}`, sFrio);
+    ok("16: el de frío busca en el catálogo del pedido", busqueda.status === 200, json(busqueda).slice(0, 200));
+    const busquedaAjena = await pedir(R16.buscar, "GET", `${B}/pos-transferencias/buscarProductos?q=ACEI&origenId=${M.deposito.id}`, sAjeno);
+    ok("16: el de otra empresa no (403)", busquedaAjena.status === 403, json(busquedaAjena).slice(0, 200));
+
+    const helado = lineaDe16(det0, "HELADO");
+    const aceite = lineaDe16(det0, "ACEITE");
+    const yerba = lineaDe16(det0, "YERBA");
+    // El frío prepara el helado. El de mercadería lo toca —pasa a ser suyo— y lo
+    // vuelve a pendiente —sin dueño—, y el frío lo vuelve a preparar.
+    const h1 = await editar16(sFrio, { detalleId: helado.detalleId, ...vaCompleto(helado) });
+    ok("16: el frío prepara el helado, y queda suyo", h1.cuerpo.ok === true && h1.cuerpo.item.resueltoPorDepositoId === frio.id && h1.cuerpo.item.resueltoPorNombre === frio.nombre, json(h1));
+    const h2 = await editar16(sMerca, { detalleId: helado.detalleId, ...NO_HAY });
+    ok("16: el de mercadería lo toca y pasa a ser suyo", h2.cuerpo.item?.resueltoPorDepositoId === M.deposito.id, json(h2));
+    const h3 = await editar16(sMerca, { detalleId: helado.detalleId, pendiente: true });
+    ok("16: vuelto a pendiente, sin dueño", h3.cuerpo.item?.resueltoPorDepositoId === null && h3.cuerpo.item.revisadoEn === null, json(h3));
+    ok("16: el frío lo vuelve a preparar", (await editar16(sFrio, { detalleId: helado.detalleId, ...vaCompleto(helado) })).cuerpo.item?.resueltoPorDepositoId === frio.id);
+    // El frío no tiene aceite en su catálogo: no puede mandarlo de su stock.
+    const aceiteFrio = await editar16(sFrio, { detalleId: aceite.detalleId, ...vaCompleto(aceite) });
+    ok("16: el frío no prepara lo que no tiene (409)", aceiteFrio.status === 409 && /no está en el catálogo de/.test(aceiteFrio.cuerpo.error), json(aceiteFrio));
+    // El de mercadería termina lo suyo: el aceite, y la yerba no hay.
+    ok("16: el de mercadería prepara el aceite", (await editar16(sMerca, { detalleId: aceite.detalleId, ...vaCompleto(aceite) })).cuerpo.ok === true);
+    ok("16: el de mercadería no tiene yerba", (await editar16(sMerca, { detalleId: yerba.detalleId, ...NO_HAY })).cuerpo.ok === true);
+
+    const detMerca = await detalle16(sMerca, p16);
+    guardar("depositoDetalleDosDepositos", detMerca);
+    guardar("depositoOpcionesMercaderia", await pedir(R16.opciones, "GET", `${B}/pos-transferencias/opciones`, sMerca));
+    ok("16: el detalle dice quién resolvió cada uno", lineaDe16(detMerca, "HELADO").resueltoPorNombre === frio.nombre && lineaDe16(detMerca, "ACEITE").resueltoPorDepositoId === M.deposito.id && lineaDe16(detMerca, "YERBA").resueltoPorDepositoId === M.deposito.id, json(detMerca.cuerpo.item.detalles.map((d) => [d.productoNombre, d.resueltoPorDepositoId, d.resueltoPorNombre])));
+
+    // El último que termina lo manda; el otro llega tarde.
+    const stockAntes16 = await stock16();
+    const envio16 = await enviar16(sMerca, p16);
+    ok("16: el de mercadería lo envía", envio16.cuerpo.ok === true && envio16.cuerpo.transferencias?.length === 2, json(envio16).slice(0, 300));
+    const tarde = await enviar16(sFrio, p16);
+    guardar("depositoEnviarYaSeEnvio", tarde);
+    ok("16: el segundo envío se rechaza: \"Este pedido ya se envió.\" (409)", tarde.status === 409 && tarde.cuerpo.error === "Este pedido ya se envió.", json(tarde));
+    const stockDespues16 = await stock16();
+    const transf16 = await c.transferencia.findMany({
+      where: { posTransferenciaId: p16 },
+      include: { detalle: { include: { producto: { include: { base: { select: { nombre: true } } } } } } },
+      orderBy: { id: "asc" },
+    });
+    const viaje16 = {
+      transferencias: transf16.map((t) => ({
+        origen: t.origenId === frio.id ? "frio" : t.origenId === M.deposito.id ? "merca" : t.origenId,
+        destinoEsElLocal: t.destinoId === M.local.id,
+        lineas: t.detalle.map((d) => [d.producto.base.nombre, Number(d.cantidad)]),
+      })),
+      stockAntes: stockAntes16,
+      stockDespues: stockDespues16,
+    };
+    guardar("depositoViajeDosDepositos", viaje16);
+    ok("16: dos transferencias del mismo pedido: aceite desde mercadería, helado desde frío; sin yerba",
+      json(viaje16.transferencias) === json([
+        { origen: "merca", destinoEsElLocal: true, lineas: [["ACEITE", 2]] },
+        { origen: "frio", destinoEsElLocal: true, lineas: [["HELADO", 3]] },
+      ]),
+      json(viaje16.transferencias));
+    const baja = (k) => stockAntes16[k] - stockDespues16[k];
+    ok("16: cada depósito baja solo lo suyo", baja("merca:ACEITE") === 2 && baja("merca:HELADO") === 0 && baja("merca:YERBA") === 0 && baja("frio:HELADO") === 3, json({ stockAntes16, stockDespues16 }));
+    // La recepción del local: las dos, como cualquier transferencia.
+    for (const t of transf16) {
+      const rec = await pedir(R16.recepcion, "GET", `${B}/transferencias/detalle?id=${t.id}`, M.sPin);
+      ok(`16: el local ve para recibir la de ${t.origenId === frio.id ? "frío" : "mercadería"}`, rec.cuerpo.ok === true && (rec.cuerpo.item?.items?.length ?? 0) === 1, json(rec).slice(0, 300));
+    }
+
+    // Cancelar lo puede hacer cualquiera de los dos: el de frío cancela otro.
+    ok("16b: el local pide aceite otra vez", (await M.fijar(M.ids.ACEITE, 1)).cuerpo.ok === true);
+    const carrito16b = await carrito(M.sPin);
+    await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, M.sPin, { posId: carrito16b.cuerpo.posId });
+    const cancela16 = await pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, sFrio, { posId: carrito16b.cuerpo.posId });
+    ok("16b: el de frío lo cancela", cancela16.cuerpo.ok === true, json(cancela16));
+
+    // Los dos tocan "Enviar al local" A LA VEZ: sale una vez, y el otro lee que
+    // ya se envió —no que el local lo cambió—.
+    ok("16c: el local pide helado", (await M.fijar(M.ids.HELADO, 2)).cuerpo.ok === true);
+    const carrito16c = await carrito(M.sPin);
+    await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, M.sPin, { posId: carrito16c.cuerpo.posId });
+    const p16c = carrito16c.cuerpo.posId;
+    const helado16c = lineaDe16(await detalle16(sFrio, p16c), "HELADO");
+    ok("16c: el frío lo prepara", (await editar16(sFrio, { detalleId: helado16c.detalleId, ...vaCompleto(helado16c) })).cuerpo.ok === true);
+    const [e1, e2] = await Promise.all([enviar16(sFrio, p16c), enviar16(sMerca, p16c)]);
+    const salieron = [e1, e2].filter((e) => e.cuerpo.ok === true);
+    const rechazados = [e1, e2].filter((e) => e.status === 409 && e.cuerpo.error === "Este pedido ya se envió.");
+    ok("16c: a la vez, sale uno y el otro lee \"Este pedido ya se envió.\"", salieron.length === 1 && rechazados.length === 1, json([e1.status, e1.cuerpo.error, e2.status, e2.cuerpo.error]));
+    ok("16c: y hay una sola transferencia", (await c.transferencia.count({ where: { posTransferenciaId: p16c } })) === 1);
+  }
+
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
     const RUTA_FIXTURE = "app/modulos/pedidos/enviarCancelar.fixture.json";
     const previo = existsSync(RUTA_FIXTURE) ? JSON.parse(readFileSync(RUTA_FIXTURE, "utf8")) : {};

@@ -16,8 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **94 migraciones**, las mismas que el árbol, la
-última `20261028180000_preparado_tres_decimales`.
+Producción está en **94 migraciones**, la última
+`20261028180000_preparado_tres_decimales`. Falta una:
+
+- `20261028200000_detalle_resuelto_por_deposito` — **aditiva.** Una columna
+  nula, `PosTransferenciaDetalle.resueltoPorDepositoId`, y su clave foránea a
+  `Local`: qué depósito resolvió cada renglón, para que dos depósitos de la
+  misma empresa armen el mismo pedido y cada renglón salga del stock del suyo.
+  No rellena nada: las líneas de antes quedan en null y salen del origen del
+  pedido, como siempre. El clasificador la da por aditiva.
 
 La `20261028180000_preparado_tres_decimales` —cambio de tipo que ENSANCHA:
 `PosTransferenciaDetalle.preparado` de `DECIMAL(12,2)` a `DECIMAL(13,3)`— se

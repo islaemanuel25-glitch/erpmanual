@@ -34,7 +34,7 @@ function escritura(ruta, cuerpo) {
   return e.respuesta;
 }
 
-const montarPreparar = ({ detalle = dep.depositoDetalleNuevo, enviar = [], posId = ids.p1, ancho = "telefono" } = {}) => {
+const montarPreparar = ({ detalle = dep.depositoDetalleNuevo, enviar = [], posId = ids.p1, ancho = "telefono", opciones = dep.depositoOpciones } = {}) => {
   const colaEnviar = [...enviar];
   return A.montar({
     pagina: Pagina,
@@ -44,7 +44,7 @@ const montarPreparar = ({ detalle = dep.depositoDetalleNuevo, enviar = [], posId
     otras: {
       "/api/me": dep.depositoMe,
       "/api/operador/me": dep.depositoOperadorMe,
-      "/api/pos-transferencias/opciones": dep.depositoOpciones,
+      "/api/pos-transferencias/opciones": opciones,
       "/api/pos-transferencias/solicitados": dep.depositoSolicitadosNuevo,
       "/api/pos-transferencias/detalle": detalle,
       "/api/pos-transferencias/detalle/editar": ({ cuerpo }) => escritura("/api/pos-transferencias/detalle/editar", cuerpo),
@@ -243,6 +243,38 @@ test("VOLVER A PENDIENTE: solo en una preparada, debajo de Guardar; la línea y 
 });
 
 const json = (x) => JSON.stringify(x);
+
+test("DOS DEPÓSITOS: lo del otro dice «Lo preparó …», los contadores son del pedido entero, y el envío tardío avisa «Este pedido ya se envió»", async () => {
+  // Sección 16, vista desde el de mercadería: el frío preparó el helado; éste,
+  // el aceite y «No hay» yerba. El frío ya lo envió cuando éste toca enviar.
+  const { pedidos } = await montarPreparar({
+    detalle: dep.depositoDetalleDosDepositos,
+    opciones: dep.depositoOpcionesMercaderia,
+    enviar: [dep.depositoEnviarYaSeEnvio],
+  });
+  const frio = dep.depositoDetalleDosDepositos.cuerpo.item.detalles.find((d) => d.productoNombre === "HELADO").resueltoPorNombre;
+  assert.deepEqual(opciones(), ["Pendientes 0", "Con cambios 1", "Preparados 3", "Todos 3"]);
+  assert.match(A.contenido().textContent, /3 \/ 3 preparados/);
+  assert.doesNotMatch(A.contenido().textContent, /Falta revisar/);
+  await elegir("Todos");
+  assert.match(linea("HELADO").textContent, new RegExp(`Lo preparó ${frio}`));
+  for (const n of ["ACEITE", "YERBA"]) assert.doesNotMatch(linea(n).textContent, /Lo preparó/, `${n} es de este depósito`);
+  // Chico y debajo del nombre, en suave.
+  const rotulo = [...linea("HELADO").querySelectorAll("span")].find((s) => s.textContent === `Lo preparó ${frio}`);
+  assert.ok(rotulo, "el «Lo preparó» no es un renglón propio");
+  assert.match(rotulo.className, /\btext-xs2\b/);
+  assert.match(rotulo.className, /\bsunmi-text-muted\b/);
+  // Se puede tocar igual: abre la hoja.
+  await A.tocar(linea("HELADO").querySelector("button"));
+  assert.ok(A.modal(), "lo del otro depósito no se puede tocar");
+  await A.tocar(A.boton("Cerrar", A.modal()));
+
+  assert.ok(!enviarBoton().disabled, "con cero pendientes, Enviar sigue apagado");
+  await A.tocar(enviarBoton());
+  assert.equal(A.llamadas(pedidos, "/api/pos-transferencias/enviar").length, 1);
+  assert.match(A.texto(), /Este pedido ya se envió\./);
+  assert.deepEqual(A.navegacion.at(-1), ["push", "/modulos/pos-transferencias"]);
+});
 
 const detalleIdDe = (detalle, nombre) => detalle.cuerpo.item.detalles.find((d) => d.productoNombre === nombre).detalleId;
 

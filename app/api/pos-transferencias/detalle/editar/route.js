@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { DATOS_LINEA_PENDIENTE } from "@/lib/pedidos/revisionDeLinea";
+import { esDepositoDelPedido, mensajeNoEstaEnElCatalogo, productoDelDeposito } from "@/lib/pedidos/depositosDelPedido";
 import {
   bloquearParDelPedido,
   bloquearFilaDelPedido,
@@ -70,10 +71,11 @@ export async function POST(req) {
 
     // Scope: no-admin solo puede operar sobre POS de su local (origen o destino).
     // ESCRITURA sobre recurso ajeno → 403.
+    // Los depósitos de la empresa del local también: arman el mismo pedido.
     if (
       !session.esAdmin &&
-      Number(session.localId) !== detalle.pos.origenId &&
-      Number(session.localId) !== detalle.pos.destinoId
+      Number(session.localId) !== detalle.pos.destinoId &&
+      !(await esDepositoDelPedido(prisma, session.localId, detalle.pos))
     ) {
       return NextResponse.json(
         { ok: false, error: "No autorizado para esta transferencia" },
@@ -196,6 +198,28 @@ export async function POST(req) {
     // volver a pendiente. Con el pedido enviado cae en los rechazos de siempre.
     if (esDeposito && body.pendiente === true) Object.assign(data, DATOS_LINEA_PENDIENTE);
 
+    // ── QUÉ DEPÓSITO LA RESOLVIÓ (2026-10-28) ────────────────────────────────
+    // El que la decide —va completo, corregida, pesada o "No hay"— pasa a ser
+    // su dueño, aunque la hubiera resuelto el otro; volver a pendiente la deja
+    // sin dueño. El admin sin local resuelve como el origen del pedido. Lo que
+    // va más que 0 tiene que estar en el catálogo de ese depósito: sale de su
+    // stock (`enviar`).
+    if (esDeposito && data.preparado !== undefined) {
+      if (data.revisadoEn === null) {
+        data.resueltoPorDepositoId = null;
+      } else {
+        const resuelve = isAdminUser ? detalle.pos.origenId : Number(session.localId);
+        if (resuelve !== detalle.pos.origenId && data.preparado > 0 && !(await productoDelDeposito(prisma, resuelve, detalle.producto.baseId))) {
+          const deposito = await prisma.local.findUnique({ where: { id: resuelve }, select: { nombre: true } });
+          return NextResponse.json(
+            { ok: false, error: mensajeNoEstaEnElCatalogo(detalle.producto.nombre || baseProducto?.nombre || "Este producto", deposito?.nombre ?? "este depósito") },
+            { status: 409 }
+          );
+        }
+        data.resueltoPorDepositoId = resuelve;
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { ok: false, error: "No hay cambios para aplicar" },
@@ -221,6 +245,7 @@ export async function POST(req) {
         include: {
           producto: { include: { base: true } },
           pos: { select: { origenId: true } },
+          resueltoPorDeposito: { select: { nombre: true } },
         },
       });
     });
@@ -260,6 +285,8 @@ export async function POST(req) {
       unidadSugerida: updated.unidadSugerida,
       unidadPreparada: updated.unidadPreparada,
       revisadoEn: updated.revisadoEn,
+      resueltoPorDepositoId: updated.resueltoPorDepositoId,
+      resueltoPorNombre: updated.resueltoPorDeposito?.nombre ?? null,
       productoNombre: productoLocal?.nombre || baseItem?.nombre || "",
       codigoBarra: baseItem?.codigo_barra || "",
       stockActual,

@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 import { WHERE_LINEA_REVISADA } from "@/lib/pedidos/revisionDeLinea";
+import { localesQueArmaElDeposito } from "@/lib/pedidos/depositosDelPedido";
 
 export async function GET(req) {
   try {
@@ -46,8 +47,10 @@ export async function GET(req) {
       });
 
       if (local?.es_deposito) {
-        // Depósito ve pedidos donde él es el origen
-        where.origenId = localId;
+        // Depósito ve los pedidos donde él es el origen y los de los locales de
+        // su empresa: los dos depósitos de una empresa arman el mismo pedido
+        // (2026-10-28, `lib/pedidos/depositosDelPedido.js`).
+        where.OR = [{ origenId: localId }, { destinoId: { in: await localesQueArmaElDeposito(prisma, localId) } }];
       } else {
         // Local ve pedidos donde él es el destino
         where.destinoId = localId;

@@ -161,10 +161,15 @@ export function CajaDeCantidad({ rotulo, children }) {
  * `SunmiButton` traen fondo propio y dibujarían una caja adentro de otra. Lo que
  * `SunmiLinkButton` sí trae —subrayado, acento y `text-xs`— lo ceden las clases
  * de acá, que son utilidades y le ganan por el orden de la hoja.
+ *
+ * `bajoElNombre` (2026-10-28, la preparación con dos depósitos): un renglón
+ * chico debajo del nombre —"Lo preparó Depósito Frío"—. Sin él, la fila es la de
+ * siempre, nodo por nodo.
  */
 export function FilaRevisada({
   icono = null,
   nombre,
+  bajoElNombre = null,
   derecha = null,
   tono = "",
   onTocar = null,
@@ -177,9 +182,16 @@ export function FilaRevisada({
       {icono}
 
       {/* El nombre no cede: sin un botón al lado hay lugar para que entre entero. */}
-      <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
-        {nombre}
-      </span>
+      {bajoElNombre ? (
+        <span className="min-w-0 flex-auto text-left">
+          <span className="block truncate text-sm2 sunmi-text-strong">{nombre}</span>
+          {bajoElNombre}
+        </span>
+      ) : (
+        <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
+          {nombre}
+        </span>
+      )}
 
       {derecha}
     </div>

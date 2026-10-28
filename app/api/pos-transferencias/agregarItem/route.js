@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, elDepositoCuentaPorKilo, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { esDepositoDelPedido, mensajeNoEstaEnElCatalogo, productoDelDeposito } from "@/lib/pedidos/depositosDelPedido";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import {
   bloquearParDelPedido,
@@ -64,16 +65,17 @@ export async function POST(req) {
 
     // Scope: no-admin solo puede operar sobre POS de su local (origen o destino).
     // ESCRITURA sobre recurso ajeno → 403.
-    if (
-      !session.esAdmin &&
-      Number(session.localId) !== pos.origenId &&
-      Number(session.localId) !== pos.destinoId
-    ) {
+    // Los depósitos de la empresa del local también: arman el mismo pedido.
+    const esDeposito = await esDepositoDelPedido(prisma, session.localId, pos);
+    if (!session.esAdmin && Number(session.localId) !== pos.destinoId && !esDeposito) {
       return NextResponse.json(
         { ok: false, error: "No autorizado para esta transferencia" },
         { status: 403 }
       );
     }
+    // Lo agregado lo resolvió quien lo agrega (2026-10-28); el admin sin local,
+    // como el origen del pedido.
+    const resuelve = esDeposito ? Number(session.localId) : pos.origenId;
 
     if (pos.estado === "Enviado") {
       return NextResponse.json(
@@ -107,6 +109,16 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Los combos no se transfieren; se transfieren sus componentes." },
         { status: 400 }
+      );
+    }
+
+    // El catálogo del pedido es el del origen; lo que agrega otro depósito sale
+    // de SU stock, así que tiene que estar en su catálogo.
+    if (resuelve !== pos.origenId && !(await productoDelDeposito(prisma, resuelve, productoLocal.baseId))) {
+      const deposito = await prisma.local.findUnique({ where: { id: resuelve }, select: { nombre: true } });
+      return NextResponse.json(
+        { ok: false, error: mensajeNoEstaEnElCatalogo(productoLocal.nombre || productoLocal.base.nombre, deposito?.nombre ?? "este depósito") },
+        { status: 409 }
       );
     }
 
@@ -178,8 +190,10 @@ export async function POST(req) {
           where: { id: existente.id },
           data: {
             preparado: Number(existente.preparado || 0) + cantidad,
+            resueltoPorDepositoId: resuelve,
             ...(tipo === "sugerido" ? { sugerido: cantidad, unidadSugerida, unidadPreparada } : { unidadPreparada }),
           },
+          include: { resueltoPorDeposito: { select: { nombre: true } } },
         });
       }
       return tx.posTransferenciaDetalle.create({
@@ -191,7 +205,9 @@ export async function POST(req) {
           tipo,
           unidadSugerida,
           unidadPreparada,
+          resueltoPorDepositoId: resuelve,
         },
+        include: { resueltoPorDeposito: { select: { nombre: true } } },
       });
     });
 
@@ -231,6 +247,8 @@ export async function POST(req) {
       tipo: detalle.tipo,
       unidadSugerida: detalle.unidadSugerida,
       unidadPreparada: detalle.unidadPreparada,
+      resueltoPorDepositoId: detalle.resueltoPorDepositoId,
+      resueltoPorNombre: detalle.resueltoPorDeposito?.nombre ?? null,
       modoEnvio: productoLocal.base.modo_envio || efectivo,
       esFiambre: esProductoFiambre(productoLocal.base),
       modoVentaDeposito: productoLocal.base.modoVentaDeposito || "PESO",

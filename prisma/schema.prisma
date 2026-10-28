@@ -225,6 +225,8 @@ model Local {
 
   posTransferenciasOrigen  PosTransferencia[] @relation("pos_origen")
   posTransferenciasDestino PosTransferencia[] @relation("pos_destino")
+  /// Los renglones de pedidos que resolvió este depósito (2026-10-28).
+  posDetallesResueltos     PosTransferenciaDetalle[] @relation("pos_detalle_resuelto_por")
 
   /// Los acuerdos de corte de período, por los dos lados de la relación.
   acuerdosComoDeposito AcuerdoDepositoLocal[] @relation("acuerdo_deposito")
@@ -1751,11 +1753,20 @@ model PosTransferenciaDetalle {
   /// viaja) y `depositoEmpezo`. Las líneas anteriores quedan en null.
   revisadoEn DateTime?
 
+  /// QUÉ DEPÓSITO RESOLVIÓ ESTA LÍNEA (2026-10-28): dos depósitos de la misma
+  /// empresa —frío y mercadería— arman el mismo pedido, cada uno su parte. Lo
+  /// escribe el que la decide (`detalle/editar`, también "No hay", y
+  /// `agregarItem`); "Volver a pendiente" lo vuelve a null. Lo lee `enviar`:
+  /// cada línea sale del stock de ESE depósito, en su propia transferencia.
+  /// Null en las de antes: salen del origen del pedido, como siempre.
+  resueltoPorDepositoId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   pos      PosTransferencia @relation(fields: [posTransferenciaId], references: [id], onDelete: Cascade)
   producto ProductoLocal    @relation(fields: [productoId], references: [id])
+  resueltoPorDeposito Local? @relation("pos_detalle_resuelto_por", fields: [resueltoPorDepositoId], references: [id], onDelete: SetNull)
 
   @@index([posTransferenciaId])
   @@index([productoId])

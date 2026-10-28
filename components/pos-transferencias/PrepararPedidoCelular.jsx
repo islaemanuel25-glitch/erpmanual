@@ -14,6 +14,10 @@
 //     derecha y "Corregir" abajo, que abre la hoja con el campo de cantidad;
 //     la corregida queda con el borde y una línea de acento; la que va
 //     completa se achica a un renglón;
+//   · dos depósitos de la empresa arman el mismo pedido (2026-10-28): lo que
+//     resolvió el otro dice "Lo preparó …" debajo del nombre, los contadores
+//     son del pedido entero, y el que envía segundo lee "Este pedido ya se
+//     envió" (`lib/pedidos/depositosDelPedido.js`);
 //   · "No hay" al lado de "✓ Va completo" y en la hoja: la deja en 0 decidido
 //     de un toque (2026-10-28);
 //   · un producto por peso se carga en KILOS (2026-10-28): pedido en unidades
@@ -79,6 +83,7 @@ import {
   pidioEnUnidades,
   sePesa,
   textoDelCambio,
+  textoLoPreparoOtro,
   textoPidio,
   rotuloDeLoPedido,
   textoVa,
@@ -97,6 +102,8 @@ export const TEXTO_LO_PREPARADO_NO_SE_ENVIA = "Lo preparado no se envía.";
 const ENTRADA = "/modulos/pos-transferencias";
 /** El 409 de `enviar` cuando el pedido se canceló antes que el envío. */
 const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
+/** El 409 de `enviar` cuando el otro depósito ya lo mandó (2026-10-28). */
+const MENSAJE_YA_SE_ENVIO = "Este pedido ya se envió.";
 
 /** Un peso escrito: entero, o con coma (o punto) y hasta tres decimales. */
 const KILOS_ESCRITOS = /^\d+([.,]\d{1,3})?$/;
@@ -223,7 +230,9 @@ function HojaCorregir({ linea, guardando, onGuardar, onNoHay, onVolverAPendiente
 }
 
 // ── UNA LÍNEA ─────────────────────────────────────────────────────────────
-function LineaParaPreparar({ l, guardando, onVaCompleto, onNoHay, onCorregir }) {
+function LineaParaPreparar({ l, miDepositoId, guardando, onVaCompleto, onNoHay, onCorregir }) {
+  // La resolvió el otro depósito: lo dice chico, debajo del nombre.
+  const loPreparo = textoLoPreparoOtro(l, miDepositoId);
   const estado = estadoDePreparacion(l);
 
   // Va completa: un renglón, tocable entero para corregirla, como la recepción.
@@ -232,6 +241,7 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onNoHay, onCorregir }) 
       <FilaRevisada
         icono={<Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />}
         nombre={l.productoNombre}
+        bajoElNombre={loPreparo ? <span className="block truncate text-xs2 sunmi-text-muted">{loPreparo}</span> : null}
         derecha={<span className="min-w-0 truncate text-sm2 text-right sunmi-text-muted">{`· ${textoVa(l)}`}</span>}
         onTocar={() => onCorregir(l)}
         disabled={guardando}
@@ -252,6 +262,7 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onNoHay, onCorregir }) 
           {/* Lo que pidió el local, resaltado IGUAL que lo enviado en la
               recepción: la misma pieza (`CantidadDestacada`) y el mismo texto
               (`rotuloDeLoPedido`, con la función de "2 PACK x10"). */}
+          {loPreparo ? <p className="text-xs2 sunmi-text-muted">{loPreparo}</p> : null}
           {esAgregada(l) ? null : <CantidadDestacada rotulo="Pidió" cantidad={rotuloDeLoPedido(l)} />}
           {cambio ? <p className="text-sm2 font-semibold sunmi-text-accent">{cambio}</p> : null}
         </>
@@ -294,6 +305,7 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
   const { perfil, cargando: cargandoPerfil } = useUser();
 
   const [modo, setModo] = useState(null);
+  const [miDepositoId, setMiDepositoId] = useState(null);
   const [pos, setPos] = useState(null);
   const [lineas, setLineas] = useState([]);
   const [solicitud, setSolicitud] = useState(null);
@@ -342,6 +354,8 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
         const jsonOpt = await resOpt.json().catch(() => ({}));
         if (!vivo) return;
         setModo(jsonOpt.ok ? jsonOpt.modo : "otro");
+        // El depósito propio, para "Lo preparó …" en lo que resolvió el otro.
+        setMiDepositoId(jsonOpt.ok && jsonOpt.modo === "deposito" ? jsonOpt.origen?.id ?? null : null);
         if (!jsonOpt.ok || (jsonOpt.modo !== "deposito" && jsonOpt.modo !== "admin")) return;
         await leer();
         // Cuándo y quién lo pidió: lo sabe la lista de pedidos, no el detalle.
@@ -455,7 +469,8 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
       // arriba y el pedido como está ahora.
       // Lo canceló el depósito mientras se enviaba: no hay nada que releer,
       // el aviso y de vuelta a la lista, donde ya no está.
-      if (res.status === 409 && json.error === MENSAJE_SE_CANCELO) {
+      // Lo mismo si el otro depósito ya lo mandó: sale una sola vez.
+      if (res.status === 409 && (json.error === MENSAJE_SE_CANCELO || json.error === MENSAJE_YA_SE_ENVIO)) {
         showWarning(json.error);
         router.push(ENTRADA);
         return;
@@ -616,6 +631,7 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
               <LineaParaPreparar
                 key={l.detalleId}
                 l={l}
+                miDepositoId={miDepositoId}
                 guardando={guardando}
                 onVaCompleto={(x) => escribirPreparado(x, vaCompleto(x))}
                 onNoHay={(x) => escribirPreparado(x, NO_HAY)}

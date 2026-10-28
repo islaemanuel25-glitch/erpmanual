@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { elDepositoCuentaPorKilo, esProductoFiambre } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { esDepositoDelPedido } from "@/lib/pedidos/depositosDelPedido";
 
 export async function GET(req) {
   try {
@@ -49,7 +50,13 @@ export async function GET(req) {
 
     // Scope: no-admin solo puede leer transferencias de su local (origen o destino).
     // LECTURA de recurso ajeno → 404 (no revelar existencia).
-    if (!session.esAdmin && Number(session.localId) !== pos.origenId && Number(session.localId) !== pos.destinoId) {
+    // Los depósitos de la empresa del local también: arman el mismo pedido
+    // (`lib/pedidos/depositosDelPedido.js`).
+    if (
+      !session.esAdmin &&
+      Number(session.localId) !== pos.destinoId &&
+      !(await esDepositoDelPedido(prisma, session.localId, pos))
+    ) {
       return NextResponse.json(
         { ok: false, error: "POS no encontrada" },
         { status: 404 }
@@ -72,6 +79,7 @@ export async function GET(req) {
             },
           },
         },
+        resueltoPorDeposito: { select: { nombre: true } },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -146,6 +154,9 @@ export async function GET(req) {
         unidadPreparada: detalle.unidadPreparada || detalle.unidadSugerida || "BULTO",
         // Cuándo la decidió el depósito; null si nadie. Ver `lib/pedidos/revisionDeLinea.js`.
         revisadoEn: detalle.revisadoEn,
+        // Qué depósito la resolvió, para "Lo preparó …" (2026-10-28).
+        resueltoPorDepositoId: detalle.resueltoPorDepositoId,
+        resueltoPorNombre: detalle.resueltoPorDeposito?.nombre ?? null,
 
         productoNombre: productoLocal?.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || "",

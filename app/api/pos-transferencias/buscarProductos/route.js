@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { buscarCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
+import { sonDepositosHermanos } from "@/lib/pedidos/depositosDelPedido";
 
 // BUSCAR PRODUCTOS PARA ARMAR UNA TRANSFERENCIA.
 //
@@ -49,7 +50,9 @@ export async function GET(req) {
       );
     }
 
-    if (!session.esAdmin && origenId !== Number(session.localId)) {
+    // Un depósito busca también en el catálogo de otro depósito de su empresa:
+    // es el catálogo del pedido que arman juntos (2026-10-28).
+    if (!session.esAdmin && !(await sonDepositosHermanos(prisma, Number(session.localId), origenId))) {
       return NextResponse.json(
         { ok: false, error: "No autorizado para este local" },
         { status: 403 }
