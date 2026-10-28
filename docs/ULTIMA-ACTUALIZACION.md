@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-28 02:06
+**Fecha:** 2026-10-28 02:34
 
 ## Módulos modificados recientemente
 
-### stock
-- revert: se saca la lectura con cámara del Control de stock — vuelve a 78c98a2, fix(escaner): la cámara lee — zxing en todos los equipos, con el .wasm servido desde el sitio, feat(stock): leer el código de barras con la cámara en Control de stock
-- Archivos: 2 modificados (2 total)
+### transferencias
+- fix(comprobantes): el lector interpretado pide los importes del pie, y un costo repartido por encima del importe prueba que el papel trae impuestos — Arcor #362
+- Archivos: 1 modificados (1 total)
 
 
 

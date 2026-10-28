@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-26 14:51
+**Última actualización:** 2026-10-28 02:34
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-28: fix(comprobantes): el lector interpretado pide los importes del pie, y un costo repartido por encima del importe prueba que el papel trae impuestos — Arcor #362
 - 2026-10-26: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
 - 2026-10-26: refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
 - 2026-10-26: feat: salida a mano en Corregir — cantidad, importe y «No vino» (SIN VERIFICAR en pantalla)
