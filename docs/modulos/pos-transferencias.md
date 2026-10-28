@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-26 14:51
+**Última actualización:** 2026-10-28 03:38
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-28: feat(pedidos): volver a pendiente un renglón ya preparado en el celular
 - 2026-10-26: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado
 - 2026-10-26: refactor(kit): la acción rápida de las tarjetas —«✓ Coincide» y sus parientes— pasa al kit como SunmiAccionRapida
 - 2026-10-23: fix(deposito): enviar dice "Este pedido se canceló." y la hoja de corregir habla como la tarjeta
