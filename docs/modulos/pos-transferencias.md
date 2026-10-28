@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-28 18:02
+**Última actualización:** 2026-10-28 19:19
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-28: feat(pedidos): preparar un pedido del depósito en la computadora, desde 768 px
 - 2026-10-28: feat(pedidos): un «solo por bulto» de bulto 1 sale aunque se haya preparado por unidad
 - 2026-10-28: fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19
 - 2026-10-28: fix(pedidos): «No hay» baja a la fila de Corregir, a la derecha, y el nombre recupera su ancho
