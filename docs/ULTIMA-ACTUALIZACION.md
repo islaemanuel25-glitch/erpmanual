@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-28 19:19
+**Fecha:** 2026-10-28 23:28
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- fix(pos-ventas): consumo del personal en dos renglones y con kilo decimal (descuento SIN VERIFICAR en Postgres)
+- Archivos: 3 modificados (3 total)
 
 ### pos-transferencias
 - feat(pedidos): preparar un pedido del depósito en la computadora, desde 768 px, feat(pedidos): un «solo por bulto» de bulto 1 sale aunque se haya preparado por unidad, fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19
