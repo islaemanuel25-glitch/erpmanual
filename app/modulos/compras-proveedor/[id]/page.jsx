@@ -22,6 +22,7 @@ import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea"
 import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
 import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
 import {
+  bajaQueDejaElTuyo,
   cantidadEnEscalaDelPedido,
   hayDiferenciaDePrecio,
   unidadesFisicasDeLaFactura,
@@ -623,6 +624,16 @@ export default function DetallePedidoProveedorPage({ params }) {
       });
       const d = await r.json().catch(() => null);
       if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo aceptar." };
+      // ── EL COSTO QUE VIAJA AL CIERRE ES EL QUE SE ACEPTÓ ───────────────
+      //
+      // El cierre manda `costos`, que se carga una vez al abrir el pedido. La
+      // ruta ya escribió el precio aceptado en la línea, pero sin esto el
+      // cierre mandaba el de antes y lo volvía a escribir: Arcor #362, los
+      // MOGUL 7,3 % más baratos nunca bajaban. Mismo formato que al cargar.
+      const nuevo = Number(d.precioNuevo);
+      if (fila?.pedidoDetalleId != null && Number.isFinite(nuevo) && nuevo > 0) {
+        setCostos((prev) => ({ ...prev, [fila.pedidoDetalleId]: nuevo.toFixed(2) }));
+      }
       // Se vuelve a pedir la conciliación: el precio cambió y la comparación de
       // todas las filas de ese producto ya no es la misma.
       setRecargarConciliacion((n) => n + 1);
@@ -679,6 +690,15 @@ export default function DetallePedidoProveedorPage({ params }) {
       const r = await aceptarPrecioDeLinea(fila);
       if (r && r.ok === false) return;
     }
+    // ── UNA BAJA DENTRO DE LA VARIACIÓN: EL TILDE ES "DEJAR EL MÍO" ────
+    //
+    // La tarjeta ofrece "✓ Coincide" sin decisión tomada (`bajaQueDejaElTuyo`),
+    // así que el toque la toma: queda el precio más alto, y queda guardado,
+    // igual que si se hubiera elegido en Corregir.
+    if (bajaQueDejaElTuyo(fila)) {
+      const r = await dejarMiPrecioDeLinea(fila);
+      if (r && r.ok === false) return;
+    }
     // ── EL FIAMBRE DE PESO VARIABLE QUE VIENE EN KILOS ─────────────────
     //
     // Das #255: "10,94 × 9.375,87" son kilos. Lo que el tilde confirma es ese
@@ -706,7 +726,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     const entran = unidadesFisicasDeLaFactura(fila);
     if (entran !== null) setFisicas((prev) => ({ ...prev, [fila.pedidoDetalleId]: entran }));
     await marcarRevisada(fila, true);
-  }, [aceptarPrecioDeLinea, marcarRevisada]);
+  }, [aceptarPrecioDeLinea, dejarMiPrecioDeLinea, marcarRevisada]);
 
   // ── CORREGIR ES ESCRIBIR, Y SE ESCRIBE APENAS OCURRE ───────────────────
   //
