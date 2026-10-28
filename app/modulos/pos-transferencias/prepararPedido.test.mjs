@@ -458,16 +458,13 @@ test("el local sumó antes de que el depósito empiece: al volver a leer, lo nue
   assert.match(A.contenido().textContent, /0 \/ 2 preparados/);
 });
 
-test("en la computadora, la pantalla de siempre", async () => {
-  // La de siempre arma un sonido al montarse (`new Audio`), que jsdom no trae:
-  // uno mudo, solo para que se pueda montar.
-  globalThis.Audio = window.Audio = class {
-    play() { return Promise.resolve(); }
-    pause() {}
-    load() {}
-    addEventListener() {}
-    removeEventListener() {}
-  };
-  await montarPreparar({ ancho: "escritorio" });
-  assert.ok(!document.querySelector("[data-preparar-pedido]"), "se montó la del celular");
-});
+// Decía "en la computadora, la pantalla de siempre". Desde el 2026-10-28 un
+// pedido de local se prepara en la computadora con `PrepararPedidoEscritorio`,
+// desde el `md` (768 px): a 900 px también, que antes era el celular.
+for (const ancho of ["tableta", "escritorio"]) {
+  test(`a ${ancho === "tableta" ? "900 px" : "1366 px"}, la de computadora y no la del celular`, async () => {
+    await montarPreparar({ ancho });
+    assert.ok(!document.querySelector("[data-preparar-pedido]"), "se montó la del celular");
+    assert.ok(document.querySelector(`[data-preparar-pedido-escritorio="${ids.p1}"]`), "no se montó la de computadora");
+  });
+}

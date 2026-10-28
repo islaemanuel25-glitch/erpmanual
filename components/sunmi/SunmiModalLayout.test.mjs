@@ -694,6 +694,10 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // otra hoja, la de agregar lo que el local no pidió, es una búsqueda: perder
     // el término no es perder nada, pero este chequeo mira el ARCHIVO.
     "components/pos-transferencias/PrepararPedidoCelular.jsx": true,
+    // Y en la COMPUTADORA (2026-10-28) contesta que NO: ahí no hay hoja de
+    // corregir —la cantidad se escribe en la fila—, y sus dos modales son la
+    // búsqueda de agregar y el menú del "⋯". Nada escrito que perder al cerrar.
+    "components/pos-transferencias/PrepararPedidoEscritorio.jsx": false,
     // El "⋯" del Control de stock: la misma hoja de "Más acciones" de recibir
     // una transferencia, con un solo botón —"Ver diferencias"—. Un menú: nada
     // que perder al cerrar.

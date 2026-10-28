@@ -29,14 +29,20 @@ Object.defineProperty(globalThis, "navigator", { value: dom.window.navigator, co
 // `(min-width: 1024px)`. Cada candado elige con `montar({ ancho })` —"telefono"
 // por defecto— y `cambiarAncho` simula cruzar el corte. Cualquier otra
 // pregunta —la del movimiento reducido— contesta que sí, como siempre.
+//
+// "tableta" (2026-10-28): 900 px, entre el `md` y el `lg`. La pregunta se
+// contesta con el número de la consulta contra el ancho, así que "telefono" y
+// "escritorio" contestan lo mismo que antes a 768 y a 1024.
 let anchoDeVentana = "telefono";
+const PX_DEL_ANCHO = Object.freeze({ telefono: 360, tableta: 900, escritorio: 1366 });
 const oyentesDelAncho = new Set();
 dom.window.matchMedia = (consulta) =>
   /min-width/.test(String(consulta))
     ? {
         // Vivo, como el de verdad: lo lee el manejador del cambio.
         get matches() {
-          return anchoDeVentana === "escritorio";
+          const px = /min-width:\s*(\d+)px/.exec(String(consulta));
+          return px ? PX_DEL_ANCHO[anchoDeVentana] >= Number(px[1]) : anchoDeVentana === "escritorio";
         },
         media: consulta,
         addEventListener: (_, f) => oyentesDelAncho.add(f),

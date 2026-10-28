@@ -114,7 +114,9 @@ export function TarjetaDeRevision({
 export function CantidadDestacada({ rotulo, cantidad, children = null }) {
   return (
     <p className="flex items-baseline gap-x-2 flex-wrap break-words">
-      <span className="text-xs sunmi-text-muted shrink-0">{rotulo}</span>
+      {/* Sin rótulo cuando la columna ya lo dice (el escritorio de preparar,
+          2026-10-28): sin el nodo vacío, que correría la cantidad con el gap. */}
+      {rotulo ? <span className="text-xs sunmi-text-muted shrink-0">{rotulo}</span> : null}
       <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
         {cantidad}
       </span>

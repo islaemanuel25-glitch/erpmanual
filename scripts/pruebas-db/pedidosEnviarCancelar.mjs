@@ -1188,6 +1188,10 @@ try {
       ok("14: el aceite va completo otra vez", (await editarD({ detalleId: aceiteNuevo.detalleId, ...vaCompleto(aceiteNuevo) })).cuerpo.ok === true);
       const arroz = await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
       ok("14: el arroz va 1 de 3", arroz.cuerpo.ok === true && arroz.cuerpo.item.preparado === 1, json(arroz));
+      // El + del escritorio sobre el arroz ya corregido (2026-10-28): a 2, y de
+      // vuelta a 1, que es como sigue el recorrido.
+      ok("14: el arroz, con el +, a 2", (await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 2, unidadPreparada: "UNIDAD" })).cuerpo.item?.preparado === 2);
+      ok("14: el arroz de vuelta a 1", (await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" })).cuerpo.item?.preparado === 1);
       // Buscar en el catálogo del depósito lo que el local no pidió, como la
       // pantalla (la lógica de `BuscadorManual`).
       const buscarRuta = await import("../../app/api/pos-transferencias/buscarProductos/route.js");

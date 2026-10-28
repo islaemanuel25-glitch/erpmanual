@@ -11,7 +11,8 @@ import BuscadorManual from "@/components/pos-transferencias/nueva/BuscadorManual
 import PreparadosTable from "@/components/pos-transferencias/nueva/PreparadosTable";
 import Separador from "@/components/pos-transferencias/nueva/Separador";
 import PrepararPedidoCelular from "@/components/pos-transferencias/PrepararPedidoCelular";
-import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
+import PrepararPedidoEscritorio from "@/components/pos-transferencias/PrepararPedidoEscritorio";
+import { useDesdeMd } from "@/lib/layout/useEsEscritorio";
 
 function unidadPlural(u) {
   if (!u) return "unidades";
@@ -36,27 +37,32 @@ function normalizarValorFiltro(v) {
   return SENTINEL_ALL;
 }
 
-// ── UNA PÁGINA, DOS PANTALLAS ─────────────────────────────────────────────
+// ── UNA PÁGINA, TRES PANTALLAS ────────────────────────────────────────────
 //
-// Por debajo de 1024 px, un pedido de local (`?posId=`) se prepara en
-// `components/pos-transferencias/PrepararPedidoCelular.jsx` (2026-10-22), que
-// le devuelve la pantalla de siempre a lo que no es suyo: un pedido que no está
-// Solicitado, o quien no es depósito ni admin. Desde 1024 px, y sin `posId`
+// Un pedido de local (`?posId=`) se prepara por debajo de `md` (768 px) en
+// `components/pos-transferencias/PrepararPedidoCelular.jsx` (2026-10-22), y
+// desde `md` en `PrepararPedidoEscritorio.jsx` (2026-10-28, corte decidido por
+// Emanuel). Las dos le devuelven la pantalla de siempre a lo que no es suyo: un
+// pedido que no está Solicitado, o quien no es depósito ni admin. Sin `posId`
 // —la transferencia sin pedido, con sus sugeridos por stock—, la de siempre,
 // más abajo y sin tocar.
 export default function PaginaNuevaTransferencia() {
   const params = useSearchParams();
   const posId = Number(params.get("posId") || 0);
-  const esEscritorio = useEsEscritorio();
-  if (esEscritorio === null) {
+  const desdeMd = useDesdeMd();
+  if (desdeMd === null) {
     return (
       <div className="min-h-screen sunmi-bg flex items-center justify-center">
         <span className="text-sm sunmi-text-muted">Cargando...</span>
       </div>
     );
   }
-  if (!esEscritorio && posId > 0) {
-    return <PrepararPedidoCelular posId={posId} PantallaDeSiempre={NuevaTransferenciaPage} />;
+  if (posId > 0) {
+    return desdeMd ? (
+      <PrepararPedidoEscritorio posId={posId} PantallaDeSiempre={NuevaTransferenciaPage} />
+    ) : (
+      <PrepararPedidoCelular posId={posId} PantallaDeSiempre={NuevaTransferenciaPage} />
+    );
   }
   return <NuevaTransferenciaPage />;
 }
