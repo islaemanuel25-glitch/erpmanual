@@ -29,7 +29,7 @@ import { nuevaClaveDePago } from "@/lib/finanzas/pagosProveedores";
 import { formatearMoneda } from "@/lib/moneda";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
 import { esModalidadServicio } from "@/lib/pos-ventas/servicios";
-import { resumenDelConsumo } from "@/lib/pos-ventas/consumoPersonal";
+import { cantidadEscrita, resumenDelConsumo } from "@/lib/pos-ventas/consumoPersonal";
 
 export default function PanelConsumoPersonal({ turnoId, localId, esDeposito = false, empleados = [], onRegistrado }) {
   const { requerirOperador } = useOperadorContext();
@@ -41,9 +41,17 @@ export default function PanelConsumoPersonal({ turnoId, localId, esDeposito = fa
   // Un intento por lista: el mismo envío repetido cae en el mismo consumo.
   const clave = useRef(nuevaClaveDePago(`consumo-${turnoId}`));
 
-  const productos = lista.carrito;
+  // Lo escrito en cada campo —"0,100" en un producto por peso— pasa a número
+  // para sumar y para mandar; la lista guarda lo escrito.
+  const productos = lista.carrito.map((p) => ({ ...p, cantidad: cantidadEscrita(p.cantidad) }));
   const resumen = resumenDelConsumo(productos);
-  const puedeConfirmar = Boolean(turnoId) && Boolean(empleadoId) && resumen.productos > 0 && !resumen.hayServicios && !registrando;
+  const puedeConfirmar =
+    Boolean(turnoId) &&
+    Boolean(empleadoId) &&
+    resumen.productos > 0 &&
+    productos.every((p) => p.cantidad > 0) &&
+    !resumen.hayServicios &&
+    !registrando;
 
   const agregar = (producto) => {
     // Un servicio no sale del stock: no hay nada que consumir.
@@ -102,28 +110,47 @@ export default function PanelConsumoPersonal({ turnoId, localId, esDeposito = fa
 
       {productos.length > 0 ? (
         <div data-lista-consumo className="rounded-xl2 border sunmi-border sunmi-bg-card px-4 divide-y sunmi-divide">
-          {productos.map((p, idx) => {
-            const porPeso = p.unidadMedida === "kg";
+          {lista.carrito.map((p, idx) => {
+            const esKg = p.unidadMedida === "kg";
+            // Dos renglones: el nombre a lo ancho —compartiendo la fila con los
+            // controles se partía letra por letra— y abajo la cantidad y "Quitar".
             return (
-              <div key={p.productoBaseId} className="flex items-center gap-3 py-2.5">
-                <span className="min-w-0 flex-1 text-sm3 sunmi-text-strong break-words">{p.nombre}</span>
-                <SunmiCampoCantidad
-                  valor={p.cantidad}
-                  onCambiar={(v) => despachar({ type: ActionTypes.UPDATE_CANTIDAD, payload: { idx, nuevaCantidad: v } })}
-                  etiqueta={`Cantidad de ${p.nombre}`}
-                  minimo={porPeso ? 0.001 : 1}
-                  paso={porPeso ? 0.1 : 1}
-                  decimales={porPeso ? 3 : 0}
-                  tamano="compacto"
-                />
-                <SunmiLinkButton
-                  type="button"
-                  onClick={() => despachar({ type: ActionTypes.REMOVE_ITEM, payload: { idx } })}
-                  disabled={registrando}
-                  className="shrink-0 text-sm3"
-                >
-                  Quitar
-                </SunmiLinkButton>
+              <div key={p.productoBaseId} className="grid gap-2 py-2.5">
+                <span className="line-clamp-2 break-words text-sm3 sunmi-text-strong">{p.nombre}</span>
+                <div className="flex items-center justify-between gap-3">
+                  {/* El campo del carrito de la venta (`CantidadStepper` de
+                      CarritoVenta.jsx), con sus mismos mínimo, paso, tope y caja.
+                      Lo único que se suma es `conservaLoEscrito` en el kilo: sin
+                      eso la coma se borra al tipearla y 0,100 no se puede
+                      escribir. Lo escrito se lee con `cantidadEscrita`. */}
+                  <SunmiCampoCantidad
+                    valor={p.cantidad}
+                    onCambiar={(s) =>
+                      despachar({
+                        type: ActionTypes.UPDATE_CANTIDAD,
+                        payload: { idx, nuevaCantidad: esKg || s === "" ? s : Number(s) },
+                      })
+                    }
+                    etiqueta={`Cantidad de ${p.nombre}`}
+                    minimo={esKg ? 0.001 : 1}
+                    paso={esKg ? 0.001 : 1}
+                    maximo={p.stockMax != null && p.stockMax > 0 ? p.stockMax : 9999}
+                    decimales={esKg ? 3 : 0}
+                    conservaLoEscrito={esKg}
+                    normalizaAlSalir={!esKg}
+                    conMarco={false}
+                    claseInput="w-16 !text-center !py-1"
+                    tamano="compacto"
+                  />
+                  <SunmiLinkButton
+                    type="button"
+                    onClick={() => despachar({ type: ActionTypes.REMOVE_ITEM, payload: { idx } })}
+                    disabled={registrando}
+                    className="shrink-0 text-sm3"
+                  >
+                    Quitar
+                  </SunmiLinkButton>
+                </div>
               </div>
             );
           })}
