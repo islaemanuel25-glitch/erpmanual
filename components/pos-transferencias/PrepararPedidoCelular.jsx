@@ -18,7 +18,7 @@
 //     resolvió el otro dice "Lo preparó …" debajo del nombre, los contadores
 //     son del pedido entero, y el que envía segundo lee "Este pedido ya se
 //     envió" (`lib/pedidos/depositosDelPedido.js`);
-//   · "No hay" al lado de "✓ Va completo" y en la hoja: la deja en 0 decidido
+//   · "No hay" abajo a la derecha, enfrente de "Corregir", y en la hoja: la deja en 0 decidido
 //     de un toque (2026-10-28);
 //   · un producto por peso se carga en KILOS (2026-10-28): pedido en unidades
 //     no tiene "va completo" sino "Pesar"; ver `HojaCorregir`;
@@ -268,31 +268,32 @@ function LineaParaPreparar({ l, miDepositoId, guardando, onVaCompleto, onNoHay, 
         </>
       }
       accionArriba={
-        estado === ESTADO_PREPARACION.PENDIENTE ? (
-          <span className="flex shrink-0 items-center gap-2">
-            {/* "No hay": lo pedido no está, de un toque y sin confirmar; se
-                deshace con "Volver a pendiente". */}
-            <SunmiButton color="slate" onClick={() => onNoHay(l)} disabled={guardando} className="shrink-0">
-              {TEXTO_NO_HAY}
-            </SunmiButton>
-            {/* Pedido en unidades y por peso no hay "va completo": lo pedido no
-                son kilos. Se pesa, en la misma hoja. */}
-            {pidioEnUnidades(l) ? (
-              <SunmiAccionRapida onClick={() => onCorregir(l)} disabled={guardando}>
-                {TEXTO_PESAR}
-              </SunmiAccionRapida>
-            ) : (
-              <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
-                {TEXTO_VA_COMPLETO}
-              </SunmiAccionRapida>
-            )}
-          </span>
+        // Pedido en unidades y por peso no hay "va completo": lo pedido no son
+        // kilos. Se pesa, en la misma hoja.
+        estado === ESTADO_PREPARACION.PENDIENTE && pidioEnUnidades(l) ? (
+          <SunmiAccionRapida onClick={() => onCorregir(l)} disabled={guardando}>
+            {TEXTO_PESAR}
+          </SunmiAccionRapida>
+        ) : estado === ESTADO_PREPARACION.PENDIENTE ? (
+          <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
+            {TEXTO_VA_COMPLETO}
+          </SunmiAccionRapida>
         ) : null
       }
       accionAbajo={
         <SunmiButton onClick={() => onCorregir(l)} disabled={guardando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
           {TEXTO_CORREGIR}
         </SunmiButton>
+      }
+      // "No hay", abajo a la derecha, enfrente de Corregir (2026-10-28): al lado
+      // de "Va completo" apretaba el nombre y se tocaba sin querer. Lo pedido no
+      // está, de un toque y sin confirmar; se deshace con "Volver a pendiente".
+      alPie={
+        estado === ESTADO_PREPARACION.PENDIENTE ? (
+          <SunmiButton color="slate" onClick={() => onNoHay(l)} disabled={guardando} className="shrink-0">
+            {TEXTO_NO_HAY}
+          </SunmiButton>
+        ) : null
       }
       data-linea-preparar={l.productoNombre}
       data-estado={estado}

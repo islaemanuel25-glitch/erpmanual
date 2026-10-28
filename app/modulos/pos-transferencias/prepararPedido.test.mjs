@@ -278,13 +278,24 @@ test("DOS DEPÓSITOS: lo del otro dice «Lo preparó …», los contadores son d
 
 const detalleIdDe = (detalle, nombre) => detalle.cuerpo.item.detalles.find((d) => d.productoNombre === nombre).detalleId;
 
-test("NO HAY en el renglón: un botón al lado de Va completo; revisado en 0, en Con cambios, y se deshace con Volver a pendiente", async () => {
+test("NO HAY en el renglón: abajo a la derecha, enfrente de Corregir; revisado en 0, en Con cambios, y se deshace con Volver a pendiente", async () => {
   const { pedidos } = await montarPreparar();
   const ultimoCuerpo = () => A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo;
   const noHay = A.boton("No hay", linea("ACEITE"));
   assert.ok(noHay, "el renglón pendiente no tiene No hay");
   assert.match(noHay.className, /\bsunmi-btn/, "No hay no es un botón del kit");
-  assert.ok(A.boton("✓ Va completo", linea("ACEITE")), "No hay reemplazó a Va completo");
+  const vaCompleto = A.boton("✓ Va completo", linea("ACEITE"));
+  assert.ok(vaCompleto, "No hay reemplazó a Va completo");
+  // La ubicación (2026-10-28): estaba al lado de Va completo, apretaba el nombre
+  // y se tocaba sin querer. Arriba queda solo Va completo, al lado del nombre;
+  // No hay va en la fila de abajo, la de Corregir, último —a la derecha—.
+  const corregir = A.boton("Corregir", linea("ACEITE"));
+  // Con `assert.ok(a === b)` y no `assert.equal(a, b)`: un nodo de jsdom en el
+  // mensaje de un rojo cuelga el proceso describiéndolo.
+  assert.ok(noHay.parentElement === corregir.parentElement, "No hay no está en la fila de Corregir");
+  assert.ok(noHay.parentElement.lastElementChild === noHay, "No hay no quedó a la derecha");
+  assert.ok(!vaCompleto.parentElement.contains(noHay), "No hay sigue arriba, al lado de Va completo");
+  assert.ok(vaCompleto.parentElement === linea("ACEITE").firstElementChild, "Va completo dejó de ir suelto al lado del nombre");
 
   await A.tocar(noHay);
   assert.deepEqual(ultimoCuerpo(), { detalleId: detalleIdDe(dep.depositoDetalleNuevo, "ACEITE"), preparado: 0, unidadPreparada: "UNIDAD" });
@@ -322,9 +333,12 @@ test("NO HAY en la hoja: debajo de Guardar, deja la línea en 0 de un toque", as
   assert.match(linea("YERBA").textContent, /No hay/);
 });
 
-test("NO HAY en lo que se pesa: al lado de Pesar, el mismo 0", async () => {
+test("NO HAY en lo que se pesa: Pesar arriba, No hay abajo, el mismo 0", async () => {
   const { pedidos } = await montarPreparar({ detalle: dep.depositoDetallePeso });
   assert.ok(A.boton("Pesar", linea("SALAMETRO")), "se perdió Pesar");
+  // Arriba, solo Pesar; No hay abajo, en la fila de Corregir.
+  assert.ok(A.boton("Pesar", linea("SALAMETRO")).parentElement === linea("SALAMETRO").firstElementChild, "Pesar dejó de ir suelto al lado del nombre");
+  assert.ok(A.boton("No hay", linea("SALAMETRO")).parentElement === A.boton("Corregir", linea("SALAMETRO")).parentElement, "No hay no está en la fila de Corregir");
   await A.tocar(A.boton("No hay", linea("SALAMETRO")));
   assert.deepEqual(A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo, { detalleId: detalleIdDe(dep.depositoDetallePeso, "SALAMETRO"), preparado: 0, unidadPreparada: "UNIDAD" });
   await elegir("Con cambios");
