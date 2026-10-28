@@ -1772,9 +1772,12 @@ try {
     // pantalla del celular produce sola: "solo por bulto" con factor 1, que el
     // local pide —y el depósito prepara— por unidad.
     //
-    // Lo que se afirma: el envío dice QUÉ producto y por qué, no escribe nada
-    // —ninguna transferencia, ningún stock, el pedido igual—, y con ese renglón
-    // en "No hay" el pedido sale entero.
+    // Regla de Emanuel (2026-10-28, después del incidente): con bulto de 1,
+    // bulto y unidad son lo mismo, y la gaseosa preparada por unidad SALE. Con
+    // bulto de más de 1 sigue el rechazo: la LECHE (bulto de 12) preparada por
+    // unidad hace que el envío diga QUÉ producto y por qué, sin escribir nada
+    // —ninguna transferencia, ningún stock, el pedido igual—. Con la leche
+    // vuelta a bultos, el pedido sale entero.
     seccion("17. El pedido #19");
     const agregarCompu = await import("../../app/api/pos-transferencias/detalle/agregar/route.js");
     const agregarItem17 = await import("../../app/api/pos-transferencias/agregarItem/route.js");
@@ -1824,17 +1827,21 @@ try {
 
     ok("17: mercadería: gaseosa completa, por unidad, como la pidió el local", (await editar17(sMerca17, { detalleId: l17("GASEOSA").detalleId, ...vaCompleto(l17("GASEOSA")) })).cuerpo.item?.unidadPreparada === "UNIDAD");
 
+    // La leche, de bulto de 12, preparada por unidad: 24 sueltas.
+    ok("17: mercadería: leche por unidad, 24", (await editar17(sMerca17, { detalleId: l17("LECHE").detalleId, preparado: 24, unidadPreparada: "UNIDAD" })).cuerpo.item?.unidadPreparada === "UNIDAD");
+
     const stockAntes17 = await c.stockLocal.findMany({ where: { OR: [{ localId: N.deposito.id }, { localId: frio17.id }] } });
-    // El envío del incidente: dice qué producto, y no escribe NADA.
+    // Bulto de 12 por unidad: dice qué producto, y no escribe NADA. La gaseosa,
+    // de bulto de 1 y también por unidad, ya no es el motivo.
     const falla17 = await enviar16(sMerca17, p17);
     guardar("depositoEnviarProductoNoSeEnvia", falla17);
-    ok("17: el envío nombra el producto que no se puede enviar (409, sin «POS» ni «interno»)",
-      falla17.status === 409 && falla17.cuerpo.error === "GASEOSA: solo se puede enviar por bulto.", json(falla17));
+    ok("17: bulto de 12 por unidad: el envío nombra el producto (409, sin «POS» ni «interno»)",
+      falla17.status === 409 && falla17.cuerpo.error === "LECHE: solo se puede enviar por bulto.", json(falla17));
     const stockTrasFalla = await c.stockLocal.findMany({ where: { OR: [{ localId: N.deposito.id }, { localId: frio17.id }] } });
     ok("17: todo o nada: ninguna transferencia", (await c.transferencia.count({ where: { posTransferenciaId: p17 } })) === 0);
     ok("17: todo o nada: ningún stock se movió", json(stockTrasFalla.map((s) => [s.id, String(s.cantidad)]).sort()) === json(stockAntes17.map((s) => [s.id, String(s.cantidad)]).sort()));
     ok("17: todo o nada: el pedido sigue preparándose", (await c.posTransferencia.findUnique({ where: { id: p17 } })).estado === "Solicitado");
-    ok("17: no hay gaseosa", (await editar17(sMerca17, { detalleId: l17("GASEOSA").detalleId, ...NO_HAY })).cuerpo.ok === true);
+    ok("17: mercadería: leche de vuelta a bultos, completa", (await editar17(sMerca17, { detalleId: l17("LECHE").detalleId, ...vaCompleto(l17("LECHE")) })).cuerpo.item?.unidadPreparada === "BULTO");
 
     const envio17 = await enviar16(sMerca17, p17);
     guardar("depositoEnviarPedido19", envio17);
@@ -1860,12 +1867,12 @@ try {
       bajaDelStock: delta17,
     };
     guardar("depositoViajePedido19", viaje17);
-    ok("17: dos transferencias: lo sin dueño sale de mercadería, el origen", json(viaje17.transferencias) === json([
-      { origen: "merca", lineas: [["ACEITE", 2, "UNIDAD"], ["AZUCAR", 1, "UNIDAD"], ["LECHE", 2, "BULTO"], ["QUESO", 1.853, "UNIDAD"], ["YOGURT", 2, "UNIDAD"]] },
+    ok("17: dos transferencias: lo sin dueño sale de mercadería, el origen; la gaseosa de bulto 1 sale por unidad", json(viaje17.transferencias) === json([
+      { origen: "merca", lineas: [["ACEITE", 2, "UNIDAD"], ["AZUCAR", 1, "UNIDAD"], ["GASEOSA", 4, "UNIDAD"], ["LECHE", 2, "BULTO"], ["QUESO", 1.853, "UNIDAD"], ["YOGURT", 2, "UNIDAD"]] },
       { origen: "frio", lineas: [["HELADO", 3, "UNIDAD"]] },
     ]), json(viaje17.transferencias));
-    ok("17: el stock baja en cada depósito solo por lo suyo; la yerba no baja", json(Object.entries(delta17).filter(([, v]) => v !== 0).sort()) === json([
-      ["frio:HELADO", 3], ["merca:ACEITE", 2], ["merca:AZUCAR", 1], ["merca:LECHE", 24], ["merca:QUESO", 1.853], ["merca:YOGURT", 2],
+    ok("17: el stock baja en cada depósito solo por lo suyo —la gaseosa, 4: bulto de 1 = 1 unidad—; la yerba no baja", json(Object.entries(delta17).filter(([, v]) => v !== 0).sort()) === json([
+      ["frio:HELADO", 3], ["merca:ACEITE", 2], ["merca:AZUCAR", 1], ["merca:GASEOSA", 4], ["merca:LECHE", 24], ["merca:QUESO", 1.853], ["merca:YOGURT", 2],
     ]), json(delta17));
   }
 

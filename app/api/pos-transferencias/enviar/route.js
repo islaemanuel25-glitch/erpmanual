@@ -230,7 +230,13 @@ export async function POST(req) {
         // dice CUÁL y por qué (incidente del pedido #19, 2026-10-28). Salía como
         // error suelto y el `catch` lo convertía en "Error interno al enviar
         // POS", sin nombre: el depósito no tenía cómo saber qué renglón tocar.
-        if (!validacion.ok) {
+        //
+        // Regla de Emanuel (2026-10-28): "solo por bulto" con bulto de 1 sale
+        // aunque se haya preparado por unidad —con bulto de 1, bulto y unidad
+        // son lo mismo, y el stock se mueve igual—. Con bulto de más de 1 sigue
+        // el rechazo. Ninguna otra combinación cambia.
+        const bultoDeUno = modoEnvio === "SOLO_BULTO" && unidadPreparada === "UNIDAD" && factorPack <= 1;
+        if (!validacion.ok && !bultoDeUno) {
           throw new ProductoQueNoSeEnvia(detalle.producto?.nombre || base?.nombre || "Un producto", validacion.error);
         }
 
