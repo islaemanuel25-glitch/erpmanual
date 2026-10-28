@@ -16,8 +16,16 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **93 migraciones**, las mismas que el árbol, la
-última `20261028120000_arcor_362_pie_leido`.
+Producción está en **93 migraciones**, la última
+`20261028120000_arcor_362_pie_leido`. Falta una:
+
+- `20261028180000_preparado_tres_decimales` — **cambio de tipo, que ENSANCHA.**
+  `PosTransferenciaDetalle.preparado` pasa de `DECIMAL(12,2)` a `DECIMAL(13,3)`
+  para que lo que el depósito pesa al preparar guarde los gramos. La misma parte
+  entera y un decimal más: no cambia ningún valor ni rechaza nada que escriba la
+  versión que está atendiendo. El clasificador la marca NO ADITIVA por
+  "cambio de tipo de columna": es un falso positivo, pero confirmarlo es de
+  Emanuel y va con `DEPLOY_MIGRACION_AUTORIZADA=1` solo con su confirmación.
 
 La `20261028120000_arcor_362_pie_leido` —de datos, un solo comprobante— se
 aplicó con el despliegue de `42b300ee` (2026-10-28), antes de levantar la

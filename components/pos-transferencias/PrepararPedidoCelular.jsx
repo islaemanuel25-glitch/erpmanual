@@ -14,6 +14,8 @@
 //     derecha y "Corregir" abajo, que abre la hoja con el campo de cantidad;
 //     la corregida queda con el borde y una línea de acento; la que va
 //     completa se achica a un renglón;
+//   · un producto por peso se carga en KILOS (2026-10-28): pedido en unidades
+//     no tiene "va completo" sino "Pesar"; ver `HojaCorregir`;
 //   · "+ Agregar producto que no pidió", que busca en el catálogo del depósito;
 //   · la barra de abajo, fija, con el avance y "Enviar al local", apagado hasta
 //     que no quede nada por revisar.
@@ -39,6 +41,7 @@ import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
@@ -70,6 +73,8 @@ import {
   esAgregada,
   estadoDePreparacion,
   lineasVisibles,
+  pidioEnUnidades,
+  sePesa,
   textoDelCambio,
   textoPidio,
   rotuloDeLoPedido,
@@ -78,6 +83,7 @@ import {
 
 export const TEXTO_VA_COMPLETO = "✓ Va completo";
 export const TEXTO_CORREGIR = "Corregir";
+export const TEXTO_PESAR = "Pesar";
 export const TEXTO_VOLVER_A_PENDIENTE = "Volver a pendiente";
 export const TEXTO_AGREGAR = "+ Agregar producto que no pidió";
 export const TEXTO_ENVIAR = "Enviar al local";
@@ -88,6 +94,18 @@ export const TEXTO_LO_PREPARADO_NO_SE_ENVIA = "Lo preparado no se envía.";
 const ENTRADA = "/modulos/pos-transferencias";
 /** El 409 de `enviar` cuando el pedido se canceló antes que el envío. */
 const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
+
+/** Un peso escrito: entero, o con coma (o punto) y hasta tres decimales. */
+const KILOS_ESCRITOS = /^\d+([.,]\d{1,3})?$/;
+
+/** Kilos como se escriben en el campo: "1,850". */
+const textoDeKilos = (n) => Number(n || 0).toFixed(3).replace(".", ",");
+
+/** Lo decidido; si no, lo pedido en kilos; pedido en unidades, nada: se pesa. */
+function kilosIniciales(l) {
+  if (estaRevisada(l)) return textoDeKilos(l.preparado);
+  return pidioEnUnidades(l) ? "" : textoDeKilos(l.sugerido);
+}
 
 // ── LA HOJA DE CORRECCIÓN ─────────────────────────────────────────────────
 //
@@ -101,7 +119,15 @@ const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
 // Una línea ya preparada suma "Volver a pendiente" debajo de Guardar: borra la
 // marca y la cantidad (`pendiente: true` en `detalle/editar`). En una pendiente
 // no hay nada que deshacer y no aparece.
+//
+// Un producto por peso (`sePesa`) se carga en KILOS: un campo con coma y hasta
+// tres decimales —la balanza pesa en gramos—, sin − / +, porque se pesa y no se
+// cuenta. Pedido en kilos, arranca en esos kilos; pedido en unidades, vacío, y
+// Guardar no se prende hasta que haya un peso.
 function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
+  const enKilos = sePesa(linea);
+  const [kilos, setKilos] = useState(() => kilosIniciales(linea));
+  const hayPeso = KILOS_ESCRITOS.test(kilos.trim());
   const pedido = loPedido(linea);
   const porBulto = pedido.unidad === "BULTO";
   // Un pack que el producto solo deja mandar por bulto no ofrece sueltas: el
@@ -114,6 +140,8 @@ function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
   const [sueltas, setSueltas] = useState(() => String(porBulto ? unidadesIniciales % pedido.factorPack : 0));
 
   const guardar = () => {
+    // Kilos: `UNIDAD` de un producto en kg, que es como viaja y mueve stock.
+    if (enKilos) return onGuardar({ preparado: Number(kilos.trim().replace(",", ".")), unidadPreparada: "UNIDAD" });
     const b = Number(String(bultos).replace(",", ".")) || 0;
     const s = conSueltas ? Number(String(sueltas).replace(",", ".")) || 0 : 0;
     if (!porBulto) return onGuardar({ preparado: b, unidadPreparada: "UNIDAD" });
@@ -127,18 +155,32 @@ function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
     <>
       <p className="text-sm2 sunmi-text-muted">{textoPidio(linea)}</p>
       <ParDeCantidades>
-        <CajaDeCantidad rotulo={porBulto ? `Bultos de ${pedido.factorPack} u` : "Unidades"}>
-          <SunmiCampoCantidad
-            valor={bultos}
-            onCambiar={setBultos}
-            etiqueta={porBulto ? `Bultos de ${linea.productoNombre}` : `Unidades de ${linea.productoNombre}`}
-            minimo={0}
-            tipo="number"
-            claseMarco="flex-1"
-            claseInput="text-lg"
-          />
-        </CajaDeCantidad>
-        {conSueltas ? (
+        {enKilos ? (
+          <CajaDeCantidad rotulo="Kilos">
+            <SunmiInput
+              type="text"
+              inputMode="decimal"
+              value={kilos}
+              onChange={(e) => setKilos(e.target.value)}
+              placeholder="0,000"
+              aria-label={`Kilos de ${linea.productoNombre}`}
+              className="text-lg"
+            />
+          </CajaDeCantidad>
+        ) : (
+          <CajaDeCantidad rotulo={porBulto ? `Bultos de ${pedido.factorPack} u` : "Unidades"}>
+            <SunmiCampoCantidad
+              valor={bultos}
+              onCambiar={setBultos}
+              etiqueta={porBulto ? `Bultos de ${linea.productoNombre}` : `Unidades de ${linea.productoNombre}`}
+              minimo={0}
+              tipo="number"
+              claseMarco="flex-1"
+              claseInput="text-lg"
+            />
+          </CajaDeCantidad>
+        )}
+        {conSueltas && !enKilos ? (
           <CajaDeCantidad rotulo="Unidades sueltas">
             <SunmiCampoCantidad
               valor={sueltas}
@@ -152,7 +194,12 @@ function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
           </CajaDeCantidad>
         ) : null}
       </ParDeCantidades>
-      <SunmiButton color="primary" className="w-full min-h-toque justify-center" onClick={guardar} disabled={guardando}>
+      <SunmiButton
+        color="primary"
+        className="w-full min-h-toque justify-center"
+        onClick={guardar}
+        disabled={guardando || (enKilos && !hayPeso)}
+      >
         {guardando ? "Guardando..." : "Guardar"}
       </SunmiButton>
       {estaRevisada(linea) ? (
@@ -199,7 +246,13 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onCorregir }) {
         </>
       }
       accionArriba={
-        estado === ESTADO_PREPARACION.PENDIENTE ? (
+        // Pedido en unidades y por peso no hay "va completo": lo pedido no son
+        // kilos. Se pesa, en la misma hoja.
+        estado === ESTADO_PREPARACION.PENDIENTE && pidioEnUnidades(l) ? (
+          <SunmiAccionRapida onClick={() => onCorregir(l)} disabled={guardando}>
+            {TEXTO_PESAR}
+          </SunmiAccionRapida>
+        ) : estado === ESTADO_PREPARACION.PENDIENTE ? (
           <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
             {TEXTO_VA_COMPLETO}
           </SunmiAccionRapida>

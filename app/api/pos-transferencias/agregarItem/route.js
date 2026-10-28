@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, elDepositoCuentaPorKilo, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import {
@@ -235,6 +235,8 @@ export async function POST(req) {
       esFiambre: esProductoFiambre(productoLocal.base),
       modoVentaDeposito: productoLocal.base.modoVentaDeposito || "PESO",
       pesoReferenciaKg: esProductoFiambre(productoLocal.base) ? Number(productoLocal.base.pesoReferenciaKg || 0) : null,
+      // Lo mismo que `detalle`: lo agregado por peso también se pesa.
+      seCargaEnKilos: elDepositoCuentaPorKilo(productoLocal.base),
     };
 
     return NextResponse.json({

@@ -1,0 +1,13 @@
+-- LO PREPARADO DE UN PEDIDO, CON TRES DECIMALES.
+--
+-- Un producto por peso el depósito lo carga en KILOS, pesándolo (2026-10-28,
+-- pantalla de preparar del celular), y la balanza pesa en gramos. Con
+-- `Decimal(12,2)`, 1,853 kg se guardaba 1,85, y eso es lo que viajaba en la
+-- transferencia y lo que movía el stock, que ya es `Decimal(12,3)`.
+--
+-- `Decimal(13,3)` es estrictamente MÁS ANCHO que `Decimal(12,2)`: la misma
+-- parte entera (10 dígitos) y un decimal más. No cambia ningún valor guardado
+-- —1,85 queda 1,850— y todo lo que escribe la versión anterior entra igual.
+-- El clasificador del despliegue lo marca por ser un cambio de tipo; acá no
+-- angosta nada.
+ALTER TABLE "PosTransferenciaDetalle" ALTER COLUMN "preparado" SET DATA TYPE DECIMAL(13,3);

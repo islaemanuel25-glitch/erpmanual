@@ -118,7 +118,9 @@ test("la misma pieza y la misma función en los dos lados, no copias", () => {
     assert.match(src, /from "@\/components\/revision\/PiezasDeRevision"/, `${rel} no toma la pieza compartida`);
     assert.doesNotMatch(src, /text-base2 font-semibold tabular-nums sunmi-text-accent/, `${rel} escribe la clase de la cantidad a mano`);
   }
-  assert.match(texto, /import \{ rotuloConSueltasCorto \} from "@\/lib\/transferencias\/presentacionEnvio";/);
+  // Del módulo compartido, junto con lo que haga falta de él (desde el
+  // 2026-10-28 también `fmtCantidadDeEnvio`, para los kilos de lo que se pesa).
+  assert.match(texto, /import \{[^}]*\brotuloConSueltasCorto\b[^}]*\} from "@\/lib\/transferencias\/presentacionEnvio";/);
   assert.match(texto, /return rotuloConSueltasCorto\(\{/);
   assert.match(texto, /presentacionDeProducto\(\{/);
 });

@@ -242,6 +242,53 @@ test("VOLVER A PENDIENTE: solo en una preparada, debajo de Guardar; la línea y 
 
 const json = (x) => JSON.stringify(x);
 
+test("POR PESO: pedido en unidades se pesa con «Pesar», en kilos y sin − / +; pedido en kilos va completo con esos kilos", async () => {
+  // Sección 14c: 2 SALAMETRO (de pieza: lo pidió en unidades) y 2 QUESO (a granel).
+  const { pedidos } = await montarPreparar({ detalle: dep.depositoDetallePeso });
+  const ultimoCuerpo = () => A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo;
+  const pidio = (n) => [...linea(n).querySelectorAll("p")].find((p) => p.firstElementChild?.textContent === "Pidió")?.children[1].textContent.trim();
+  assert.deepEqual(visibles(), ["SALAMETRO", "QUESO"]);
+  assert.equal(pidio("SALAMETRO"), "2 u");
+  assert.equal(pidio("QUESO"), "2,000 KG");
+  assert.ok(!A.boton("✓ Va completo", linea("SALAMETRO")), "pedido en unidades ofrece Va completo");
+  assert.ok(A.boton("✓ Va completo", linea("QUESO")), "pedido en kilos sin Va completo");
+
+  // El salametro: Pesar abre la hoja, en kilos, vacía y con Guardar apagado.
+  await A.tocar(A.boton("Pesar", linea("SALAMETRO")));
+  let hoja = A.modal();
+  assert.ok(hoja, "Pesar no abrió la hoja");
+  assert.match(hoja.textContent, /Pidió 2 u/);
+  assert.match(hoja.textContent, /Kilos/);
+  assert.doesNotMatch(hoja.textContent, /Unidades/);
+  const campos = [...hoja.querySelectorAll("input")];
+  assert.equal(campos.length, 1);
+  assert.equal(campos[0].value, "");
+  assert.equal(campos[0].getAttribute("inputmode"), "decimal");
+  assert.equal(A.botones(hoja).filter((b) => /^[−+-]$/.test(b.textContent.trim())).length, 0, "la hoja de kilos tiene − / +");
+  assert.ok(A.boton("Guardar", hoja).disabled, "Guardar prendido sin peso");
+  await A.teclear(campos[0], "1,853");
+  assert.ok(!A.boton("Guardar", hoja).disabled, "Guardar sigue apagado con un peso");
+  await A.tocar(A.boton("Guardar", hoja));
+  assert.deepEqual(ultimoCuerpo(), { detalleId: dep.depositoDetallePeso.cuerpo.item.detalles.find((d) => d.productoNombre === "SALAMETRO").detalleId, preparado: 1.853, unidadPreparada: "UNIDAD" });
+  // Cargar el peso de lo pedido en unidades no es un cambio.
+  assert.deepEqual(opciones(), ["Pendientes 1", "Con cambios 0", "Preparados 1", "Todos 2"]);
+
+  // El queso: va completo manda los mismos kilos; corregido, Con cambios.
+  await A.tocar(A.boton("✓ Va completo", linea("QUESO")));
+  assert.deepEqual(ultimoCuerpo().preparado, 2);
+  assert.deepEqual(opciones(), ["Pendientes 0", "Con cambios 0", "Preparados 2", "Todos 2"]);
+  await elegir("Todos");
+  assert.match(linea("SALAMETRO").textContent, /· va 1,853 KG/);
+  await A.tocar(linea("QUESO").querySelector("button"));
+  hoja = A.modal();
+  assert.equal(hoja.querySelector("input").value, "2,000");
+  await A.teclear(hoja.querySelector("input"), "1,85");
+  await A.tocar(A.boton("Guardar", hoja));
+  assert.equal(ultimoCuerpo().preparado, 1.85);
+  assert.equal(estadoDe("QUESO"), "conCambios");
+  assert.match(linea("QUESO").textContent, /Va 1,850 KG de 2,000 KG · falta 0,150 KG/);
+});
+
 test("enviar y el depósito ya lo había cancelado: el aviso y de vuelta a Pedidos de locales", async () => {
   // La respuesta que dio `enviar` al perder la carrera contra cancelar
   // (sección 15d), y nunca "El local cambió…".

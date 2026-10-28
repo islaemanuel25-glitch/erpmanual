@@ -1733,7 +1733,11 @@ model PosTransferenciaDetalle {
   productoId         Int
 
   sugerido        Decimal?    @db.Decimal(12, 2)
-  preparado       Decimal?    @db.Decimal(12, 2)
+  /// Tres decimales desde el 2026-10-28: un producto por peso el depósito lo
+  /// carga en KILOS, pesándolo, y la balanza pesa en gramos. Con dos, 1,853 kg
+  /// se guardaba 1,85 y viajaba (y movía stock, que es `Decimal(12,3)`) eso.
+  /// 13 dígitos y no 12: así es estrictamente más ancho que el de antes.
+  preparado       Decimal?    @db.Decimal(13, 3)
   tipo            String      @default("sugerido")
   unidadSugerida  ModoPedido  @default(BULTO)
   unidadPreparada ModoPedido? // BULTO o UNIDAD según cómo se preparó

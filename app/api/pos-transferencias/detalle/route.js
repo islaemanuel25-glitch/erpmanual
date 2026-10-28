@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { esProductoFiambre } from "@/lib/conversiones/stock";
+import { elDepositoCuentaPorKilo, esProductoFiambre } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
@@ -170,6 +170,9 @@ export async function GET(req) {
         esFiambre: esProductoFiambre(base),
         modoVentaDeposito: base?.modoVentaDeposito || "PESO",
         pesoReferenciaKg: esProductoFiambre(base) ? Number(base?.pesoReferenciaKg || 0) : null,
+        // El depósito lo carga en KILOS, pesándolo (2026-10-28). La pantalla
+        // no lo puede deducir: le faltan campos del producto que el predicado lee.
+        seCargaEnKilos: elDepositoCuentaPorKilo(base),
       };
     });
 

@@ -1269,6 +1269,82 @@ try {
       const quitada = await pedir(quitarRuta, "POST", `${B}/pos-transferencias/detalle/quitar`, sDepo, { detalleId: sal.detalleId });
       const salQuitada = lineaDe(await detalleD(p2), "SAL");
       ok("14b: quitada, la sal vuelve a sin decidir", quitada.cuerpo.accion === "devuelto_a_sugerido" && salQuitada?.preparado === 0 && salQuitada.revisadoEn === null, json({ quitada, salQuitada }));
+
+      // ── 14c. Por peso (2026-10-28): el depósito carga KILOS, y viajan kilos ─
+      // El local pide 2 salametros (en unidades: es de pieza) y 2 kg de queso
+      // (a granel). El depósito pesa el salametro —1,853 kg, con los gramos—,
+      // corrige el queso a 1,85 y lo deja completo, y envía.
+      // Un local y un depósito propios: el de arriba tiene un pedido sin
+      // empezar, y lo que pidiera el local caería en ése.
+      const W = await armarLocal("Grupo peso", [
+        // De pieza con su peso de referencia, y el depósito lo guarda por kilo.
+        { nombre: "SALAMETRO", extra: { unidad_medida: "kg", modoCompraProveedor: "UNIDAD", pesoReferenciaKg: 0.9, modoVentaDeposito: "PESO" } },
+        { nombre: "QUESO", extra: { unidad_medida: "kg" } },
+      ]);
+      for (const id of Object.values(W.ids)) await c.stockLocal.create({ data: { localId: W.deposito.id, productoId: id, cantidad: 1000 } });
+      const grupoIdW = (await c.grupoLocal.findFirst({ where: { localId: W.local.id }, select: { grupoId: true } })).grupoId;
+      await c.cliente.create({ data: { grupoId: grupoIdW, localId: W.deposito.id, nombre: `${W.local.nombre} (interno)`, localVinculadoId: W.local.id } });
+      const cuentaDepoW = await c.usuario.create({
+        data: { nombre: "Depósito Peso", email: `deposito-peso-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: W.deposito.id },
+      });
+      const operariaW = await c.operadorLocal.create({ data: { nombre: "Marta", pinHash: "x", localId: W.deposito.id } });
+      const sDepoW = `${sesionDe(cuentaDepoW, W.deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: operariaW.id, nombre: operariaW.nombre, localId: W.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+      const editarW = async (body) => {
+        const r = await pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepoW, body);
+        escrituras.push({ ruta: "/api/pos-transferencias/detalle/editar", cuerpo: body, respuesta: r });
+        return r;
+      };
+      ok("14c: el local pide 2 SALAMETRO", (await W.fijar(W.ids.SALAMETRO, 2)).cuerpo.ok === true);
+      ok("14c: el local pide 2 QUESO", (await W.fijar(W.ids.QUESO, 2)).cuerpo.ok === true);
+      const carritoW = await carrito(W.sPin);
+      const solW = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, W.sPin, { posId: carritoW.cuerpo.posId });
+      ok("14c: el local lo envía", solW.cuerpo.ok === true, json(solW));
+      const p3 = carritoW.cuerpo.posId;
+      const detPeso = await pedir(RD.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${p3}`, sDepoW);
+      guardar("depositoDetallePeso", detPeso);
+      const salametro = lineaDe(detPeso, "SALAMETRO");
+      const queso = lineaDe(detPeso, "QUESO");
+      ok("14c: los dos se cargan en kilos; el salametro es de pieza y el queso no", salametro?.seCargaEnKilos === true && salametro.esFiambre === true && queso?.seCargaEnKilos === true && queso.esFiambre === false, json({ salametro, queso }));
+      ok("14c: lo que no es por peso no se carga en kilos", lineaDe(trasSumar, "ACEITE")?.seCargaEnKilos === false, json(lineaDe(trasSumar, "ACEITE")));
+      const pesado = await editarW({ detalleId: salametro.detalleId, preparado: 1.853, unidadPreparada: "UNIDAD" });
+      ok("14c: el salametro pesado guarda los gramos: 1,853", pesado.cuerpo.ok === true && pesado.cuerpo.item.preparado === 1.853, json(pesado));
+      const quesoMenos = await editarW({ detalleId: queso.detalleId, preparado: 1.85, unidadPreparada: "UNIDAD" });
+      ok("14c: el queso corregido a 1,85", quesoMenos.cuerpo.ok === true && quesoMenos.cuerpo.item.preparado === 1.85, json(quesoMenos));
+      ok("14c: el queso va completo: 2 kg", (await editarW({ detalleId: queso.detalleId, ...vaCompleto(queso) })).cuerpo.ok === true);
+      const stockDePeso = async () =>
+        Object.fromEntries((await c.stockLocal.findMany({ where: { localId: W.deposito.id, productoId: { in: [W.ids.SALAMETRO, W.ids.QUESO] } } })).map((s) => [s.productoId, Number(s.cantidad)]));
+      const stockAntesPeso = await stockDePeso();
+      const envioPeso = await pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepoW, { posId: p3 });
+      ok("14c: se envía", envioPeso.cuerpo.ok === true, json(envioPeso).slice(0, 400));
+      const tPeso = envioPeso.cuerpo.item?.id;
+      const lineasPeso = await c.transferenciaDetalle.findMany({
+        where: { transferenciaId: tPeso },
+        include: { producto: { include: { base: { select: { nombre: true } } } } },
+        orderBy: { id: "asc" },
+      });
+      const stockTrasPeso = await stockDePeso();
+      // Lo que quedó en la base, tal cual: lo lee el candado del servidor
+      // (`lib/pedidos/preparacionPorPeso.test.mjs`).
+      const viajePeso = {
+        lineas: lineasPeso.map((l) => ({
+          nombre: l.producto?.base?.nombre,
+          cantidad: Number(l.cantidad),
+          cantidadPresentada: Number(l.cantidadPresentada),
+          unidadEnviada: l.unidadEnviada,
+          presentacionEnvio: l.presentacionEnvio,
+        })),
+        stockDelDeposito: {
+          SALAMETRO: { antes: stockAntesPeso[W.ids.SALAMETRO], despues: stockTrasPeso[W.ids.SALAMETRO] },
+          QUESO: { antes: stockAntesPeso[W.ids.QUESO], despues: stockTrasPeso[W.ids.QUESO] },
+        },
+      };
+      guardar("depositoViajePeso", viajePeso);
+      const viajaKg = (n, kg) => viajePeso.lineas.some((l) => l.nombre === n && l.cantidad === kg && l.cantidadPresentada === kg && l.presentacionEnvio === "KG" && l.unidadEnviada === "UNIDAD");
+      ok("14c: la transferencia lleva 1,853 KG de salametro y 2 KG de queso", viajaKg("SALAMETRO", 1.853) && viajaKg("QUESO", 2) && viajePeso.lineas.length === 2, json(viajePeso.lineas));
+      ok("14c: el stock del depósito baja en kilos", Math.abs(viajePeso.stockDelDeposito.SALAMETRO.antes - viajePeso.stockDelDeposito.SALAMETRO.despues - 1.853) < 1e-9 && viajePeso.stockDelDeposito.QUESO.antes - viajePeso.stockDelDeposito.QUESO.despues === 2, json(viajePeso.stockDelDeposito));
+      const recPeso = await pedir(RD.recepcion, "GET", `${B}/transferencias/detalle?id=${tPeso}`, W.sPin);
+      guardar("recepcionPeso", recPeso);
+      ok("14c: el local la ve para recibir, en KG", recPeso.cuerpo.ok === true && (recPeso.cuerpo.item?.items || []).every((d) => d.presentacionEnvio === "KG"), json(recPeso).slice(0, 400));
       // ── Lo que leen las pantallas del depósito al entrar ─────────────────
       // El depósito y un admin (permiso "*", sin local), firmados como el login.
       const opcionesRuta = await import("../../app/api/pos-transferencias/opciones/route.js");
