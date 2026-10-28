@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-28] - Actualización: stock
+
+### Modificado
+- **stock**: revert: se saca la lectura con cámara del Control de stock — vuelve a 78c98a2
+- **stock**: fix(escaner): la cámara lee — zxing en todos los equipos, con el .wasm servido desde el sitio
+- **stock**: feat(stock): leer el código de barras con la cámara en Control de stock
+
+
 ## [2026-10-27] - Actualización: stock
 
 ### Modificado
