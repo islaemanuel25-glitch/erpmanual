@@ -5,12 +5,12 @@
       "ok": true,
       "items": [
         {
-          "id": 139,
-          "origenId": 21,
-          "origenNombre": "Depósito Grupo depósito 1793159715787",
-          "destinoId": 20,
-          "destinoNombre": "Mini Grupo depósito 1793159715787",
-          "solicitadoAt": "2026-10-28T03:55:28.814Z",
+          "id": 304,
+          "origenId": 45,
+          "origenNombre": "Depósito Grupo depósito 1793161720142",
+          "destinoId": 44,
+          "destinoNombre": "Mini Grupo depósito 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:52.574Z",
           "itemCount": 5,
           "solicitadoPorNombre": "Cuenta Grupo depósito",
           "revisados": 0,
@@ -25,12 +25,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 139,
-          "posTransferenciaId": 139,
+          "id": 304,
+          "posTransferenciaId": 304,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -42,12 +42,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -59,31 +59,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:28.726Z",
-          "updatedAt": "2026-10-28T03:55:28.815Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.500Z",
+          "updatedAt": "2026-10-28T04:28:52.574Z"
         },
         "detalles": [
           {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -91,7 +91,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -107,9 +107,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 278,
-            "productoLocalId": 171,
-            "baseId": 166,
+            "detalleId": 592,
+            "productoLocalId": 362,
+            "baseId": 343,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 0,
@@ -117,7 +117,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ARROZ",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -133,9 +133,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 279,
-            "productoLocalId": 172,
-            "baseId": 167,
+            "detalleId": 593,
+            "productoLocalId": 363,
+            "baseId": 344,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -143,7 +143,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -159,9 +159,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 280,
-            "productoLocalId": 173,
-            "baseId": 168,
+            "detalleId": 594,
+            "productoLocalId": 364,
+            "baseId": 345,
             "tipo": "manual",
             "sugerido": 4,
             "preparado": 0,
@@ -169,7 +169,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "YERBA",
-            "codigoBarra": "7917931597003",
+            "codigoBarra": "7917931617003",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -185,9 +185,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -195,7 +195,7 @@
             "unidadPreparada": "BULTO",
             "revisadoEn": null,
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -226,12 +226,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 139,
-          "posTransferenciaId": 139,
+          "id": 304,
+          "posTransferenciaId": 304,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -243,12 +243,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -260,31 +260,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:28.726Z",
-          "updatedAt": "2026-10-28T03:55:28.815Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.500Z",
+          "updatedAt": "2026-10-28T04:28:52.574Z"
         },
         "detalles": [
           {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -292,7 +292,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -308,9 +308,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 278,
-            "productoLocalId": 171,
-            "baseId": 166,
+            "detalleId": 592,
+            "productoLocalId": 362,
+            "baseId": 343,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 0,
@@ -318,7 +318,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ARROZ",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -334,9 +334,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 279,
-            "productoLocalId": 172,
-            "baseId": 167,
+            "detalleId": 593,
+            "productoLocalId": 363,
+            "baseId": 344,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -344,7 +344,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -360,17 +360,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 280,
-            "productoLocalId": 173,
-            "baseId": 168,
+            "detalleId": 594,
+            "productoLocalId": 364,
+            "baseId": 345,
             "tipo": "manual",
             "sugerido": 4,
             "preparado": 0,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.852Z",
+            "revisadoEn": "2026-10-28T04:28:52.604Z",
             "productoNombre": "YERBA",
-            "codigoBarra": "7917931597003",
+            "codigoBarra": "7917931617003",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -386,17 +386,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 9,
             "unidadSugerida": "BULTO",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.891Z",
+            "revisadoEn": "2026-10-28T04:28:52.637Z",
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -427,10 +427,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 175,
-          "baseId": 170,
+          "productoLocalId": 366,
+          "baseId": 347,
           "nombre": "AZUCAR",
-          "codigoBarra": "7917931597005",
+          "codigoBarra": "7917931617005",
           "codigoBarraSecundario": "",
           "codigoBarraPropio": "",
           "stockActual": 1000,
@@ -455,12 +455,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 139,
-          "posTransferenciaId": 139,
+          "id": 304,
+          "posTransferenciaId": 304,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -472,12 +472,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -489,39 +489,39 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:28.726Z",
-          "updatedAt": "2026-10-28T03:55:28.815Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.500Z",
+          "updatedAt": "2026-10-28T04:28:52.574Z"
         },
         "detalles": [
           {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.976Z",
+            "revisadoEn": "2026-10-28T04:28:52.753Z",
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -537,17 +537,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 278,
-            "productoLocalId": 171,
-            "baseId": 166,
+            "detalleId": 592,
+            "productoLocalId": 362,
+            "baseId": 343,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 1,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.991Z",
+            "revisadoEn": "2026-10-28T04:28:52.767Z",
             "productoNombre": "ARROZ",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -563,9 +563,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 279,
-            "productoLocalId": 172,
-            "baseId": 167,
+            "detalleId": 593,
+            "productoLocalId": 363,
+            "baseId": 344,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -573,7 +573,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -589,17 +589,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 280,
-            "productoLocalId": 173,
-            "baseId": 168,
+            "detalleId": 594,
+            "productoLocalId": 364,
+            "baseId": 345,
             "tipo": "manual",
             "sugerido": 4,
             "preparado": 0,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.852Z",
+            "revisadoEn": "2026-10-28T04:28:52.604Z",
             "productoNombre": "YERBA",
-            "codigoBarra": "7917931597003",
+            "codigoBarra": "7917931617003",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -615,17 +615,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "BULTO",
             "unidadPreparada": "BULTO",
-            "revisadoEn": "2026-10-28T03:55:28.932Z",
+            "revisadoEn": "2026-10-28T04:28:52.674Z",
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -641,9 +641,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 282,
-            "productoLocalId": 175,
-            "baseId": 170,
+            "detalleId": 596,
+            "productoLocalId": 366,
+            "baseId": 347,
             "tipo": "manual",
             "sugerido": 0,
             "preparado": 1,
@@ -651,7 +651,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "AZUCAR",
-            "codigoBarra": "7917931597005",
+            "codigoBarra": "7917931617005",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -682,12 +682,12 @@
       "ok": true,
       "items": [
         {
-          "id": 139,
-          "origenId": 21,
-          "origenNombre": "Depósito Grupo depósito 1793159715787",
-          "destinoId": 20,
-          "destinoNombre": "Mini Grupo depósito 1793159715787",
-          "solicitadoAt": "2026-10-28T03:55:28.814Z",
+          "id": 304,
+          "origenId": 45,
+          "origenNombre": "Depósito Grupo depósito 1793161720142",
+          "destinoId": 44,
+          "destinoNombre": "Mini Grupo depósito 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:52.574Z",
           "itemCount": 6,
           "solicitadoPorNombre": "Cuenta Grupo depósito",
           "revisados": 5,
@@ -702,12 +702,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 139,
-          "posTransferenciaId": 139,
+          "id": 304,
+          "posTransferenciaId": 304,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -719,12 +719,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -736,39 +736,39 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:28.726Z",
-          "updatedAt": "2026-10-28T03:55:28.815Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.500Z",
+          "updatedAt": "2026-10-28T04:28:52.574Z"
         },
         "detalles": [
           {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.976Z",
+            "revisadoEn": "2026-10-28T04:28:52.753Z",
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -784,17 +784,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 278,
-            "productoLocalId": 171,
-            "baseId": 166,
+            "detalleId": 592,
+            "productoLocalId": 362,
+            "baseId": 343,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 1,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.991Z",
+            "revisadoEn": "2026-10-28T04:28:52.767Z",
             "productoNombre": "ARROZ",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -810,17 +810,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 279,
-            "productoLocalId": 172,
-            "baseId": 167,
+            "detalleId": 593,
+            "productoLocalId": 363,
+            "baseId": 344,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 1,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.050Z",
+            "revisadoEn": "2026-10-28T04:28:52.835Z",
             "productoNombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -836,17 +836,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 280,
-            "productoLocalId": 173,
-            "baseId": 168,
+            "detalleId": 594,
+            "productoLocalId": 364,
+            "baseId": 345,
             "tipo": "manual",
             "sugerido": 4,
             "preparado": 0,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.852Z",
+            "revisadoEn": "2026-10-28T04:28:52.604Z",
             "productoNombre": "YERBA",
-            "codigoBarra": "7917931597003",
+            "codigoBarra": "7917931617003",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -862,17 +862,17 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "BULTO",
             "unidadPreparada": "BULTO",
-            "revisadoEn": "2026-10-28T03:55:28.932Z",
+            "revisadoEn": "2026-10-28T04:28:52.674Z",
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -888,9 +888,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 282,
-            "productoLocalId": 175,
-            "baseId": 170,
+            "detalleId": 596,
+            "productoLocalId": 366,
+            "baseId": 347,
             "tipo": "manual",
             "sugerido": 0,
             "preparado": 1,
@@ -898,7 +898,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "AZUCAR",
-            "codigoBarra": "7917931597005",
+            "codigoBarra": "7917931617005",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -928,116 +928,26 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 27,
-        "origenId": 21,
-        "destinoId": 20,
+        "id": 66,
+        "origenId": 45,
+        "destinoId": 44,
         "estado": "Enviada",
-        "fechaEnvio": "2026-10-28T03:55:29.084Z",
+        "fechaEnvio": "2026-10-28T04:28:52.865Z",
         "fechaRecepcion": null,
-        "creadaPor": 13,
-        "posTransferenciaId": 139,
+        "creadaPor": 33,
+        "posTransferenciaId": 304,
         "ventaId": null,
         "tieneDiferencias": false,
         "canceladaEn": null,
         "canceladaPorId": null,
         "motivoCancelacion": null,
-        "createdAt": "2026-10-28T03:55:29.085Z",
-        "updatedAt": "2026-10-28T03:55:29.085Z",
+        "createdAt": "2026-10-28T04:28:52.866Z",
+        "updatedAt": "2026-10-28T04:28:52.866Z",
         "detalle": [
           {
-            "id": 29,
-            "transferenciaId": 27,
-            "productoId": 177,
-            "cantidad": "2",
-            "recibido": null,
-            "precioCosto": "600",
-            "unidadEnviada": "UNIDAD",
-            "motivoDiferencia": null,
-            "motivoPrincipal": null,
-            "motivoDetalle": null,
-            "confirmadoPorId": null,
-            "fechaRecepcion": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPorId": null,
-            "agregadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": "2",
-            "sueltasEnviadas": "0",
-            "factorPresentacion": null,
-            "pesoPiezaKg": null,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPorId": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPorId": null,
-            "revisadoEnRecepcionAt": null,
-            "createdAt": "2026-10-28T03:55:29.108Z",
-            "updatedAt": "2026-10-28T03:55:29.108Z"
-          },
-          {
-            "id": 30,
-            "transferenciaId": 27,
-            "productoId": 178,
-            "cantidad": "1",
-            "recibido": null,
-            "precioCosto": "600",
-            "unidadEnviada": "UNIDAD",
-            "motivoDiferencia": null,
-            "motivoPrincipal": null,
-            "motivoDetalle": null,
-            "confirmadoPorId": null,
-            "fechaRecepcion": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPorId": null,
-            "agregadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": "1",
-            "sueltasEnviadas": "0",
-            "factorPresentacion": null,
-            "pesoPiezaKg": null,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPorId": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPorId": null,
-            "revisadoEnRecepcionAt": null,
-            "createdAt": "2026-10-28T03:55:29.108Z",
-            "updatedAt": "2026-10-28T03:55:29.108Z"
-          },
-          {
-            "id": 31,
-            "transferenciaId": 27,
-            "productoId": 179,
-            "cantidad": "1",
-            "recibido": null,
-            "precioCosto": "600",
-            "unidadEnviada": "UNIDAD",
-            "motivoDiferencia": null,
-            "motivoPrincipal": null,
-            "motivoDetalle": null,
-            "confirmadoPorId": null,
-            "fechaRecepcion": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPorId": null,
-            "agregadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": "1",
-            "sueltasEnviadas": "0",
-            "factorPresentacion": null,
-            "pesoPiezaKg": null,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPorId": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPorId": null,
-            "revisadoEnRecepcionAt": null,
-            "createdAt": "2026-10-28T03:55:29.108Z",
-            "updatedAt": "2026-10-28T03:55:29.108Z"
-          },
-          {
-            "id": 32,
-            "transferenciaId": 27,
-            "productoId": 180,
+            "id": 75,
+            "transferenciaId": 66,
+            "productoId": 368,
             "cantidad": "2",
             "recibido": null,
             "precioCosto": "600",
@@ -1061,13 +971,43 @@
             "revisadoEnRecepcion": false,
             "revisadoEnRecepcionPorId": null,
             "revisadoEnRecepcionAt": null,
-            "createdAt": "2026-10-28T03:55:29.108Z",
-            "updatedAt": "2026-10-28T03:55:29.108Z"
+            "createdAt": "2026-10-28T04:28:52.895Z",
+            "updatedAt": "2026-10-28T04:28:52.895Z"
           },
           {
-            "id": 33,
-            "transferenciaId": 27,
-            "productoId": 181,
+            "id": 76,
+            "transferenciaId": 66,
+            "productoId": 369,
+            "cantidad": "2",
+            "recibido": null,
+            "precioCosto": "600",
+            "unidadEnviada": "UNIDAD",
+            "motivoDiferencia": null,
+            "motivoPrincipal": null,
+            "motivoDetalle": null,
+            "confirmadoPorId": null,
+            "fechaRecepcion": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPorId": null,
+            "agregadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": "2",
+            "sueltasEnviadas": "0",
+            "factorPresentacion": null,
+            "pesoPiezaKg": null,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPorId": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPorId": null,
+            "revisadoEnRecepcionAt": null,
+            "createdAt": "2026-10-28T04:28:52.895Z",
+            "updatedAt": "2026-10-28T04:28:52.895Z"
+          },
+          {
+            "id": 77,
+            "transferenciaId": 66,
+            "productoId": 370,
             "cantidad": "1",
             "recibido": null,
             "precioCosto": "600",
@@ -1091,12 +1031,72 @@
             "revisadoEnRecepcion": false,
             "revisadoEnRecepcionPorId": null,
             "revisadoEnRecepcionAt": null,
-            "createdAt": "2026-10-28T03:55:29.108Z",
-            "updatedAt": "2026-10-28T03:55:29.108Z"
+            "createdAt": "2026-10-28T04:28:52.895Z",
+            "updatedAt": "2026-10-28T04:28:52.895Z"
+          },
+          {
+            "id": 78,
+            "transferenciaId": 66,
+            "productoId": 371,
+            "cantidad": "1",
+            "recibido": null,
+            "precioCosto": "600",
+            "unidadEnviada": "UNIDAD",
+            "motivoDiferencia": null,
+            "motivoPrincipal": null,
+            "motivoDetalle": null,
+            "confirmadoPorId": null,
+            "fechaRecepcion": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPorId": null,
+            "agregadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": "1",
+            "sueltasEnviadas": "0",
+            "factorPresentacion": null,
+            "pesoPiezaKg": null,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPorId": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPorId": null,
+            "revisadoEnRecepcionAt": null,
+            "createdAt": "2026-10-28T04:28:52.895Z",
+            "updatedAt": "2026-10-28T04:28:52.895Z"
+          },
+          {
+            "id": 79,
+            "transferenciaId": 66,
+            "productoId": 372,
+            "cantidad": "1",
+            "recibido": null,
+            "precioCosto": "600",
+            "unidadEnviada": "UNIDAD",
+            "motivoDiferencia": null,
+            "motivoPrincipal": null,
+            "motivoDetalle": null,
+            "confirmadoPorId": null,
+            "fechaRecepcion": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPorId": null,
+            "agregadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": "1",
+            "sueltasEnviadas": "0",
+            "factorPresentacion": null,
+            "pesoPiezaKg": null,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPorId": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPorId": null,
+            "revisadoEnRecepcionAt": null,
+            "createdAt": "2026-10-28T04:28:52.895Z",
+            "updatedAt": "2026-10-28T04:28:52.895Z"
           }
         ]
       },
-      "posId": 139,
+      "posId": 304,
       "totalItems": 5,
       "error": null
     }
@@ -1113,23 +1113,23 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 27,
+        "id": 66,
         "estado": "Enviada",
         "tieneDiferencias": true,
-        "fechaCreada": "2026-10-28T03:55:29.085Z",
-        "fechaEnvio": "2026-10-28T03:55:29.084Z",
+        "fechaCreada": "2026-10-28T04:28:52.866Z",
+        "fechaEnvio": "2026-10-28T04:28:52.865Z",
         "fechaRecepcion": null,
         "origen": {
-          "id": 21,
-          "nombre": "Depósito Grupo depósito 1793159715787",
+          "id": 45,
+          "nombre": "Depósito Grupo depósito 1793161720142",
           "esDeposito": true
         },
         "destino": {
-          "id": 20,
-          "nombre": "Mini Grupo depósito 1793159715787"
+          "id": 44,
+          "nombre": "Mini Grupo depósito 1793161720142"
         },
         "creadaPor": {
-          "id": 13,
+          "id": 33,
           "nombre": "Cuenta Grupo depósito"
         },
         "confirmadores": [],
@@ -1148,156 +1148,9 @@
         },
         "items": [
           {
-            "id": 29,
-            "nombre": "ACEITE",
-            "codigoBarra": "7917931597000",
-            "cantidadEnviada": 2,
-            "cantidadRecibida": null,
-            "precioCosto": 600,
-            "subtotal": 1200,
-            "costoUnitarioFisico": 600,
-            "subtotalRecibido": 1200,
-            "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": null,
-            "devolucionOrigen": null,
-            "excedenteOrigen": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPor": null,
-            "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPor": null,
-            "revisadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": 0,
-            "codigoBarraSecundario": null,
-            "codigoBarraPropio": null,
-            "categoria": null,
-            "confirmadoPor": null,
-            "fechaRecepcion": null,
-            "motivoPrincipal": "",
-            "motivoDetalle": "",
-            "unidadEnviada": "UNIDAD",
-            "factorPack": 1,
-            "unidadMedida": "unidad",
-            "esFiambreFijo": false,
-            "pesoReferenciaKg": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": 2,
-            "sueltasEnviadas": 0,
-            "factorPresentacion": null,
-            "pesoPiezaKg": 0,
-            "modoVentaDeposito": "PESO",
-            "modoCompraProveedor": "BULTO",
-            "pesoEsFijo": false,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPor": null,
-            "presentacionActual": {
-              "presentacion": "UNIDAD",
-              "factor": null,
-              "pesoPiezaKg": null
-            }
-          },
-          {
-            "id": 30,
-            "nombre": "ARROZ",
-            "codigoBarra": "7917931597001",
-            "cantidadEnviada": 1,
-            "cantidadRecibida": null,
-            "precioCosto": 600,
-            "subtotal": 600,
-            "costoUnitarioFisico": 600,
-            "subtotalRecibido": 600,
-            "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": null,
-            "devolucionOrigen": null,
-            "excedenteOrigen": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPor": null,
-            "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPor": null,
-            "revisadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": 0,
-            "codigoBarraSecundario": null,
-            "codigoBarraPropio": null,
-            "categoria": null,
-            "confirmadoPor": null,
-            "fechaRecepcion": null,
-            "motivoPrincipal": "",
-            "motivoDetalle": "",
-            "unidadEnviada": "UNIDAD",
-            "factorPack": 1,
-            "unidadMedida": "unidad",
-            "esFiambreFijo": false,
-            "pesoReferenciaKg": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": 1,
-            "sueltasEnviadas": 0,
-            "factorPresentacion": null,
-            "pesoPiezaKg": 0,
-            "modoVentaDeposito": "PESO",
-            "modoCompraProveedor": "BULTO",
-            "pesoEsFijo": false,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPor": null,
-            "presentacionActual": {
-              "presentacion": "UNIDAD",
-              "factor": null,
-              "pesoPiezaKg": null
-            }
-          },
-          {
-            "id": 31,
-            "nombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
-            "cantidadEnviada": 1,
-            "cantidadRecibida": null,
-            "precioCosto": 600,
-            "subtotal": 600,
-            "costoUnitarioFisico": 600,
-            "subtotalRecibido": 600,
-            "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": null,
-            "devolucionOrigen": null,
-            "excedenteOrigen": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPor": null,
-            "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPor": null,
-            "revisadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": 0,
-            "codigoBarraSecundario": null,
-            "codigoBarraPropio": null,
-            "categoria": null,
-            "confirmadoPor": null,
-            "fechaRecepcion": null,
-            "motivoPrincipal": "",
-            "motivoDetalle": "",
-            "unidadEnviada": "UNIDAD",
-            "factorPack": 1,
-            "unidadMedida": "unidad",
-            "esFiambreFijo": false,
-            "pesoReferenciaKg": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": 1,
-            "sueltasEnviadas": 0,
-            "factorPresentacion": null,
-            "pesoPiezaKg": 0,
-            "modoVentaDeposito": "PESO",
-            "modoCompraProveedor": "BULTO",
-            "pesoEsFijo": false,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPor": null,
-            "presentacionActual": {
-              "presentacion": "UNIDAD",
-              "factor": null,
-              "pesoPiezaKg": null
-            }
-          },
-          {
-            "id": 32,
+            "id": 75,
             "nombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "cantidadEnviada": 2,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -1344,9 +1197,156 @@
             }
           },
           {
-            "id": 33,
+            "id": 76,
+            "nombre": "ACEITE",
+            "codigoBarra": "7917931617000",
+            "cantidadEnviada": 2,
+            "cantidadRecibida": null,
+            "precioCosto": 600,
+            "subtotal": 1200,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 1200,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 2,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 77,
+            "nombre": "ARROZ",
+            "codigoBarra": "7917931617001",
+            "cantidadEnviada": 1,
+            "cantidadRecibida": null,
+            "precioCosto": 600,
+            "subtotal": 600,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 600,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 1,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 78,
             "nombre": "AZUCAR",
-            "codigoBarra": "7917931597005",
+            "codigoBarra": "7917931617005",
+            "cantidadEnviada": 1,
+            "cantidadRecibida": null,
+            "precioCosto": 600,
+            "subtotal": 600,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 600,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 1,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 79,
+            "nombre": "FIDEOS",
+            "codigoBarra": "7917931617002",
             "cantidadEnviada": 1,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -1401,23 +1401,23 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 27,
+        "id": 66,
         "estado": "Recibiendo",
         "tieneDiferencias": true,
-        "fechaCreada": "2026-10-28T03:55:29.085Z",
-        "fechaEnvio": "2026-10-28T03:55:29.084Z",
+        "fechaCreada": "2026-10-28T04:28:52.866Z",
+        "fechaEnvio": "2026-10-28T04:28:52.865Z",
         "fechaRecepcion": null,
         "origen": {
-          "id": 21,
-          "nombre": "Depósito Grupo depósito 1793159715787",
+          "id": 45,
+          "nombre": "Depósito Grupo depósito 1793161720142",
           "esDeposito": true
         },
         "destino": {
-          "id": 20,
-          "nombre": "Mini Grupo depósito 1793159715787"
+          "id": 44,
+          "nombre": "Mini Grupo depósito 1793161720142"
         },
         "creadaPor": {
-          "id": 13,
+          "id": 33,
           "nombre": "Cuenta Grupo depósito"
         },
         "confirmadores": [],
@@ -1436,58 +1436,9 @@
         },
         "items": [
           {
-            "id": 31,
-            "nombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
-            "cantidadEnviada": 1,
-            "cantidadRecibida": null,
-            "precioCosto": 600,
-            "subtotal": 600,
-            "costoUnitarioFisico": 600,
-            "subtotalRecibido": 600,
-            "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": null,
-            "devolucionOrigen": null,
-            "excedenteOrigen": null,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPor": null,
-            "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": false,
-            "revisadoEnRecepcionPor": null,
-            "revisadoEnRecepcionAt": null,
-            "recibidoUnidadesSueltas": 0,
-            "codigoBarraSecundario": null,
-            "codigoBarraPropio": null,
-            "categoria": null,
-            "confirmadoPor": null,
-            "fechaRecepcion": null,
-            "motivoPrincipal": "",
-            "motivoDetalle": "",
-            "unidadEnviada": "UNIDAD",
-            "factorPack": 1,
-            "unidadMedida": "unidad",
-            "esFiambreFijo": false,
-            "pesoReferenciaKg": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": 1,
-            "sueltasEnviadas": 0,
-            "factorPresentacion": null,
-            "pesoPiezaKg": 0,
-            "modoVentaDeposito": "PESO",
-            "modoCompraProveedor": "BULTO",
-            "pesoEsFijo": false,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPor": null,
-            "presentacionActual": {
-              "presentacion": "UNIDAD",
-              "factor": null,
-              "pesoPiezaKg": null
-            }
-          },
-          {
-            "id": 32,
+            "id": 75,
             "nombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "cantidadEnviada": 2,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -1534,9 +1485,113 @@
             }
           },
           {
-            "id": 33,
+            "id": 76,
+            "nombre": "ACEITE",
+            "codigoBarra": "7917931617000",
+            "cantidadEnviada": 2,
+            "cantidadRecibida": 2,
+            "precioCosto": 600,
+            "subtotal": 1200,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 1200,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": 0,
+            "devolucionOrigen": 0,
+            "excedenteOrigen": 0,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "revisadoEnRecepcion": true,
+            "revisadoEnRecepcionPor": {
+              "id": 33,
+              "nombre": "Cuenta Grupo depósito"
+            },
+            "revisadoEnRecepcionAt": "2026-10-28T04:28:52.950Z",
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 2,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 77,
+            "nombre": "ARROZ",
+            "codigoBarra": "7917931617001",
+            "cantidadEnviada": 1,
+            "cantidadRecibida": 0,
+            "precioCosto": 600,
+            "subtotal": 600,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 0,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": 1,
+            "devolucionOrigen": 1,
+            "excedenteOrigen": 0,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "revisadoEnRecepcion": true,
+            "revisadoEnRecepcionPor": {
+              "id": 33,
+              "nombre": "Cuenta Grupo depósito"
+            },
+            "revisadoEnRecepcionAt": "2026-10-28T04:28:52.964Z",
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "Faltante",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 1,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 78,
             "nombre": "AZUCAR",
-            "codigoBarra": "7917931597005",
+            "codigoBarra": "7917931617005",
             "cantidadEnviada": 1,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -1583,28 +1638,25 @@
             }
           },
           {
-            "id": 29,
-            "nombre": "ACEITE",
-            "codigoBarra": "7917931597000",
-            "cantidadEnviada": 2,
-            "cantidadRecibida": 2,
+            "id": 79,
+            "nombre": "FIDEOS",
+            "codigoBarra": "7917931617002",
+            "cantidadEnviada": 1,
+            "cantidadRecibida": null,
             "precioCosto": 600,
-            "subtotal": 1200,
+            "subtotal": 600,
             "costoUnitarioFisico": 600,
-            "subtotalRecibido": 1200,
+            "subtotalRecibido": 600,
             "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": 0,
-            "devolucionOrigen": 0,
-            "excedenteOrigen": 0,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
             "agregadoEnRecepcion": false,
             "agregadoEnRecepcionPor": null,
             "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": true,
-            "revisadoEnRecepcionPor": {
-              "id": 13,
-              "nombre": "Cuenta Grupo depósito"
-            },
-            "revisadoEnRecepcionAt": "2026-10-28T03:55:29.154Z",
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
             "recibidoUnidadesSueltas": 0,
             "codigoBarraSecundario": null,
             "codigoBarraPropio": null,
@@ -1612,58 +1664,6 @@
             "confirmadoPor": null,
             "fechaRecepcion": null,
             "motivoPrincipal": "",
-            "motivoDetalle": "",
-            "unidadEnviada": "UNIDAD",
-            "factorPack": 1,
-            "unidadMedida": "unidad",
-            "esFiambreFijo": false,
-            "pesoReferenciaKg": null,
-            "presentacionEnvio": "UNIDAD",
-            "cantidadPresentada": 2,
-            "sueltasEnviadas": 0,
-            "factorPresentacion": null,
-            "pesoPiezaKg": 0,
-            "modoVentaDeposito": "PESO",
-            "modoCompraProveedor": "BULTO",
-            "pesoEsFijo": false,
-            "presentacionAdoptadaAt": null,
-            "presentacionAdoptadaPor": null,
-            "presentacionActual": {
-              "presentacion": "UNIDAD",
-              "factor": null,
-              "pesoPiezaKg": null
-            }
-          },
-          {
-            "id": 30,
-            "nombre": "ARROZ",
-            "codigoBarra": "7917931597001",
-            "cantidadEnviada": 1,
-            "cantidadRecibida": 0,
-            "precioCosto": 600,
-            "subtotal": 600,
-            "costoUnitarioFisico": 600,
-            "subtotalRecibido": 0,
-            "costoNormalizadoRecibido": 600,
-            "ajusteOrigen": 1,
-            "devolucionOrigen": 1,
-            "excedenteOrigen": 0,
-            "agregadoEnRecepcion": false,
-            "agregadoEnRecepcionPor": null,
-            "agregadoEnRecepcionAt": null,
-            "revisadoEnRecepcion": true,
-            "revisadoEnRecepcionPor": {
-              "id": 13,
-              "nombre": "Cuenta Grupo depósito"
-            },
-            "revisadoEnRecepcionAt": "2026-10-28T03:55:29.167Z",
-            "recibidoUnidadesSueltas": 0,
-            "codigoBarraSecundario": null,
-            "codigoBarraPropio": null,
-            "categoria": null,
-            "confirmadoPor": null,
-            "fechaRecepcion": null,
-            "motivoPrincipal": "Faltante",
             "motivoDetalle": "",
             "unidadEnviada": "UNIDAD",
             "factorPack": 1,
@@ -1696,12 +1696,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 140,
-          "posTransferenciaId": 140,
+          "id": 305,
+          "posTransferenciaId": 305,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1713,12 +1713,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1730,31 +1730,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:29.193Z",
-          "updatedAt": "2026-10-28T03:55:29.217Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.988Z",
+          "updatedAt": "2026-10-28T04:28:53.012Z"
         },
         "detalles": [
           {
-            "detalleId": 283,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 597,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -1762,7 +1762,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 998,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -1793,12 +1793,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 140,
-          "posTransferenciaId": 140,
+          "id": 305,
+          "posTransferenciaId": 305,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1810,12 +1810,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1827,31 +1827,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:29.193Z",
-          "updatedAt": "2026-10-28T03:55:29.217Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.988Z",
+          "updatedAt": "2026-10-28T04:28:53.012Z"
         },
         "detalles": [
           {
-            "detalleId": 283,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 597,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -1859,7 +1859,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 998,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -1875,9 +1875,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 284,
-            "productoLocalId": 176,
-            "baseId": 171,
+            "detalleId": 598,
+            "productoLocalId": 367,
+            "baseId": 348,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -1885,7 +1885,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "SAL",
-            "codigoBarra": "7917931597006",
+            "codigoBarra": "7917931617006",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -1916,12 +1916,12 @@
       "ok": true,
       "items": [
         {
-          "id": 140,
-          "origenId": 21,
-          "origenNombre": "Depósito Grupo depósito 1793159715787",
-          "destinoId": 20,
-          "destinoNombre": "Mini Grupo depósito 1793159715787",
-          "solicitadoAt": "2026-10-28T03:55:29.216Z",
+          "id": 305,
+          "origenId": 45,
+          "origenNombre": "Depósito Grupo depósito 1793161720142",
+          "destinoId": 44,
+          "destinoNombre": "Mini Grupo depósito 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:53.011Z",
           "itemCount": 2,
           "solicitadoPorNombre": "Cuenta Grupo depósito",
           "revisados": 0,
@@ -1936,12 +1936,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 141,
-          "posTransferenciaId": 141,
+          "id": 306,
+          "posTransferenciaId": 306,
           "estado": "Solicitado",
           "origen": {
-            "id": 23,
-            "nombre": "Depósito Grupo peso 1793159715787",
+            "id": 47,
+            "nombre": "Depósito Grupo peso 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1953,12 +1953,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:29.302Z",
-            "updatedAt": "2026-10-28T03:55:29.302Z"
+            "createdAt": "2026-10-28T04:28:53.111Z",
+            "updatedAt": "2026-10-28T04:28:53.111Z"
           },
           "destino": {
-            "id": 22,
-            "nombre": "Mini Grupo peso 1793159715787",
+            "id": 46,
+            "nombre": "Mini Grupo peso 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -1970,31 +1970,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:29.300Z",
-            "updatedAt": "2026-10-28T03:55:29.300Z"
+            "createdAt": "2026-10-28T04:28:53.105Z",
+            "updatedAt": "2026-10-28T04:28:53.105Z"
           },
           "usuario": {
-            "id": 15,
+            "id": 35,
             "nombre": "Cuenta Grupo peso",
-            "email": "grupo-peso-1793159715787@ci.local",
+            "email": "grupo-peso-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 22,
+            "localId": 46,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:29.310Z",
-            "updatedAt": "2026-10-28T03:55:29.310Z"
+            "createdAt": "2026-10-28T04:28:53.121Z",
+            "updatedAt": "2026-10-28T04:28:53.121Z"
           },
-          "origenId": 23,
-          "destinoId": 22,
-          "createdAt": "2026-10-28T03:55:29.344Z",
-          "updatedAt": "2026-10-28T03:55:29.388Z"
+          "origenId": 47,
+          "destinoId": 46,
+          "createdAt": "2026-10-28T04:28:53.154Z",
+          "updatedAt": "2026-10-28T04:28:53.192Z"
         },
         "detalles": [
           {
-            "detalleId": 285,
-            "productoLocalId": 182,
-            "baseId": 172,
+            "detalleId": 599,
+            "productoLocalId": 373,
+            "baseId": 349,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -2002,7 +2002,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "SALAMETRO",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -2018,9 +2018,9 @@
             "seCargaEnKilos": true
           },
           {
-            "detalleId": 286,
-            "productoLocalId": 183,
-            "baseId": 173,
+            "detalleId": 600,
+            "productoLocalId": 374,
+            "baseId": 350,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -2028,7 +2028,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "QUESO",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -2086,23 +2086,23 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 28,
+        "id": 67,
         "estado": "Enviada",
         "tieneDiferencias": true,
-        "fechaCreada": "2026-10-28T03:55:29.468Z",
-        "fechaEnvio": "2026-10-28T03:55:29.467Z",
+        "fechaCreada": "2026-10-28T04:28:53.270Z",
+        "fechaEnvio": "2026-10-28T04:28:53.269Z",
         "fechaRecepcion": null,
         "origen": {
-          "id": 23,
-          "nombre": "Depósito Grupo peso 1793159715787",
+          "id": 47,
+          "nombre": "Depósito Grupo peso 1793161720142",
           "esDeposito": true
         },
         "destino": {
-          "id": 22,
-          "nombre": "Mini Grupo peso 1793159715787"
+          "id": 46,
+          "nombre": "Mini Grupo peso 1793161720142"
         },
         "creadaPor": {
-          "id": 15,
+          "id": 35,
           "nombre": "Cuenta Grupo peso"
         },
         "confirmadores": [],
@@ -2121,9 +2121,9 @@
         },
         "items": [
           {
-            "id": 34,
+            "id": 80,
             "nombre": "SALAMETRO",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "cantidadEnviada": 1.853,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -2170,9 +2170,9 @@
             }
           },
           {
-            "id": 35,
+            "id": 81,
             "nombre": "QUESO",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "cantidadEnviada": 2,
             "cantidadRecibida": null,
             "precioCosto": 600,
@@ -2227,9 +2227,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 14,
+        "id": 34,
         "nombre": "Depósito Marta",
-        "email": "deposito-prepara-1793159715787@ci.local",
+        "email": "deposito-prepara-1793161720142@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -2269,7 +2269,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 21,
+        "localId": 45,
         "esDeposito": true,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -2283,17 +2283,17 @@
       "ok": true,
       "modo": "deposito",
       "origen": {
-        "id": 21,
-        "nombre": "Depósito Grupo depósito 1793159715787",
+        "id": 45,
+        "nombre": "Depósito Grupo depósito 1793161720142",
         "esDeposito": true,
-        "grupoId": 10
+        "grupoId": 22
       },
       "destinos": [
         {
-          "id": 20,
-          "nombre": "Mini Grupo depósito 1793159715787",
+          "id": 44,
+          "nombre": "Mini Grupo depósito 1793161720142",
           "esDeposito": false,
-          "grupoId": 10
+          "grupoId": 22
         }
       ],
       "error": null
@@ -2304,12 +2304,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 11,
+        "operadorId": 29,
         "nombre": "Marta",
-        "localId": 21,
-        "emitidoEn": 1793159728714
+        "localId": 45,
+        "emitidoEn": 1793161732488
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoxMSwibG9jYWxJZCI6MjEsIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE1OTcyOSwiZXhwIjoxNzkzMTg4NTI5fQ.KLfzYdZKLhVguCGQ-ZczZCVLup-Kx4WfPiAYPreMkNQ"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoyOSwibG9jYWxJZCI6NDUsIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE2MTczMywiZXhwIjoxNzkzMTkwNTMzfQ.i717gqyZBuHySplZ034BjBK07YKPSyhV0TTqvGdQt4k"
     }
   },
   "depositoOpcionesDelLocal": {
@@ -2318,13 +2318,13 @@
       "ok": true,
       "modo": "local",
       "local": {
-        "id": 20,
-        "nombre": "Mini Grupo depósito 1793159715787",
-        "grupoId": 10
+        "id": 44,
+        "nombre": "Mini Grupo depósito 1793161720142",
+        "grupoId": 22
       },
       "deposito": {
-        "id": 21,
-        "nombre": "Depósito Grupo depósito 1793159715787"
+        "id": 45,
+        "nombre": "Depósito Grupo depósito 1793161720142"
       },
       "error": null
     }
@@ -2334,9 +2334,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 14,
+        "id": 34,
         "nombre": "Admin pruebas",
-        "email": "deposito-prepara-1793159715787@ci.local",
+        "email": "deposito-prepara-1793161720142@ci.local",
         "rolId": 3,
         "rolNombre": "ADMIN",
         "permisos": [
@@ -2366,12 +2366,42 @@
           "locales": []
         },
         {
+          "id": 12,
+          "nombre": "Grupo cancela depósito 1793159715787",
+          "depositos": [
+            {
+              "id": 25,
+              "nombre": "Depósito Grupo cancela depósito 1793159715787",
+              "esDeposito": true
+            }
+          ],
+          "locales": [
+            {
+              "id": 24,
+              "nombre": "Mini Grupo cancela depósito 1793159715787",
+              "esDeposito": false
+            }
+          ]
+        },
+        {
           "id": 5,
           "nombre": "Grupo carrera 1793159715787",
           "depositos": [
             {
               "id": 11,
               "nombre": "Depósito Grupo carrera 1793159715787",
+              "esDeposito": true
+            }
+          ],
+          "locales": []
+        },
+        {
+          "id": 17,
+          "nombre": "Grupo carrera 1793161720142",
+          "depositos": [
+            {
+              "id": 35,
+              "nombre": "Depósito Grupo carrera 1793161720142",
               "esDeposito": true
             }
           ],
@@ -2396,12 +2426,42 @@
           ]
         },
         {
+          "id": 22,
+          "nombre": "Grupo depósito 1793161720142",
+          "depositos": [
+            {
+              "id": 45,
+              "nombre": "Depósito Grupo depósito 1793161720142",
+              "esDeposito": true
+            }
+          ],
+          "locales": [
+            {
+              "id": 44,
+              "nombre": "Mini Grupo depósito 1793161720142",
+              "esDeposito": false
+            }
+          ]
+        },
+        {
           "id": 6,
           "nombre": "Grupo envio 1793159715787",
           "depositos": [
             {
               "id": 13,
               "nombre": "Depósito Grupo envio 1793159715787",
+              "esDeposito": true
+            }
+          ],
+          "locales": []
+        },
+        {
+          "id": 18,
+          "nombre": "Grupo envio 1793161720142",
+          "depositos": [
+            {
+              "id": 37,
+              "nombre": "Depósito Grupo envio 1793161720142",
               "esDeposito": true
             }
           ],
@@ -2420,66 +2480,12 @@
           "locales": []
         },
         {
-          "id": 3,
-          "nombre": "Grupo paginado 1793159715787",
+          "id": 21,
+          "nombre": "Grupo historial 1793161720142",
           "depositos": [
             {
-              "id": 7,
-              "nombre": "Depósito paginado 1793159715787",
-              "esDeposito": true
-            }
-          ],
-          "locales": []
-        },
-        {
-          "id": 2,
-          "nombre": "Grupo pedidos 1793159715787",
-          "depositos": [
-            {
-              "id": 5,
-              "nombre": "Depósito pedidos 1793159715787",
-              "esDeposito": true
-            }
-          ],
-          "locales": []
-        },
-        {
-          "id": 11,
-          "nombre": "Grupo peso 1793159715787",
-          "depositos": [
-            {
-              "id": 23,
-              "nombre": "Depósito Grupo peso 1793159715787",
-              "esDeposito": true
-            }
-          ],
-          "locales": [
-            {
-              "id": 22,
-              "nombre": "Mini Grupo peso 1793159715787",
-              "esDeposito": false
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "nombre": "Grupo recorrido 1793159715787",
-          "depositos": [
-            {
-              "id": 9,
-              "nombre": "Depósito Grupo recorrido 1793159715787",
-              "esDeposito": true
-            }
-          ],
-          "locales": []
-        },
-        {
-          "id": 7,
-          "nombre": "Grupo sumar 1793159715787",
-          "depositos": [
-            {
-              "id": 15,
-              "nombre": "Depósito Grupo sumar 1793159715787",
+              "id": 43,
+              "nombre": "Depósito Grupo historial 1793161720142",
               "esDeposito": true
             }
           ],
@@ -2494,6 +2500,54 @@
     "cuerpo": {
       "ok": true,
       "items": [
+        {
+          "id": 305,
+          "origenId": 45,
+          "origenNombre": "Depósito Grupo depósito 1793161720142",
+          "destinoId": 44,
+          "destinoNombre": "Mini Grupo depósito 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:53.011Z",
+          "itemCount": 2,
+          "solicitadoPorNombre": "Cuenta Grupo depósito",
+          "revisados": 0,
+          "depositoEmpezo": false
+        },
+        {
+          "id": 303,
+          "origenId": 43,
+          "origenNombre": "Depósito Grupo historial 1793161720142",
+          "destinoId": 42,
+          "destinoNombre": "Mini Grupo historial 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:52.208Z",
+          "itemCount": 2,
+          "solicitadoPorNombre": "Cuenta Grupo historial",
+          "revisados": 1,
+          "depositoEmpezo": true
+        },
+        {
+          "id": 190,
+          "origenId": 41,
+          "origenNombre": "Depósito Grupo vacio 1793161720142",
+          "destinoId": 40,
+          "destinoNombre": "Mini Grupo vacio 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:44.389Z",
+          "itemCount": 0,
+          "solicitadoPorNombre": "Cuenta Grupo vacio",
+          "revisados": 0,
+          "depositoEmpezo": false
+        },
+        {
+          "id": 167,
+          "origenId": 33,
+          "origenNombre": "Depósito Grupo recorrido 1793161720142",
+          "destinoId": 32,
+          "destinoNombre": "Mini Grupo recorrido 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:42.173Z",
+          "itemCount": 5,
+          "solicitadoPorNombre": "Cuenta Grupo recorrido",
+          "revisados": 0,
+          "depositoEmpezo": false
+        },
         {
           "id": 140,
           "origenId": 21,
@@ -2549,7 +2603,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 280,
+        "detalleId": 594,
         "preparado": 0,
         "unidadPreparada": "UNIDAD"
       },
@@ -2558,17 +2612,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 280,
-            "productoLocalId": 173,
-            "baseId": 168,
+            "detalleId": 594,
+            "productoLocalId": 364,
+            "baseId": 345,
             "tipo": "manual",
             "sugerido": 4,
             "preparado": 0,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.852Z",
+            "revisadoEn": "2026-10-28T04:28:52.604Z",
             "productoNombre": "YERBA",
-            "codigoBarra": "7917931597003",
+            "codigoBarra": "7917931617003",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2586,7 +2640,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 281,
+        "detalleId": 595,
         "preparado": 9,
         "unidadPreparada": "UNIDAD"
       },
@@ -2595,17 +2649,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 9,
             "unidadSugerida": "BULTO",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.891Z",
+            "revisadoEn": "2026-10-28T04:28:52.637Z",
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2623,7 +2677,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 277,
+        "detalleId": 591,
         "preparado": 2,
         "unidadPreparada": "UNIDAD"
       },
@@ -2632,17 +2686,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.917Z",
+            "revisadoEn": "2026-10-28T04:28:52.661Z",
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2660,7 +2714,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 281,
+        "detalleId": 595,
         "preparado": 2,
         "unidadPreparada": "BULTO"
       },
@@ -2669,17 +2723,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 281,
-            "productoLocalId": 174,
-            "baseId": 169,
+            "detalleId": 595,
+            "productoLocalId": 365,
+            "baseId": 346,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "BULTO",
             "unidadPreparada": "BULTO",
-            "revisadoEn": "2026-10-28T03:55:28.932Z",
+            "revisadoEn": "2026-10-28T04:28:52.674Z",
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597004",
+            "codigoBarra": "7917931617004",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2697,7 +2751,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 277,
+        "detalleId": 591,
         "pendiente": true
       },
       "respuesta": {
@@ -2705,9 +2759,9 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 0,
@@ -2715,7 +2769,7 @@
             "unidadPreparada": null,
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2733,7 +2787,80 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 277,
+        "detalleId": 591,
+        "preparado": 0,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-10-28T04:28:52.718Z",
+            "productoNombre": "ACEITE",
+            "codigoBarra": "7917931617000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 591,
+        "pendiente": true
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": null,
+            "revisadoEn": null,
+            "productoNombre": "ACEITE",
+            "codigoBarra": "7917931617000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 591,
         "preparado": 2,
         "unidadPreparada": "UNIDAD"
       },
@@ -2742,17 +2869,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 277,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 591,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.976Z",
+            "revisadoEn": "2026-10-28T04:28:52.753Z",
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2770,7 +2897,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 278,
+        "detalleId": 592,
         "preparado": 1,
         "unidadPreparada": "UNIDAD"
       },
@@ -2779,17 +2906,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 278,
-            "productoLocalId": 171,
-            "baseId": 166,
+            "detalleId": 592,
+            "productoLocalId": 362,
+            "baseId": 343,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 1,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:28.991Z",
+            "revisadoEn": "2026-10-28T04:28:52.767Z",
             "productoNombre": "ARROZ",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2807,8 +2934,8 @@
     {
       "ruta": "/api/pos-transferencias/agregarItem",
       "cuerpo": {
-        "posId": 139,
-        "productoLocalId": 175,
+        "posId": 304,
+        "productoLocalId": 366,
         "cantidad": 1,
         "tipo": "manual"
       },
@@ -2817,11 +2944,11 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 282,
-            "productoLocalId": 175,
-            "baseId": 170,
+            "detalleId": 596,
+            "productoLocalId": 366,
+            "baseId": 347,
             "productoNombre": "AZUCAR",
-            "codigoBarra": "7917931597005",
+            "codigoBarra": "7917931617005",
             "stockActual": 1000,
             "cantidadReal": 0,
             "unidadMedida": "unidad",
@@ -2845,7 +2972,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 279,
+        "detalleId": 593,
         "preparado": 1,
         "unidadPreparada": "UNIDAD"
       },
@@ -2854,17 +2981,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 279,
-            "productoLocalId": 172,
-            "baseId": 167,
+            "detalleId": 593,
+            "productoLocalId": 363,
+            "baseId": 344,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 1,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.050Z",
+            "revisadoEn": "2026-10-28T04:28:52.835Z",
             "productoNombre": "FIDEOS",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2882,7 +3009,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 284,
+        "detalleId": 598,
         "preparado": 2,
         "unidadPreparada": "UNIDAD"
       },
@@ -2891,17 +3018,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 284,
-            "productoLocalId": 176,
-            "baseId": 171,
+            "detalleId": 598,
+            "productoLocalId": 367,
+            "baseId": 348,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.270Z",
+            "revisadoEn": "2026-10-28T04:28:53.071Z",
             "productoNombre": "SAL",
-            "codigoBarra": "7917931597006",
+            "codigoBarra": "7917931617006",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2919,8 +3046,8 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 285,
-        "preparado": 1.853,
+        "detalleId": 599,
+        "preparado": 0,
         "unidadPreparada": "UNIDAD"
       },
       "respuesta": {
@@ -2928,17 +3055,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 285,
-            "productoLocalId": 182,
-            "baseId": 172,
+            "detalleId": 599,
+            "productoLocalId": 373,
+            "baseId": 349,
             "tipo": "manual",
             "sugerido": 2,
-            "preparado": 1.853,
+            "preparado": 0,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.408Z",
+            "revisadoEn": "2026-10-28T04:28:53.206Z",
             "productoNombre": "SALAMETRO",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2956,7 +3083,44 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 286,
+        "detalleId": 599,
+        "preparado": 1.853,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 599,
+            "productoLocalId": 373,
+            "baseId": 349,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 1.853,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-10-28T04:28:53.219Z",
+            "productoNombre": "SALAMETRO",
+            "codigoBarra": "7917931617000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "kg",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": true,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": 0.9
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 600,
         "preparado": 1.85,
         "unidadPreparada": "UNIDAD"
       },
@@ -2965,17 +3129,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 286,
-            "productoLocalId": 183,
-            "baseId": 173,
+            "detalleId": 600,
+            "productoLocalId": 374,
+            "baseId": 350,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 1.85,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.426Z",
+            "revisadoEn": "2026-10-28T04:28:53.233Z",
             "productoNombre": "QUESO",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -2993,7 +3157,7 @@
     {
       "ruta": "/api/pos-transferencias/detalle/editar",
       "cuerpo": {
-        "detalleId": 286,
+        "detalleId": 600,
         "preparado": 2,
         "unidadPreparada": "UNIDAD"
       },
@@ -3002,17 +3166,17 @@
         "cuerpo": {
           "ok": true,
           "item": {
-            "detalleId": 286,
-            "productoLocalId": 183,
-            "baseId": 173,
+            "detalleId": 600,
+            "productoLocalId": 374,
+            "baseId": 350,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.441Z",
+            "revisadoEn": "2026-10-28T04:28:53.245Z",
             "productoNombre": "QUESO",
-            "codigoBarra": "7917931597001",
+            "codigoBarra": "7917931617001",
             "stockActual": 1000,
             "cantidadReal": 1000,
             "precioCosto": 600,
@@ -3041,12 +3205,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 140,
-          "posTransferenciaId": 140,
+          "id": 305,
+          "posTransferenciaId": 305,
           "estado": "Solicitado",
           "origen": {
-            "id": 21,
-            "nombre": "Depósito Grupo depósito 1793159715787",
+            "id": 45,
+            "nombre": "Depósito Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -3058,12 +3222,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.651Z",
-            "updatedAt": "2026-10-28T03:55:28.651Z"
+            "createdAt": "2026-10-28T04:28:52.415Z",
+            "updatedAt": "2026-10-28T04:28:52.415Z"
           },
           "destino": {
-            "id": 20,
-            "nombre": "Mini Grupo depósito 1793159715787",
+            "id": 44,
+            "nombre": "Mini Grupo depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -3075,31 +3239,31 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:28.649Z",
-            "updatedAt": "2026-10-28T03:55:28.649Z"
+            "createdAt": "2026-10-28T04:28:52.413Z",
+            "updatedAt": "2026-10-28T04:28:52.413Z"
           },
           "usuario": {
-            "id": 13,
+            "id": 33,
             "nombre": "Cuenta Grupo depósito",
-            "email": "grupo-dep-sito-1793159715787@ci.local",
+            "email": "grupo-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 20,
+            "localId": 44,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:28.658Z",
-            "updatedAt": "2026-10-28T03:55:28.658Z"
+            "createdAt": "2026-10-28T04:28:52.426Z",
+            "updatedAt": "2026-10-28T04:28:52.426Z"
           },
-          "origenId": 21,
-          "destinoId": 20,
-          "createdAt": "2026-10-28T03:55:29.193Z",
-          "updatedAt": "2026-10-28T03:55:29.217Z"
+          "origenId": 45,
+          "destinoId": 44,
+          "createdAt": "2026-10-28T04:28:52.988Z",
+          "updatedAt": "2026-10-28T04:28:53.012Z"
         },
         "detalles": [
           {
-            "detalleId": 283,
-            "productoLocalId": 170,
-            "baseId": 165,
+            "detalleId": 597,
+            "productoLocalId": 361,
+            "baseId": 342,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -3107,7 +3271,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 998,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -3123,9 +3287,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 284,
-            "productoLocalId": 176,
-            "baseId": 171,
+            "detalleId": 598,
+            "productoLocalId": 367,
+            "baseId": 348,
             "tipo": "manual",
             "sugerido": 3,
             "preparado": 0,
@@ -3133,7 +3297,7 @@
             "unidadPreparada": "UNIDAD",
             "revisadoEn": null,
             "productoNombre": "SAL",
-            "codigoBarra": "7917931597006",
+            "codigoBarra": "7917931617006",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -3159,11 +3323,11 @@
     }
   },
   "depositoIds": {
-    "p1": 139,
-    "p2": 140,
-    "transferenciaId": 27,
-    "local": "Mini Grupo depósito 1793159715787",
-    "deposito": "Depósito Grupo depósito 1793159715787",
+    "p1": 304,
+    "p2": 305,
+    "transferenciaId": 66,
+    "local": "Mini Grupo depósito 1793161720142",
+    "deposito": "Depósito Grupo depósito 1793161720142",
     "pidio": "Cuenta Grupo depósito"
   },
   "depositoCancelarMe": {
@@ -3171,9 +3335,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 18,
+        "id": 38,
         "nombre": "Marta cancela",
-        "email": "marta-cancela-1793159715787@ci.local",
+        "email": "marta-cancela-1793161720142@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -3213,7 +3377,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 25,
+        "localId": 49,
         "esDeposito": true,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -3226,12 +3390,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 15,
+        "operadorId": 33,
         "nombre": "Marta cancela",
-        "localId": 25,
-        "emitidoEn": 1793159729630
+        "localId": 49,
+        "emitidoEn": 1793161733471
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoxNSwibG9jYWxJZCI6MjUsIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE1OTcyOSwiZXhwIjoxNzkzMTg4NTI5fQ.X_S4geEBssV9qwbNwYXnUKEeVgRAd7ckOZexwBKFKAU"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjozMywibG9jYWxJZCI6NDksIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE2MTczMywiZXhwIjoxNzkzMTkwNTMzfQ._DToZBdvPjK-vvmsT_1fBwFKswm_ln0_JRjZyvAzlJ8"
     }
   },
   "depositoCancelarOpciones": {
@@ -3240,17 +3404,17 @@
       "ok": true,
       "modo": "deposito",
       "origen": {
-        "id": 25,
-        "nombre": "Depósito Grupo cancela depósito 1793159715787",
+        "id": 49,
+        "nombre": "Depósito Grupo cancela depósito 1793161720142",
         "esDeposito": true,
-        "grupoId": 12
+        "grupoId": 24
       },
       "destinos": [
         {
-          "id": 24,
-          "nombre": "Mini Grupo cancela depósito 1793159715787",
+          "id": 48,
+          "nombre": "Mini Grupo cancela depósito 1793161720142",
           "esDeposito": false,
-          "grupoId": 12
+          "grupoId": 24
         }
       ],
       "error": null
@@ -3270,12 +3434,12 @@
       "ok": true,
       "item": {
         "encabezado": {
-          "id": 143,
-          "posTransferenciaId": 143,
+          "id": 308,
+          "posTransferenciaId": 308,
           "estado": "Solicitado",
           "origen": {
-            "id": 25,
-            "nombre": "Depósito Grupo cancela depósito 1793159715787",
+            "id": 49,
+            "nombre": "Depósito Grupo cancela depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -3287,12 +3451,12 @@
             "activo": true,
             "es_deposito": true,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:29.598Z",
-            "updatedAt": "2026-10-28T03:55:29.598Z"
+            "createdAt": "2026-10-28T04:28:53.435Z",
+            "updatedAt": "2026-10-28T04:28:53.435Z"
           },
           "destino": {
-            "id": 24,
-            "nombre": "Mini Grupo cancela depósito 1793159715787",
+            "id": 48,
+            "nombre": "Mini Grupo cancela depósito 1793161720142",
             "tipo": "local",
             "direccion": null,
             "telefono": null,
@@ -3304,39 +3468,39 @@
             "activo": true,
             "es_deposito": false,
             "politicaLimiteCredito": "ADVERTIR",
-            "createdAt": "2026-10-28T03:55:29.597Z",
-            "updatedAt": "2026-10-28T03:55:29.597Z"
+            "createdAt": "2026-10-28T04:28:53.433Z",
+            "updatedAt": "2026-10-28T04:28:53.433Z"
           },
           "usuario": {
-            "id": 17,
+            "id": 37,
             "nombre": "Cuenta Grupo cancela depósito",
-            "email": "grupo-cancela-dep-sito-1793159715787@ci.local",
+            "email": "grupo-cancela-dep-sito-1793161720142@ci.local",
             "passwordHash": "x",
             "rolId": 3,
-            "localId": 24,
+            "localId": 48,
             "activo": true,
             "sesionInvalidadaEn": null,
-            "createdAt": "2026-10-28T03:55:29.605Z",
-            "updatedAt": "2026-10-28T03:55:29.605Z"
+            "createdAt": "2026-10-28T04:28:53.441Z",
+            "updatedAt": "2026-10-28T04:28:53.441Z"
           },
-          "origenId": 25,
-          "destinoId": 24,
-          "createdAt": "2026-10-28T03:55:29.735Z",
-          "updatedAt": "2026-10-28T03:55:29.774Z"
+          "origenId": 49,
+          "destinoId": 48,
+          "createdAt": "2026-10-28T04:28:53.580Z",
+          "updatedAt": "2026-10-28T04:28:53.622Z"
         },
         "detalles": [
           {
-            "detalleId": 288,
-            "productoLocalId": 186,
-            "baseId": 174,
+            "detalleId": 602,
+            "productoLocalId": 377,
+            "baseId": 351,
             "tipo": "manual",
             "sugerido": 2,
             "preparado": 2,
             "unidadSugerida": "UNIDAD",
             "unidadPreparada": "UNIDAD",
-            "revisadoEn": "2026-10-28T03:55:29.792Z",
+            "revisadoEn": "2026-10-28T04:28:53.643Z",
             "productoNombre": "ACEITE",
-            "codigoBarra": "7917931597000",
+            "codigoBarra": "7917931617000",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -3352,9 +3516,9 @@
             "seCargaEnKilos": false
           },
           {
-            "detalleId": 289,
-            "productoLocalId": 188,
-            "baseId": 176,
+            "detalleId": 603,
+            "productoLocalId": 379,
+            "baseId": 353,
             "tipo": "manual",
             "sugerido": 1,
             "preparado": 0,
@@ -3362,7 +3526,7 @@
             "unidadPreparada": "BULTO",
             "revisadoEn": null,
             "productoNombre": "AGUA X6",
-            "codigoBarra": "7917931597002",
+            "codigoBarra": "7917931617002",
             "stockActual": 1000,
             "cantidadReal": 0,
             "precioCosto": 600,
@@ -3393,12 +3557,12 @@
       "ok": true,
       "items": [
         {
-          "id": 143,
-          "origenId": 25,
-          "origenNombre": "Depósito Grupo cancela depósito 1793159715787",
-          "destinoId": 24,
-          "destinoNombre": "Mini Grupo cancela depósito 1793159715787",
-          "solicitadoAt": "2026-10-28T03:55:29.773Z",
+          "id": 308,
+          "origenId": 49,
+          "origenNombre": "Depósito Grupo cancela depósito 1793161720142",
+          "destinoId": 48,
+          "destinoNombre": "Mini Grupo cancela depósito 1793161720142",
+          "solicitadoAt": "2026-10-28T04:28:53.622Z",
           "itemCount": 2,
           "solicitadoPorNombre": "Cuenta Grupo cancela depósito",
           "revisados": 1,
@@ -3434,9 +3598,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 17,
+        "id": 37,
         "nombre": "Cuenta Grupo cancela depósito",
-        "email": "grupo-cancela-dep-sito-1793159715787@ci.local",
+        "email": "grupo-cancela-dep-sito-1793161720142@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -3476,7 +3640,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 24,
+        "localId": 48,
         "esDeposito": false,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -3489,12 +3653,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 14,
+        "operadorId": 32,
         "nombre": "Caro",
-        "localId": 24,
-        "emitidoEn": 1793159729619
+        "localId": 48,
+        "emitidoEn": 1793161733458
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoxNCwibG9jYWxJZCI6MjQsIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE1OTcyOSwiZXhwIjoxNzkzMTg4NTI5fQ.8J7eBcG7ILgUJJjay_T6C-yw-pvXmeZSgwp-lHGB_tA"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjozMiwibG9jYWxJZCI6NDgsIl90aXBvIjoib3BlcmFkb3Jfdm91Y2hlciIsImlhdCI6MTc5MzE2MTczMywiZXhwIjoxNzkzMTkwNTMzfQ.xarcImHYFhpmAG2R-8HuHQmIFE0vuoABrLcw3D0P_5o"
     }
   },
   "depositoCanceloOpcionesDelLocal": {
@@ -3502,14 +3666,14 @@
     "cuerpo": {
       "ok": true,
       "local": {
-        "id": 24,
-        "nombre": "Mini Grupo cancela depósito 1793159715787"
+        "id": 48,
+        "nombre": "Mini Grupo cancela depósito 1793161720142"
       },
       "deposito": {
-        "id": 25,
-        "nombre": "Depósito Grupo cancela depósito 1793159715787"
+        "id": 49,
+        "nombre": "Depósito Grupo cancela depósito 1793161720142"
       },
-      "grupoId": 12,
+      "grupoId": 24,
       "categorias": [],
       "proveedores": [],
       "areas": []
@@ -3521,10 +3685,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 186,
-          "baseId": 174,
+          "productoLocalId": 377,
+          "baseId": 351,
           "nombre": "ACEITE",
-          "codigoBarra": "7917931597000",
+          "codigoBarra": "7917931617000",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3539,10 +3703,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 188,
-          "baseId": 176,
+          "productoLocalId": 379,
+          "baseId": 353,
           "nombre": "AGUA X6",
-          "codigoBarra": "7917931597002",
+          "codigoBarra": "7917931617002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3557,10 +3721,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 187,
-          "baseId": 175,
+          "productoLocalId": 378,
+          "baseId": 352,
           "nombre": "ARROZ",
-          "codigoBarra": "7917931597001",
+          "codigoBarra": "7917931617001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3597,10 +3761,10 @@
       "ok": true,
       "items": [
         {
-          "posId": 143,
+          "posId": 308,
           "estado": "Cancelado",
-          "solicitadoAt": "2026-10-28T03:55:29.773Z",
-          "createdAt": "2026-10-28T03:55:29.735Z",
+          "solicitadoAt": "2026-10-28T04:28:53.622Z",
+          "createdAt": "2026-10-28T04:28:53.580Z",
           "itemCount": 2,
           "totalBultos": 1,
           "totalUnidades": 2,
@@ -3624,10 +3788,10 @@
           "transferenciaFechaRecepcion": null
         },
         {
-          "posId": 142,
+          "posId": 307,
           "estado": "Cancelado",
-          "solicitadoAt": "2026-10-28T03:55:29.710Z",
-          "createdAt": "2026-10-28T03:55:29.684Z",
+          "solicitadoAt": "2026-10-28T04:28:53.548Z",
+          "createdAt": "2026-10-28T04:28:53.520Z",
           "itemCount": 1,
           "totalBultos": 0,
           "totalUnidades": 2,
@@ -3687,10 +3851,10 @@
     }
   },
   "depositoCancelarIds": {
-    "pa": 142,
-    "pb": 143,
-    "pcc": 144,
-    "local": "Mini Grupo cancela depósito 1793159715787",
-    "deposito": "Depósito Grupo cancela depósito 1793159715787"
+    "pa": 307,
+    "pb": 308,
+    "pcc": 309,
+    "local": "Mini Grupo cancela depósito 1793161720142",
+    "deposito": "Depósito Grupo cancela depósito 1793161720142"
   }
 }

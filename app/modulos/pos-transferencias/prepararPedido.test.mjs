@@ -161,7 +161,9 @@ test("EL RECORRIDO: va completo, corregir a menos, a 0, bultos con sueltas, agre
 
   await elegir("Con cambios");
   assert.deepEqual(visibles(), ["ARROZ", "YERBA", "AGUA X6"]);
-  assert.match(linea("YERBA").textContent, /Va 0 · no va/);
+  // Decía "Va 0 · no va". Desde el 2026-10-28 un 0 decidido es "No hay", se
+  // llegue por el botón o corrigiendo a 0: es el mismo hecho.
+  assert.match(linea("YERBA").textContent, /No hay/);
   assert.match(linea("ARROZ").textContent, /Va 1 de 3 · falta 2/);
   assert.match(linea("AGUA X6").textContent, /Va 9 u de 12 u · falta 3 u/);
   for (const n of visibles()) {
@@ -241,6 +243,63 @@ test("VOLVER A PENDIENTE: solo en una preparada, debajo de Guardar; la línea y 
 });
 
 const json = (x) => JSON.stringify(x);
+
+const detalleIdDe = (detalle, nombre) => detalle.cuerpo.item.detalles.find((d) => d.productoNombre === nombre).detalleId;
+
+test("NO HAY en el renglón: un botón al lado de Va completo; revisado en 0, en Con cambios, y se deshace con Volver a pendiente", async () => {
+  const { pedidos } = await montarPreparar();
+  const ultimoCuerpo = () => A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo;
+  const noHay = A.boton("No hay", linea("ACEITE"));
+  assert.ok(noHay, "el renglón pendiente no tiene No hay");
+  assert.match(noHay.className, /\bsunmi-btn/, "No hay no es un botón del kit");
+  assert.ok(A.boton("✓ Va completo", linea("ACEITE")), "No hay reemplazó a Va completo");
+
+  await A.tocar(noHay);
+  assert.deepEqual(ultimoCuerpo(), { detalleId: detalleIdDe(dep.depositoDetalleNuevo, "ACEITE"), preparado: 0, unidadPreparada: "UNIDAD" });
+  assert.ok(!A.modal(), "No hay pidió confirmación");
+  assert.deepEqual(opciones(), ["Pendientes 4", "Con cambios 1", "Preparados 1", "Todos 5"]);
+  assert.match(A.contenido().textContent, /1 \/ 5 preparados/);
+  assert.match(A.contenido().textContent, /Falta revisar 4/);
+  assert.equal(A.contenido().querySelector("[data-avance]")?.getAttribute("data-avance"), "20");
+
+  await elegir("Con cambios");
+  assert.deepEqual(visibles(), ["ACEITE"]);
+  assert.match(linea("ACEITE").textContent, /No hay/);
+  assert.doesNotMatch(linea("ACEITE").textContent, /\b[Vv]a \d/, "dice «va N» en vez de No hay");
+  assert.ok(!A.boton("No hay", linea("ACEITE")), "uno que ya no hay sigue ofreciendo No hay");
+
+  // La hoja de uno que ya no hay: sin No hay, con Volver a pendiente.
+  await A.tocar(A.boton("Corregir", linea("ACEITE")));
+  assert.ok(!A.boton("No hay", A.modal()), "la hoja de uno que ya no hay ofrece No hay");
+  await A.tocar(A.boton("Volver a pendiente", A.modal()));
+  assert.deepEqual(ultimoCuerpo(), { detalleId: detalleIdDe(dep.depositoDetalleNuevo, "ACEITE"), pendiente: true });
+  assert.deepEqual(opciones(), ["Pendientes 5", "Con cambios 0", "Preparados 0", "Todos 5"]);
+});
+
+test("NO HAY en la hoja: debajo de Guardar, deja la línea en 0 de un toque", async () => {
+  const { pedidos } = await montarPreparar();
+  await A.tocar(A.boton("Corregir", linea("YERBA")));
+  const hoja = A.modal();
+  const textos = A.botones(hoja).map((b) => b.textContent.trim());
+  assert.ok(textos.indexOf("No hay") > textos.indexOf("Guardar"), `orden de la hoja: ${json(textos)}`);
+  await A.tocar(A.boton("No hay", hoja));
+  assert.deepEqual(A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo, { detalleId: detalleIdDe(dep.depositoDetalleNuevo, "YERBA"), preparado: 0, unidadPreparada: "UNIDAD" });
+  assert.ok(!A.modal(), "la hoja quedó abierta");
+  await elegir("Con cambios");
+  assert.equal(estadoDe("YERBA"), "conCambios");
+  assert.match(linea("YERBA").textContent, /No hay/);
+});
+
+test("NO HAY en lo que se pesa: al lado de Pesar, el mismo 0", async () => {
+  const { pedidos } = await montarPreparar({ detalle: dep.depositoDetallePeso });
+  assert.ok(A.boton("Pesar", linea("SALAMETRO")), "se perdió Pesar");
+  await A.tocar(A.boton("No hay", linea("SALAMETRO")));
+  assert.deepEqual(A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo, { detalleId: detalleIdDe(dep.depositoDetallePeso, "SALAMETRO"), preparado: 0, unidadPreparada: "UNIDAD" });
+  await elegir("Con cambios");
+  assert.equal(estadoDe("SALAMETRO"), "conCambios");
+  assert.match(linea("SALAMETRO").textContent, /No hay/);
+  assert.doesNotMatch(linea("SALAMETRO").textContent, /KG/, "dice los kilos en vez de No hay");
+});
 
 test("POR PESO: pedido en unidades se pesa con «Pesar», en kilos y sin − / +; pedido en kilos va completo con esos kilos", async () => {
   // Sección 14c: 2 SALAMETRO (de pieza: lo pidió en unidades) y 2 QUESO (a granel).

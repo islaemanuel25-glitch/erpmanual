@@ -14,6 +14,8 @@
 //     derecha y "Corregir" abajo, que abre la hoja con el campo de cantidad;
 //     la corregida queda con el borde y una línea de acento; la que va
 //     completa se achica a un renglón;
+//   · "No hay" al lado de "✓ Va completo" y en la hoja: la deja en 0 decidido
+//     de un toque (2026-10-28);
 //   · un producto por peso se carga en KILOS (2026-10-28): pedido en unidades
 //     no tiene "va completo" sino "Pesar"; ver `HojaCorregir`;
 //   · "+ Agregar producto que no pidió", que busca en el catálogo del depósito;
@@ -62,10 +64,11 @@ import {
 import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import FilaCatalogoRecepcion from "@/components/transferencias/FilaCatalogoRecepcion";
 import { cuandoDelPedido } from "@/lib/pedidos/cuandoDelPedido";
-import { estaRevisada, loPedido, vaCompleto } from "@/lib/pedidos/revisionDeLinea";
+import { NO_HAY, cantidadQueViaja, estaRevisada, loPedido, vaCompleto } from "@/lib/pedidos/revisionDeLinea";
 import {
   ESTADO_PREPARACION,
   FILTRO_PREPARAR,
+  TEXTO_NO_HAY,
   TEXTOS_FILTRO_PREPARAR,
   categoriasDePreparacion,
   conteoDePreparacion,
@@ -124,7 +127,10 @@ function kilosIniciales(l) {
 // tres decimales —la balanza pesa en gramos—, sin − / +, porque se pesa y no se
 // cuenta. Pedido en kilos, arranca en esos kilos; pedido en unidades, vacío, y
 // Guardar no se prende hasta que haya un peso.
-function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
+//
+// "No hay", debajo de Guardar, deja la línea en 0 de un toque; en una que ya
+// dice "No hay" no aparece.
+function HojaCorregir({ linea, guardando, onGuardar, onNoHay, onVolverAPendiente }) {
   const enKilos = sePesa(linea);
   const [kilos, setKilos] = useState(() => kilosIniciales(linea));
   const hayPeso = KILOS_ESCRITOS.test(kilos.trim());
@@ -202,6 +208,11 @@ function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
       >
         {guardando ? "Guardando..." : "Guardar"}
       </SunmiButton>
+      {estaRevisada(linea) && cantidadQueViaja(linea) === 0 ? null : (
+        <SunmiButton color="slate" className="w-full min-h-toque justify-center" onClick={onNoHay} disabled={guardando}>
+          {TEXTO_NO_HAY}
+        </SunmiButton>
+      )}
       {estaRevisada(linea) ? (
         <SunmiButton color="slate" className="w-full min-h-toque justify-center" onClick={onVolverAPendiente} disabled={guardando}>
           {TEXTO_VOLVER_A_PENDIENTE}
@@ -212,7 +223,7 @@ function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
 }
 
 // ── UNA LÍNEA ─────────────────────────────────────────────────────────────
-function LineaParaPreparar({ l, guardando, onVaCompleto, onCorregir }) {
+function LineaParaPreparar({ l, guardando, onVaCompleto, onNoHay, onCorregir }) {
   const estado = estadoDePreparacion(l);
 
   // Va completa: un renglón, tocable entero para corregirla, como la recepción.
@@ -246,16 +257,25 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onCorregir }) {
         </>
       }
       accionArriba={
-        // Pedido en unidades y por peso no hay "va completo": lo pedido no son
-        // kilos. Se pesa, en la misma hoja.
-        estado === ESTADO_PREPARACION.PENDIENTE && pidioEnUnidades(l) ? (
-          <SunmiAccionRapida onClick={() => onCorregir(l)} disabled={guardando}>
-            {TEXTO_PESAR}
-          </SunmiAccionRapida>
-        ) : estado === ESTADO_PREPARACION.PENDIENTE ? (
-          <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
-            {TEXTO_VA_COMPLETO}
-          </SunmiAccionRapida>
+        estado === ESTADO_PREPARACION.PENDIENTE ? (
+          <span className="flex shrink-0 items-center gap-2">
+            {/* "No hay": lo pedido no está, de un toque y sin confirmar; se
+                deshace con "Volver a pendiente". */}
+            <SunmiButton color="slate" onClick={() => onNoHay(l)} disabled={guardando} className="shrink-0">
+              {TEXTO_NO_HAY}
+            </SunmiButton>
+            {/* Pedido en unidades y por peso no hay "va completo": lo pedido no
+                son kilos. Se pesa, en la misma hoja. */}
+            {pidioEnUnidades(l) ? (
+              <SunmiAccionRapida onClick={() => onCorregir(l)} disabled={guardando}>
+                {TEXTO_PESAR}
+              </SunmiAccionRapida>
+            ) : (
+              <SunmiAccionRapida onClick={() => onVaCompleto(l)} disabled={guardando}>
+                {TEXTO_VA_COMPLETO}
+              </SunmiAccionRapida>
+            )}
+          </span>
         ) : null
       }
       accionAbajo={
@@ -598,6 +618,7 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                 l={l}
                 guardando={guardando}
                 onVaCompleto={(x) => escribirPreparado(x, vaCompleto(x))}
+                onNoHay={(x) => escribirPreparado(x, NO_HAY)}
                 onCorregir={setCorrigiendo}
               />
             ))}
@@ -646,6 +667,9 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                   guardando={guardando}
                   onGuardar={async (cuerpo) => {
                     if (await escribirPreparado(corrigiendo, cuerpo)) setCorrigiendo(null);
+                  }}
+                  onNoHay={async () => {
+                    if (await escribirPreparado(corrigiendo, NO_HAY)) setCorrigiendo(null);
                   }}
                   onVolverAPendiente={async () => {
                     if (await escribirPreparado(corrigiendo, { pendiente: true })) setCorrigiendo(null);

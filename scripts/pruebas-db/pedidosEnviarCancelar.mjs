@@ -1080,7 +1080,7 @@ try {
       // decide como la pantalla del celular: "va completo" en dos, uno a menos,
       // uno a 0 y un producto que el local no pidió. Después lo envía y el local
       // empieza a recibirlo, para tener tarjetas REALES de la recepción.
-      const { vaCompleto } = await import("../../lib/pedidos/revisionDeLinea.js");
+      const { vaCompleto, NO_HAY } = await import("../../lib/pedidos/revisionDeLinea.js");
       const RD = {
         solicitados: await import("../../app/api/pos-transferencias/solicitados/route.js"),
         detalle: await import("../../app/api/pos-transferencias/detalle/route.js"),
@@ -1180,6 +1180,11 @@ try {
       ok("14: el aceite vuelve a pendiente", aceitePendiente.cuerpo.ok === true && aceitePendiente.cuerpo.item.preparado === 0 && aceitePendiente.cuerpo.item.revisadoEn === null && aceitePendiente.cuerpo.item.unidadPreparada === null, json(aceitePendiente));
       const solTrasPendiente = deEste(await solicitadosD(), p1);
       ok("14: la entrada lo cuenta sin revisar: 2 de 5", solTrasPendiente?.revisados === 2, json(solTrasPendiente));
+      // "No hay" (2026-10-28): el aceite en 0 decidido, y de vuelta a pendiente.
+      const aceiteNoHay = await editarD({ detalleId: aceiteNuevo.detalleId, ...NO_HAY });
+      ok("14: no hay aceite: revisado en 0", aceiteNoHay.cuerpo.ok === true && aceiteNoHay.cuerpo.item.preparado === 0 && aceiteNoHay.cuerpo.item.revisadoEn != null, json(aceiteNoHay));
+      ok("14: la entrada lo cuenta revisado: 3 de 5", deEste(await solicitadosD(), p1)?.revisados === 3);
+      ok("14: el aceite sin \"no hay\" vuelve a pendiente", (await editarD({ detalleId: aceiteNuevo.detalleId, pendiente: true })).cuerpo.item?.revisadoEn === null);
       ok("14: el aceite va completo otra vez", (await editarD({ detalleId: aceiteNuevo.detalleId, ...vaCompleto(aceiteNuevo) })).cuerpo.ok === true);
       const arroz = await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
       ok("14: el arroz va 1 de 3", arroz.cuerpo.ok === true && arroz.cuerpo.item.preparado === 1, json(arroz));
@@ -1306,6 +1311,9 @@ try {
       const queso = lineaDe(detPeso, "QUESO");
       ok("14c: los dos se cargan en kilos; el salametro es de pieza y el queso no", salametro?.seCargaEnKilos === true && salametro.esFiambre === true && queso?.seCargaEnKilos === true && queso.esFiambre === false, json({ salametro, queso }));
       ok("14c: lo que no es por peso no se carga en kilos", lineaDe(trasSumar, "ACEITE")?.seCargaEnKilos === false, json(lineaDe(trasSumar, "ACEITE")));
+      // "No hay" también para lo que se pesa: el mismo 0 decidido. Después se pesa.
+      const salametroNoHay = await editarW({ detalleId: salametro.detalleId, ...NO_HAY });
+      ok("14c: no hay salametro: revisado en 0", salametroNoHay.cuerpo.ok === true && salametroNoHay.cuerpo.item.preparado === 0 && salametroNoHay.cuerpo.item.revisadoEn != null, json(salametroNoHay));
       const pesado = await editarW({ detalleId: salametro.detalleId, preparado: 1.853, unidadPreparada: "UNIDAD" });
       ok("14c: el salametro pesado guarda los gramos: 1,853", pesado.cuerpo.ok === true && pesado.cuerpo.item.preparado === 1.853, json(pesado));
       const quesoMenos = await editarW({ detalleId: queso.detalleId, preparado: 1.85, unidadPreparada: "UNIDAD" });
