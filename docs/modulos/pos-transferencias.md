@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-28 03:58
+**Última actualización:** 2026-10-28 04:32
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-28: feat(pedidos): «No hay» en la preparación del celular, para lo pedido que no está
 - 2026-10-28: feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular
 - 2026-10-28: feat(pedidos): volver a pendiente un renglón ya preparado en el celular
 - 2026-10-26: fix(transferencias): el ticket POS imprime cada línea como una venta —presentación, cantidad, costo y subtotal— con el total valorizado

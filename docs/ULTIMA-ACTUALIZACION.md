@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-28 03:58
+**Fecha:** 2026-10-28 04:32
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular, feat(pedidos): volver a pendiente un renglón ya preparado en el celular
+- feat(pedidos): «No hay» en la preparación del celular, para lo pedido que no está, feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular, feat(pedidos): volver a pendiente un renglón ya preparado en el celular
 - Archivos: 7 modificados (7 total)
 
 ### transferencias
