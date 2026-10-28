@@ -205,6 +205,43 @@ test("EL RECORRIDO: va completo, corregir a menos, a 0, bultos con sueltas, agre
   assert.deepEqual(A.navegacion.at(-1), ["push", "/modulos/pos-transferencias"]);
 });
 
+test("VOLVER A PENDIENTE: solo en una preparada, debajo de Guardar; la línea y los contadores vuelven atrás", async () => {
+  const { pedidos } = await montarPreparar();
+  // Pendiente: la hoja no lo ofrece.
+  await A.tocar(A.boton("Corregir", linea("ACEITE")));
+  assert.ok(A.boton("Guardar", A.modal()), "no se abrió la hoja del aceite");
+  assert.ok(!A.boton("Volver a pendiente", A.modal()), "una pendiente ofrece Volver a pendiente");
+  await A.tocar(A.boton("Cerrar", A.modal()));
+  assert.ok(!A.modal(), "la hoja del aceite no se cerró");
+
+  await A.tocar(A.boton("✓ Va completo", linea("ACEITE")));
+  assert.deepEqual(opciones(), ["Pendientes 4", "Con cambios 0", "Preparados 1", "Todos 5"]);
+  assert.equal(A.contenido().querySelector("[data-avance]")?.getAttribute("data-avance"), "20");
+
+  // Preparada: el renglón achicado abre la misma hoja, con el botón —un botón
+  // del kit, no un link— después de Guardar.
+  await elegir("Preparados");
+  await A.tocar(linea("ACEITE").querySelector("button"));
+  const hoja = A.modal();
+  assert.ok(hoja, "el renglón preparado no abrió la hoja");
+  const textos = A.botones(hoja).map((b) => b.textContent.trim());
+  assert.ok(textos.indexOf("Volver a pendiente") > textos.indexOf("Guardar"), `orden de la hoja: ${json(textos)}`);
+  assert.match(A.boton("Volver a pendiente", hoja).className, /\bsunmi-btn/);
+  await A.tocar(A.boton("Volver a pendiente", hoja));
+
+  assert.deepEqual(A.llamadas(pedidos, "/api/pos-transferencias/detalle/editar").at(-1).cuerpo, { detalleId: dep.depositoDetalleNuevo.cuerpo.item.detalles[0].detalleId, pendiente: true });
+  assert.ok(!A.modal(), "la hoja quedó abierta");
+  assert.deepEqual(opciones(), ["Pendientes 5", "Con cambios 0", "Preparados 0", "Todos 5"]);
+  assert.match(A.contenido().textContent, /0 \/ 5 preparados/);
+  assert.match(A.contenido().textContent, /Falta revisar 5/);
+  assert.equal(A.contenido().querySelector("[data-avance]")?.getAttribute("data-avance"), "0");
+  await elegir("Pendientes");
+  assert.equal(estadoDe("ACEITE"), "pendiente");
+  assert.ok(A.boton("✓ Va completo", linea("ACEITE")), "el aceite pendiente no ofrece Va completo");
+});
+
+const json = (x) => JSON.stringify(x);
+
 test("enviar y el depósito ya lo había cancelado: el aviso y de vuelta a Pedidos de locales", async () => {
   // La respuesta que dio `enviar` al perder la carrera contra cancelar
   // (sección 15d), y nunca "El local cambió…".

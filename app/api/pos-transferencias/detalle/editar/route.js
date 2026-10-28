@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
+import { DATOS_LINEA_PENDIENTE } from "@/lib/pedidos/revisionDeLinea";
 import {
   bloquearParDelPedido,
   bloquearFilaDelPedido,
@@ -188,6 +189,12 @@ export async function POST(req) {
     // Escribir lo preparado es DECIDIR la línea, también en 0: "va 0" deja de
     // ser lo mismo que "todavía no la miré". Ver `lib/pedidos/revisionDeLinea.js`.
     if (data.preparado !== undefined) data.revisadoEn = new Date();
+
+    // "Volver a pendiente" (`pendiente: true`): deshace la decisión del
+    // depósito —la marca y la cantidad—, y solo el depósito, igual que escribir
+    // lo preparado. Pisa lo de arriba: si vino también un `preparado`, manda
+    // volver a pendiente. Con el pedido enviado cae en los rechazos de siempre.
+    if (esDeposito && body.pendiente === true) Object.assign(data, DATOS_LINEA_PENDIENTE);
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(

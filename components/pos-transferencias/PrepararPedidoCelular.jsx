@@ -20,7 +20,7 @@
 //
 // Todo va por las rutas de siempre de `/api/pos-transferencias`, con sus
 // bloqueos: `detalle` para leer, `detalle/editar` para lo preparado (también
-// "va completo" y "va 0"), `agregarItem` para lo que el local no pidió y
+// "va completo", "va 0" y "volver a pendiente"), `agregarItem` para lo que el local no pidió y
 // `enviar`. Qué está revisado y cuánto viaja es `lib/pedidos/revisionDeLinea.js`;
 // cómo se dice y se filtra, `lib/pedidos/preparacionDelPedido.js`.
 //
@@ -78,6 +78,7 @@ import {
 
 export const TEXTO_VA_COMPLETO = "✓ Va completo";
 export const TEXTO_CORREGIR = "Corregir";
+export const TEXTO_VOLVER_A_PENDIENTE = "Volver a pendiente";
 export const TEXTO_AGREGAR = "+ Agregar producto que no pidió";
 export const TEXTO_ENVIAR = "Enviar al local";
 export const PLACEHOLDER_BUSCAR = "Buscar o escanear producto";
@@ -96,7 +97,11 @@ const MENSAJE_SE_CANCELO = "Este pedido se canceló.";
 // unidades, unidades. Arranca en lo que ya se decidió, o en lo pedido.
 //
 // 0 es válido: el producto no va.
-function HojaCorregir({ linea, guardando, onGuardar }) {
+//
+// Una línea ya preparada suma "Volver a pendiente" debajo de Guardar: borra la
+// marca y la cantidad (`pendiente: true` en `detalle/editar`). En una pendiente
+// no hay nada que deshacer y no aparece.
+function HojaCorregir({ linea, guardando, onGuardar, onVolverAPendiente }) {
   const pedido = loPedido(linea);
   const porBulto = pedido.unidad === "BULTO";
   // Un pack que el producto solo deja mandar por bulto no ofrece sueltas: el
@@ -150,6 +155,11 @@ function HojaCorregir({ linea, guardando, onGuardar }) {
       <SunmiButton color="primary" className="w-full min-h-toque justify-center" onClick={guardar} disabled={guardando}>
         {guardando ? "Guardando..." : "Guardar"}
       </SunmiButton>
+      {estaRevisada(linea) ? (
+        <SunmiButton color="slate" className="w-full min-h-toque justify-center" onClick={onVolverAPendiente} disabled={guardando}>
+          {TEXTO_VOLVER_A_PENDIENTE}
+        </SunmiButton>
+      ) : null}
     </>
   );
 }
@@ -583,6 +593,9 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                   guardando={guardando}
                   onGuardar={async (cuerpo) => {
                     if (await escribirPreparado(corrigiendo, cuerpo)) setCorrigiendo(null);
+                  }}
+                  onVolverAPendiente={async () => {
+                    if (await escribirPreparado(corrigiendo, { pendiente: true })) setCorrigiendo(null);
                   }}
                 />
               ) : null}

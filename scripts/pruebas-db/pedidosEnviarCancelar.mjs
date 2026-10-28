@@ -1169,6 +1169,18 @@ try {
         const r = await editarD({ detalleId: l.detalleId, ...vaCompleto(l) });
         ok(`14: ${nombre} va completo`, r.cuerpo.ok === true && r.cuerpo.item.preparado === l.sugerido && r.cuerpo.item.unidadPreparada === l.unidadSugerida, json(r));
       }
+      // ── Volver a pendiente (2026-10-28): el aceite, y de nuevo completo ───
+      // Lo que manda la hoja de la pantalla. El local no puede (el pedido está
+      // Solicitado, como escribir lo preparado); el depósito sí, y la línea
+      // queda como recién pedida: sin decidir, sin cantidad y sin unidad.
+      const aceiteNuevo = lineaDe(detNuevo, "ACEITE");
+      const localPendiente = await pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, D.sPin, { detalleId: aceiteNuevo.detalleId, pendiente: true });
+      ok("14: el local no puede volver a pendiente una línea (403)", localPendiente.status === 403 && localPendiente.cuerpo.ok === false, json(localPendiente));
+      const aceitePendiente = await editarD({ detalleId: aceiteNuevo.detalleId, pendiente: true });
+      ok("14: el aceite vuelve a pendiente", aceitePendiente.cuerpo.ok === true && aceitePendiente.cuerpo.item.preparado === 0 && aceitePendiente.cuerpo.item.revisadoEn === null && aceitePendiente.cuerpo.item.unidadPreparada === null, json(aceitePendiente));
+      const solTrasPendiente = deEste(await solicitadosD(), p1);
+      ok("14: la entrada lo cuenta sin revisar: 2 de 5", solTrasPendiente?.revisados === 2, json(solTrasPendiente));
+      ok("14: el aceite va completo otra vez", (await editarD({ detalleId: aceiteNuevo.detalleId, ...vaCompleto(aceiteNuevo) })).cuerpo.ok === true);
       const arroz = await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
       ok("14: el arroz va 1 de 3", arroz.cuerpo.ok === true && arroz.cuerpo.item.preparado === 1, json(arroz));
       // Buscar en el catálogo del depósito lo que el local no pidió, como la
@@ -1198,6 +1210,8 @@ try {
       const envio = await pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId: p1 });
       guardar("depositoEnviar", envio);
       ok("14: se envía", envio.cuerpo.ok === true, json(envio).slice(0, 400));
+      const pendienteEnviado = await pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, { detalleId: fideos.detalleId, pendiente: true });
+      ok("14: enviado, ya no se vuelve a pendiente", pendienteEnviado.status === 400 && pendienteEnviado.cuerpo.ok === false, json(pendienteEnviado));
       const tId = envio.cuerpo.item?.id;
       // `cantidad`, `cantidadPresentada` y la unidad en que salió. Este camino
       // guarda la cantidad en la unidad preparada: 2 BULTO es 2, no 12.
