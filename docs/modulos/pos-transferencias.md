@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-28 15:05
+**Última actualización:** 2026-10-28 17:48
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-28: fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19
 - 2026-10-28: fix(pedidos): «No hay» baja a la fila de Corregir, a la derecha, y el nombre recupera su ancho
 - 2026-10-28: feat(pedidos): los dos depósitos de la empresa arman el mismo pedido, y cada renglón sale del stock del que lo resolvió
 - 2026-10-28: feat(pedidos): «No hay» en la preparación del celular, para lo pedido que no está
