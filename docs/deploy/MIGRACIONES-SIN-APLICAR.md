@@ -16,15 +16,17 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **94 migraciones**, la última
-`20261028180000_preparado_tres_decimales`. Falta una:
+Ninguna. Producción está en **95 migraciones**, las mismas que el árbol, la
+última `20261028200000_detalle_resuelto_por_deposito`.
 
-- `20261028200000_detalle_resuelto_por_deposito` — **aditiva.** Una columna
-  nula, `PosTransferenciaDetalle.resueltoPorDepositoId`, y su clave foránea a
-  `Local`: qué depósito resolvió cada renglón, para que dos depósitos de la
-  misma empresa armen el mismo pedido y cada renglón salga del stock del suyo.
-  No rellena nada: las líneas de antes quedan en null y salen del origen del
-  pedido, como siempre. El clasificador la da por aditiva.
+La `20261028200000_detalle_resuelto_por_deposito` —aditiva: la columna nula
+`PosTransferenciaDetalle.resueltoPorDepositoId` y su clave foránea a `Local`— se
+aplicó con el despliegue de `456b3f94` (2026-10-28), antes de levantar la
+imagen: el clasificador la dio por aditiva y pasó sin autorización manual, el
+contenedor descartable informó las **95** del árbol e imprimió "Applying
+migration", y `migrate status` cerró con "Database schema is up to date!".
+Comprobada contra la base: la columna existe, entera y nula, con su clave
+foránea, y las 188 filas que había quedaron en null.
 
 La `20261028180000_preparado_tres_decimales` —cambio de tipo que ENSANCHA:
 `PosTransferenciaDetalle.preparado` de `DECIMAL(12,2)` a `DECIMAL(13,3)`— se
