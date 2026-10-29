@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-10-29] - Actualización: stock, pos-ventas, pos-transferencias, transferencias
+
+### Modificado
+- **stock**: feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
+- **pos-ventas**: fix(pos-ventas): consumo del personal en dos renglones y con kilo decimal (descuento SIN VERIFICAR en Postgres)
+- **pos-transferencias**: feat(pedidos): preparar un pedido del depósito en la computadora, desde 768 px
+- **pos-transferencias**: feat(pedidos): un «solo por bulto» de bulto 1 sale aunque se haya preparado por unidad
+- **pos-transferencias**: fix(pedidos): enviar nombra el producto que no se puede enviar, en vez de «Error interno al enviar POS» — pedido #19
+- **pos-transferencias**: fix(pedidos): «No hay» baja a la fila de Corregir, a la derecha, y el nombre recupera su ancho
+- **pos-transferencias**: feat(pedidos): los dos depósitos de la empresa arman el mismo pedido, y cada renglón sale del stock del que lo resolvió
+- **pos-transferencias**: feat(pedidos): «No hay» en la preparación del celular, para lo pedido que no está
+- **pos-transferencias**: feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular
+- **pos-transferencias**: feat(pedidos): volver a pendiente un renglón ya preparado en el celular
+- **transferencias**: feat(pedidos): los dos depósitos de la empresa arman el mismo pedido, y cada renglón sale del stock del que lo resolvió
+- **transferencias**: feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular
+- **transferencias**: fix(comprobantes): el lector interpretado pide los importes del pie, y un costo repartido por encima del importe prueba que el papel trae impuestos — Arcor #362
+
+
 ## [2026-10-28] - Actualización: stock
 
 ### Modificado

@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-28 23:28
+**Fecha:** 2026-10-29 00:34
 
 ## Módulos modificados recientemente
+
+### stock
+- feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
+- Archivos: 3 modificados (3 total)
 
 ### pos-ventas
 - fix(pos-ventas): consumo del personal en dos renglones y con kilo decimal (descuento SIN VERIFICAR en Postgres)
