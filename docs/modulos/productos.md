@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-10-29 18:26
+**Última actualización:** 2026-10-29 18:50
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-10-29: fix(recepcion): el alta desde el papel viene en Pack con el costo del bulto, y muestra el código del proveedor
 - 2026-10-29: feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo
 - 2026-10-29: fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta
 - 2026-10-29: fix(productos): el buscador del catálogo busca como la caja

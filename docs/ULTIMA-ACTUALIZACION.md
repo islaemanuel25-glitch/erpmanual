@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-29 18:26
+**Fecha:** 2026-10-29 18:50
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo, fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta, fix(productos): el buscador del catálogo busca como la caja
+- fix(recepcion): el alta desde el papel viene en Pack con el costo del bulto, y muestra el código del proveedor, feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo, fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta
 - Archivos: 4 modificados (4 total)
 
 ### pos-ventas
