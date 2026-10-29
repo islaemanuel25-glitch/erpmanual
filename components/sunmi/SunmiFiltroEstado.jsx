@@ -41,6 +41,28 @@
 // escala y sin un solo valor arbitrario. De `sm` para arriba entran todas en una
 // fila, que es donde el ancho alcanza.
 
+//
+// ── `porPagina`: CUANDO SON MÁS DE LAS QUE ENTRAN, UN CARRUSEL ────────────
+//
+// El Control de stock sumó un quinto filtro —"En negativo"— y la grilla de dos
+// por dos tenía que quedar como estaba. Con `porPagina` las opciones se parten
+// en páginas de esa cantidad, cada una con la MISMA grilla, y se pasa de una a
+// otra deslizando de costado, con un puntito por página. Todas las páginas
+// miden lo que la más alta —son hijas estiradas de la misma pista— y la grilla
+// tiene sus filas fijas, así que una página con un solo botón deja los demás
+// casilleros vacíos y lo de abajo no se mueve. Arranca en la página del filtro
+// elegido.
+//
+// La pista y los puntitos salen de `CarruselControles` (productos), que es el
+// carrusel de a cuatro que ya funciona: la misma pista con snap y sin barra, y
+// el mismo botón de 24 con el puntito adentro. Los colores, de tokens: el
+// activo `sunmi-bg-accent` —el de `sunmi-btn-primary`— y el otro `sunmi-bg-borde`.
+//
+// Sin `porPagina`, o con las opciones que entran en una, el marcado es el de
+// siempre.
+
+import { useEffect, useRef, useState } from "react";
+
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
 /**
@@ -57,6 +79,15 @@ const COLUMNAS = Object.freeze({
   5: "grid-cols-2 sm:grid-cols-5",
 });
 
+/**
+ * La grilla de UNA página, por cuántas entran. Las filas van fijas para que una
+ * página incompleta mida lo mismo que una llena. Solo la de cuatro, que es la
+ * que se usa: dos columnas por dos filas en todos los anchos.
+ */
+const GRILLA_DE_PAGINA = Object.freeze({
+  4: "grid-cols-2 grid-rows-2",
+});
+
 export default function SunmiFiltroEstado({
   /** `[{ clave, texto, cantidad? }]`. Entre 3 y 5; con menos usá el selector. */
   opciones = [],
@@ -66,23 +97,48 @@ export default function SunmiFiltroEstado({
   /** Para el `role="group"` cuando no hay rótulo visible. */
   ariaLabel = undefined,
   className = "",
+  /** Cuántas opciones por página; con más, un carrusel. Hoy, 4. */
+  porPagina = null,
 }) {
-  if (!Array.isArray(opciones) || opciones.length === 0) return null;
-
-  // Fuera del rango previsto se cae a dos columnas, que entra siempre. No se
-  // lanza un error: una pantalla no se rompe por un filtro.
-  const columnas = COLUMNAS[opciones.length] || "grid-cols-2";
+  const lista = Array.isArray(opciones) ? opciones : [];
   const elegida = valor == null ? null : String(valor);
+  const paginado = GRILLA_DE_PAGINA[porPagina] != null && lista.length > porPagina;
+  const paginas = [];
+  if (paginado) for (let i = 0; i < lista.length; i += porPagina) paginas.push(lista.slice(i, i + porPagina));
+  const indiceElegida = lista.findIndex((o) => String(o.clave) === elegida);
+  const paginaDeLaElegida = paginado && indiceElegida >= 0 ? Math.floor(indiceElegida / porPagina) : 0;
 
-  return (
-    <div className={className}>
-      {rotulo && <div className="text-sm2 sunmi-text-muted mb-1">{rotulo}</div>}
-      <div
-        role="group"
-        aria-label={ariaLabel || rotulo || undefined}
-        className={`grid ${columnas} gap-1.5`}
-      >
-        {opciones.map((o) => {
+  const pistaRef = useRef(null);
+  const [paginaVisible, setPaginaVisible] = useState(paginaDeLaElegida);
+
+  // A la página del elegido: al montar —volver a la pantalla con "En negativo"
+  // arranca en la 2—, sin animación, y si el elegido cambia de página.
+  const yaLlevoRef = useRef(false);
+  useEffect(() => {
+    if (!paginado) return;
+    const pista = pistaRef.current;
+    if (!pista) return;
+    let intentos = 0;
+    const llevar = () => {
+      const ancho = pista.clientWidth;
+      // Sin ancho el navegador no terminó de maquetar: se reintenta en el cuadro
+      // siguiente, unas pocas veces —en un entorno sin maqueta no llega nunca—.
+      if (!ancho) {
+        intentos += 1;
+        if (intentos < 10 && typeof requestAnimationFrame === "function") requestAnimationFrame(llevar);
+        return;
+      }
+      const suave = yaLlevoRef.current;
+      yaLlevoRef.current = true;
+      pista.scrollTo?.({ left: paginaDeLaElegida * ancho, behavior: suave ? "smooth" : "auto" });
+    };
+    llevar();
+    setPaginaVisible(paginaDeLaElegida);
+  }, [paginado, paginaDeLaElegida]);
+
+  if (lista.length === 0) return null;
+
+  const boton = (o) => {
           const clave = String(o.clave);
           const activa = clave === elegida;
           return (
@@ -125,7 +181,67 @@ export default function SunmiFiltroEstado({
               )}
             </SunmiButton>
           );
-        })}
+  };
+
+  if (!paginado) {
+    // Fuera del rango previsto se cae a dos columnas, que entra siempre. No se
+    // lanza un error: una pantalla no se rompe por un filtro.
+    const columnas = COLUMNAS[lista.length] || "grid-cols-2";
+    return (
+      <div className={className}>
+        {rotulo && <div className="text-sm2 sunmi-text-muted mb-1">{rotulo}</div>}
+        <div
+          role="group"
+          aria-label={ariaLabel || rotulo || undefined}
+          className={`grid ${columnas} gap-1.5`}
+        >
+          {lista.map(boton)}
+        </div>
+      </div>
+    );
+  }
+
+  const alDesplazar = (e) => {
+    const ancho = e.currentTarget.clientWidth || 1;
+    const indice = Math.round(e.currentTarget.scrollLeft / ancho);
+    if (indice !== paginaVisible) setPaginaVisible(indice);
+  };
+
+  const irA = (indice) => {
+    const pista = pistaRef.current;
+    if (!pista) return;
+    pista.scrollTo?.({ left: indice * pista.clientWidth, behavior: "smooth" });
+  };
+
+  return (
+    <div className={className}>
+      {rotulo && <div className="text-sm2 sunmi-text-muted mb-1">{rotulo}</div>}
+      <div
+        ref={pistaRef}
+        onScroll={alDesplazar}
+        role="group"
+        aria-label={ariaLabel || rotulo || undefined}
+        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {paginas.map((pagina, i) => (
+          <div key={i} data-pagina={i + 1} className={`grid ${GRILLA_DE_PAGINA[porPagina]} gap-1.5 shrink-0 w-full snap-start`}>
+            {pagina.map(boton)}
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-center gap-1.5 mt-1.5">
+        {paginas.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => irA(i)}
+            aria-label={`Página ${i + 1} de ${paginas.length}`}
+            aria-current={i === paginaVisible}
+            className="w-6 h-6 flex items-center justify-center"
+          >
+            <span className={`block w-1.5 h-1.5 rounded-full ${i === paginaVisible ? "sunmi-bg-accent" : "sunmi-bg-borde"}`} />
+          </button>
+        ))}
       </div>
     </div>
   );

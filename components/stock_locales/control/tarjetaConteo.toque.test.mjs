@@ -34,6 +34,8 @@ const { default: PantallaControlStock } = await import("@/components/stock_local
 const { useControlStock } = await import("@/components/stock_locales/control/useControlStock.js");
 const { AccionDePaginaProvider, useAccionDelShell } = await import("@/app/context/AccionDePaginaContext.jsx");
 const { AppRouterContext } = await import("next/dist/shared/lib/app-router-context.shared-runtime.js");
+const { default: SunmiFiltroEstado } = await import("@/components/sunmi/SunmiFiltroEstado.jsx");
+const { FILTRO_CONTROL, sigueEnElChip } = await import("@/lib/stock/control/controlStock.js");
 
 const real = JSON.parse(readFileSync("components/stock_locales/control/lecturaReal.fixture.json", "utf8"));
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -556,14 +558,66 @@ test("arriba: sin título repetido; la cabecera de recibir transferencia con 'Ab
 test("el buscador y los filtros de transferencias: 2 filas de 2, Sin contar de entrada, y Categoría · Todas", async () => {
   const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
   assert.equal(buscador(raiz).getAttribute("placeholder"), "Buscar producto, código o categoría...");
-  const filtros = [...raiz.querySelectorAll("[role='group'] button")];
+  // Desde el 2026-10-29 son cinco, en un carrusel de a cuatro: la página 1 es
+  // la de siempre y "En negativo" abre la 2, con la misma grilla.
+  const paginas = [...raiz.querySelectorAll("[role='group'] [data-pagina]")];
   const n = real.listaSinContarAntesDeEstaBien.resumenControl;
-  assert.deepEqual(filtros.map(texto), [`Sin contar${n.sinContar}`, `Con diferencia${n.conDiferencia}`, `Contados${n.contados}`, `Todos${n.total}`]);
-  assert.match(raiz.querySelector("[role='group']").className, /grid-cols-2/, "dos filas de dos");
+  assert.equal(paginas.length, 2, "dos páginas");
+  assert.deepEqual([...paginas[0].querySelectorAll("button")].map(texto), [`Sin contar${n.sinContar}`, `Con diferencia${n.conDiferencia}`, `Contados${n.contados}`, `Todos${n.total}`]);
+  assert.deepEqual([...paginas[1].querySelectorAll("button")].map(texto), [`En negativo${n.enNegativo}`]);
+  for (const p of paginas) assert.match(p.className, /\bgrid-cols-2 grid-rows-2\b/, "las dos páginas: dos filas de dos");
+  const filtros = [...raiz.querySelectorAll("[role='group'] button")];
   assert.equal(filtros[0].getAttribute("aria-pressed"), "true", "de entrada, Sin contar");
+  // Los puntitos van debajo de la pista, no adentro: no son filtros.
+  const puntos = [...raiz.querySelector("[role='group']").nextElementSibling.querySelectorAll("button[aria-label^='Página ']")];
+  assert.deepEqual(puntos.map((b) => b.getAttribute("aria-current")), ["true", "false"], "dos puntitos, en la página 1");
+  assert.match(puntos[0].firstElementChild.className, /sunmi-bg-accent/);
+  assert.match(puntos[1].firstElementChild.className, /sunmi-bg-borde/);
   assert.equal(listados(pedidos)[0].params.control, "sin_contar");
   assert.match(texto(raiz), new RegExp(`Categoría\\s*Todas · ${n.total}`));
   assert.doesNotMatch(texto(raiz), /Más filtros|Limpiar/, "sin los filtros de Stock Locales");
+});
+
+test("En negativo: pide `en_negativo`, muestra lo que contesta el listado, y al volver arranca en la página 2", async () => {
+  const negativos = real.listaEnNegativo;
+  const { raiz, pedidos } = await montar({
+    lista: listadoReal({ todos: real.listaSinContarAntesDeEstaBien, sin_contar: real.listaSinContarAntesDeEstaBien, en_negativo: negativos }),
+    guardado: real.estaBienDelAceite,
+  });
+  await tocarChip(raiz, "En negativo");
+  assert.equal(listados(pedidos).at(-1).params.control, FILTRO_CONTROL.EN_NEGATIVO);
+  assert.deepEqual(nombres(raiz), ["Galletas"], "solo el de stock bajo cero");
+  assert.equal(texto(chip(raiz, "En negativo")), `En negativo${negativos.resumenControl.enNegativo}`);
+  assert.equal(chip(raiz, "En negativo").getAttribute("aria-pressed"), "true");
+  const puntos = () =>
+    [...raiz.querySelector("[role='group']").nextElementSibling.querySelectorAll("button[aria-label^='Página ']")].map((b) => b.getAttribute("aria-current"));
+  assert.deepEqual(puntos(), ["false", "true"]);
+
+  // Volver a la pantalla —de Terminar o de las diferencias— vuelve a montar los
+  // filtros con el chip que quedó en el hook: arrancan en la página 2.
+  await tocarChip(raiz, "Sin contar");
+  assert.deepEqual(puntos(), ["true", "false"], "con un filtro de la página 1, en la 1");
+  const otra = document.createElement("div");
+  document.body.append(otra);
+  const r = createRoot(otra);
+  montadas.push(r);
+  const opciones = [...raiz.querySelectorAll("[role='group'] button")].map((b) => ({ clave: b.textContent, texto: b.textContent }));
+  await act(async () => r.render(React.createElement(SunmiFiltroEstado, { opciones, valor: opciones[4].clave, porPagina: 4 })));
+  assert.deepEqual(
+    [...otra.querySelectorAll("button[aria-label^='Página ']")].map((b) => b.getAttribute("aria-current")),
+    ["false", "true"],
+    "montado con En negativo elegido, arranca en la página 2"
+  );
+});
+
+test("En negativo: sigue en el filtro mientras el stock es negativo, y sale cuando el conteo lo corrige", () => {
+  // Las dos respuestas reales: la lista (galletas en −15) y el guardado de la
+  // lata del depósito, que pasó de −24 a 24 y bajó el contador.
+  const [galletas] = real.listaEnNegativo.items;
+  const contada = real.contadaSaleDeNegativo;
+  assert.equal(sigueEnElChip(galletas, FILTRO_CONTROL.EN_NEGATIVO), true);
+  assert.equal(sigueEnElChip(contada.item, FILTRO_CONTROL.EN_NEGATIVO), false);
+  assert.equal(contada.resumen.enNegativo, 0);
 });
 
 test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control' va adentro de la cabecera, sin barra fija", async () => {

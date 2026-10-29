@@ -394,6 +394,15 @@ try {
       json(ids(conDif.items)) === json([P.coca.pl, P.queso.pl, P.nuevo.pl].sort((a, b) => a - b)),
       json(conDif.items?.map((i) => i.nombre))
     );
+    const enNegativo = await lista(S.ana, "en_negativo");
+    guardar("listaEnNegativo", enNegativo);
+    ok(
+      "En negativo: solo las galletas (−15), y el contador dice 1",
+      json(ids(enNegativo.items)) === json([P.galletas.pl]) && enNegativo.resumenControl?.enNegativo === 1 && sinContar.resumenControl?.enNegativo === 1,
+      json({ items: enNegativo.items?.map((i) => i.nombre), resumen: enNegativo.resumenControl })
+    );
+    const negativoConTexto = await lista(S.ana, "en_negativo", "q=coca");
+    ok("En negativo respeta el buscador: con 'coca' no queda nada", negativoConTexto.items?.length === 0, json(negativoConTexto.items?.map((i) => i.nombre)));
     const coca = contados.items.find((i) => i.id === P.coca.pl);
     ok(
       "la tarjeta trae lo de Stock: proveedor, código, unidad y stock, y su conteo",
@@ -662,7 +671,22 @@ try {
 
     // Con el sistema en negativo antes de contar.
     const neg = await ficha(depo.id, "Lata negativa x24", "8000000000103", "pack", 24, -24);
-    await paso("depósito, 1 bulto sobre −24", neg, 24, 24);
+    const negAntes = await lista(S.adminDepo, "en_negativo");
+    ok(
+      "En negativo en el depósito: la lata en −24 está, y cuenta",
+      negAntes.items?.some((i) => i.id === neg.pl) && negAntes.resumenControl?.enNegativo === negAntes.total,
+      json({ items: negAntes.items?.map((i) => i.nombre), resumen: negAntes.resumenControl })
+    );
+    const contada = await paso("depósito, 1 bulto sobre −24", neg, 24, 24);
+    guardar("contadaSaleDeNegativo", contada);
+    const negDespues = await lista(S.adminDepo, "en_negativo");
+    ok(
+      "al aceptar 24 deja de ser negativa: sale de En negativo y el contador baja uno",
+      !negDespues.items?.some((i) => i.id === neg.pl) &&
+        contada.resumen?.enNegativo === negAntes.resumenControl.enNegativo - 1 &&
+        negDespues.resumenControl?.enNegativo === negAntes.resumenControl.enNegativo - 1,
+      json({ antes: negAntes.resumenControl?.enNegativo, guardado: contada.resumen?.enNegativo, despues: negDespues.resumenControl?.enNegativo })
+    );
     // Este depósito no admite negativo (la configuración de siempre): deshacer
     // no puede volver a −24 y se queda en 0, igual que un Restar de Ajustar.
     await paso("depósito, borrar sobre un negativo que no se admite queda en 0", neg, null, 0);
@@ -701,6 +725,12 @@ try {
     // el control nunca tocó.
     const ajena = await ficha(depo.id, "Lata con fila ajena x24", "8000000000107", "pack", 24, null);
     await c.stockLocal.create({ data: { localId: mini.id, productoId: ajena.pl, cantidad: -24 } });
+    const negDeOtro = await lista(S.adminDepo, "en_negativo");
+    ok(
+      "En negativo mira la fila del depósito: la −24 de otro local no la mete",
+      negDeOtro.status === 200 && !negDeOtro.items?.some((i) => i.id === ajena.pl),
+      json(negDeOtro.items?.map((i) => i.nombre))
+    );
     const r = await pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: ajena.pl, total: 24 });
     const enListaAjena = (await lista(S.adminDepo, "contados")).items?.find((i) => i.id === ajena.pl);
     ok(
@@ -1084,7 +1114,7 @@ try {
     });
     await c.productoLocal.delete({ where: { id: borrado.pl } });
 
-    for (const chip of ["todos", "sin_contar", "contados", "con_diferencia"]) {
+    for (const chip of ["todos", "sin_contar", "contados", "con_diferencia", "en_negativo"]) {
       const l = await lista(S.adminDepo, chip);
       ok(`el listado del control con '${chip}' contesta JSON con ok`, l.status === 200 && l.ok === true && Array.isArray(l.items), json({ status: l.status, error: l.error }));
     }

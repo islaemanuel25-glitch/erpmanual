@@ -8,7 +8,8 @@
 //   · inicio. Sin control, "Empezar control" y el historial de terminados, cada
 //     uno con sus diferencias. Con control, armada como recibir una
 //     transferencia: la cabecera con "Abierto" y, adentro, "Terminar control";
-//     el buscador, los filtros Sin contar / Con diferencia / Contados / Todos,
+//     el buscador, los filtros Sin contar / Con diferencia / Contados / Todos
+//     y, en la segunda página del carrusel, En negativo;
 //     la categoría y el listado de Stock con un campo "Contado" en cada tarjeta.
 //   · terminar. Lo que nadie contó, partido en vendidos durante el control —que
 //     no se tocan— y los que quedan en cero, con su confirmación.
@@ -158,7 +159,7 @@ export const textoSinAceptar = (n) => `Tenés ${n} ${n === 1 ? "cantidad" : "can
  * fila de conteo son las de siempre.
  */
 function ControlAbierto({ c, local, puedeGestionar }) {
-  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0, categorias: [] };
+  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0, enNegativo: 0, categorias: [] };
   const control = c.estado?.control;
   const esDeposito = c.estado?.local?.es_deposito === true;
   const idFijado = c.fijado?.id ?? null;
@@ -198,6 +199,8 @@ function ControlAbierto({ c, local, puedeGestionar }) {
     { clave: FILTRO_CONTROL.CON_DIFERENCIA, texto: "Con diferencia", cantidad: n.conDiferencia },
     { clave: FILTRO_CONTROL.CONTADOS, texto: "Contados", cantidad: n.contados },
     { clave: FILTRO_CONTROL.TODOS, texto: "Todos", cantidad: n.total },
+    // Página 2 del carrusel: el stock del sistema de esta ubicación bajo cero.
+    { clave: FILTRO_CONTROL.EN_NEGATIVO, texto: "En negativo", cantidad: n.enNegativo },
   ];
 
   return (
@@ -249,7 +252,13 @@ function ControlAbierto({ c, local, puedeGestionar }) {
         </div>
       }
       filtros={
-        <SunmiFiltroEstado opciones={opcionesEstado} valor={c.chip} onCambiar={c.setChip} ariaLabel="Filtrar productos por estado" />
+        <SunmiFiltroEstado
+          opciones={opcionesEstado}
+          valor={c.chip}
+          onCambiar={c.setChip}
+          ariaLabel="Filtrar productos por estado"
+          porPagina={4}
+        />
       }
       categoria={
         <SunmiSelectAdv
