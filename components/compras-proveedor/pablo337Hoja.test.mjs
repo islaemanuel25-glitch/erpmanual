@@ -88,7 +88,8 @@ test("2 · SANTA JULIA: LA CANTIDAD CIERRA CON EL IMPORTE, ASÍ QUE LO QUE NO CU
   assert.equal(nc.que, "PRECIO");
   assert.equal(
     nc.texto,
-    `El papel cobra ${formatearMoneda(3890)} la unidad y vos la tenés a ${formatearMoneda(6690)} (42 % menos). Fijate si es este producto.`
+    // Sin "Fijate si es este producto" desde el 2026-10-29: la alerta es visual.
+    `El papel cobra ${formatearMoneda(3890)} la unidad y vos la tenés a ${formatearMoneda(6690)} (42 % menos).`
   );
   assert.equal(motivoSinComparacion(f), nc.texto, "no «revisá la cantidad», que es lo único que estaba bien");
 });
@@ -104,9 +105,10 @@ test("2 · CHANDON: EL PAPEL COBRA LA MITAD DE LA BOTELLA, ASÍ QUE LO QUE NO CU
 test("2 · CON «DEJO MI PRECIO» YA DECIDIDO, EL FRENO NO ES UN AVISO NI BLOQUEA", () => {
   const f = santaJulia30(DEJA_EL_MIO);
   assert.equal(frenoYaDecidido(f), true);
-  // La tarjeta no lo marca.
+  // La tarjeta no lo marca: sin tono de alerta. Desde el 2026-10-29 la alerta
+  // de un salto de precio es solo visual, así que el tono es lo que se mira.
   const tarjeta = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f }));
-  assert.doesNotMatch(tarjeta, /Fijate si es este producto/);
+  assert.doesNotMatch(tarjeta, /sunmi-state-warning/);
   // La hoja lo dice como decidido, con el precio de UNA UNIDAD —la misma que el
   // "Precio de la unidad" del papel—, y sin nada en tono de alerta.
   const hoja = aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {}, onGuardar() {}, onCorregirPapel() {}, onAceptarPrecio() {}, onDejarMiPrecio() {} }));
@@ -119,9 +121,9 @@ test("2 · CON «DEJO MI PRECIO» YA DECIDIDO, EL FRENO NO ES UN AVISO NI BLOQUE
   // Desde el 2026-10-29 la guarda deja pasar también un salto de precio que se
   // acepta (`picnicSaltoDePrecio.test.mjs`); "dejo mi precio" sigue pasando.
   assert.match(ruta, /if \(sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
-  // CONTRAPRUEBA: sin la decisión, la tarjeta sí avisa.
+  // CONTRAPRUEBA: sin la decisión, la tarjeta sí avisa, con el tono.
   const sinDecidir = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: santaJulia30() }));
-  assert.match(sinDecidir, /Fijate si es este producto/);
+  assert.match(sinDecidir, /sunmi-state-warning/);
 });
 
 test("2 · LOS DOS PRECIOS JUNTOS VAN EN LA MISMA UNIDAD, DICHA AL LADO", () => {
@@ -131,5 +133,7 @@ test("2 · LOS DOS PRECIOS JUNTOS VAN EN LA MISMA UNIDAD, DICHA AL LADO", () => 
   const hoja = aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {}, onGuardar() {}, onCorregirPapel() {}, onAceptarPrecio() {}, onDejarMiPrecio() {} }));
   assert.match(hoja, new RegExp(`Dejás tu precio · ${formatearMoneda(40140).replace(/\$/g, "\\$")} / pack`));
   const codigo = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
-  assert.match(codigo, /Tenías \{formatearMoneda\(tuPrecio\)\} \/ \{unidadDelPrecio\} · la factura trae\{" "\}\s*\{formatearMoneda\(fila\.costoFactura\)\} \/ \{unidadDelPrecio\}/);
+  // Con el porcentaje del renglón ERP al lado de lo que tenías (2026-10-29).
+  assert.match(codigo, /Tenías \{formatearMoneda\(tenias\)\} \/ \{unidad\} <PorcentajeDelErp erp=\{erpDeLaTarjeta\} \/> · la factura trae\{" "\}\s*\{formatearMoneda\(trae\)\} \/ \{unidad\}/);
+  assert.match(codigo, /const losDosPreciosDeSiempre = losDosPrecios\(tuPrecio, fila\.costoFactura, unidadDelPrecio\);/);
 });

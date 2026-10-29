@@ -73,11 +73,14 @@ import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
+// El porcentaje del renglón ERP es la pieza de la tarjeta, no una parecida.
+import { PorcentajeDelErp } from "@/components/compras-proveedor/TarjetaLineaFactura";
 import { formatearMoneda, formatearKgExacto } from "@/lib/moneda";
 import {
   decisionDeCostoSugerida,
   textoDeLaDiferencia,
   MARCA,
+  SITUACION,
   VARIACION_POR_DEFECTO,
 } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
@@ -103,7 +106,11 @@ import {
   unidadesFisicasEsperadas,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
-import { quedoEnBultos, unidadDeComparacion } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
+import {
+  quedoEnBultos,
+  renglonesDeLaTarjeta,
+  unidadDeComparacion,
+} from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
   laCantidadCuadraConElPrecio,
   textoDeLaEscalaQueNoCuadra,
@@ -178,6 +185,25 @@ function Bloque({ titulo, accion = null, children }) {
       {children}
     </section>
   );
+}
+
+/**
+ * QUÉ OPCIÓN DE PRECIO VIENE MARCADA AL ABRIR: `true` aceptar, `false` dejar,
+ * `null` ninguna.
+ *
+ * Lo ya decidido manda, y lo que la regla bloquea es dejar. Si no, el más alto
+ * de los dos precios (Emanuel, 2026-10-29): en el salto de precio, los de UNA
+ * unidad —los mismos que dicen las dos opciones—; si no, los de la regla del
+ * proveedor, que deja `null` solo cuando la diferencia es el factor del bulto.
+ */
+export function opcionAlAbrir({ fila, sugerida, saltoAceptable, deUnaUnidad }) {
+  if (aceptarEstaBloqueado(fila?.precio?.decision)) return false;
+  const decidida = decisionVigente(fila);
+  if (decidida) return decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA;
+  if (saltoAceptable && deUnaUnidad) return deUnaUnidad.papel > deUnaUnidad.erp;
+  if (sugerida?.marcado === MARCA.ACEPTA) return true;
+  if (sugerida?.marcado === MARCA.DEJA) return false;
+  return null;
 }
 
 /** Una de las dos opciones de precio. Excluyentes, la elegida con borde 2. */
@@ -403,6 +429,9 @@ export default function HojaCorregirLinea({
   // decidido bajo el freno sigue diciéndose como decidido, y una baja que la
   // regla frena sigue sin ofrecerse, igual que en el caso normal.
   const saltoAceptable = saltoDePrecioAceptable(fila) && !yaDecidioElFreno && !noSePuedeAceptar;
+  // Un salto de precio, se pueda aceptar o no —una baja la frena la regla—:
+  // se muestran los dos precios de una unidad con el porcentaje, no la frase.
+  const esSaltoDePrecio = saltoDePrecioAceptable(fila) && deUnaUnidad !== null;
 
   // ── LA REGLA DEL PROVEEDOR, SOBRE LOS DOS PRECIOS DE ESTE RENGLÓN ─────
   //
@@ -419,12 +448,21 @@ export default function HojaCorregirLinea({
       }),
     [fila?.costoFactura, tuPrecio, fila?.factorPack, variacionNormalPct]
   );
-  const avisoDeLaDiferencia = textoDeLaDiferencia(sugerida, {
-    proveedor: proveedorNombre || "Este proveedor",
-    moneda: formatearMoneda,
-    papel: fila?.costoFactura,
-    tuyo: tuPrecio,
-  });
+  // Solo la de ESCALA lleva frase: una diferencia de precio fuera de la
+  // variación se alerta en la tarjeta y con el porcentaje, sin advertencia
+  // escrita (Emanuel, 2026-10-29).
+  const avisoDeLaDiferencia =
+    sugerida.situacion === SITUACION.ESCALA
+      ? textoDeLaDiferencia(sugerida, {
+          proveedor: proveedorNombre || "Este proveedor",
+          moneda: formatearMoneda,
+          papel: fila?.costoFactura,
+          tuyo: tuPrecio,
+        })
+      : null;
+  // El renglón ERP de la tarjeta, con su porcentaje: la hoja lo muestra con la
+  // misma pieza y los mismos números.
+  const erpDeLaTarjeta = renglonesDeLaTarjeta(fila).erp;
   // ── LA ESCALA SALE DEL MISMO LUGAR QUE LA DE LA TARJETA ───────────────
   //
   // Acá se preguntaba por `unidadPedido` y la tarjeta pregunta por
@@ -442,15 +480,20 @@ export default function HojaCorregirLinea({
   const [sueltas, setSueltas] = useState("");
   const [motivo, setMotivo] = useState(null);
   const [detalleMotivo, setDetalleMotivo] = useState("");
-  // ── QUÉ VIENE MARCADO, Y CUÁNDO NO VIENE NADA ────────────────────────
+  // ── QUÉ VIENE MARCADO ─────────────────────────────────────────────────
   //
   // `null` significa "todavía no eligió nadie", y es distinto de las dos
-  // opciones: cuando la diferencia no es normal para este proveedor no viene
-  // marcada ninguna y guardar no avanza hasta que la persona elija. Hasta esta
-  // tanda arrancaba en `true` —"aceptar el precio nuevo"— siempre, así que
-  // sobre las papas del 242, con el papel 14 % MÁS BARATO, el que tocaba
-  // "Revisado y seguir" sin mirar se bajaba el costo solo.
-  const [aceptaPrecio, setAceptaPrecio] = useState(null);
+  // opciones. Desde el 2026-10-29 viene marcado SIEMPRE el más alto de los dos
+  // precios, dentro y fuera de la variación, y en el salto de precio también;
+  // queda `null` solo cuando la diferencia es el factor del bulto, que no es un
+  // precio. Hasta el 2026-10-26 arrancaba en `true` —"aceptar el precio
+  // nuevo"— siempre, así que sobre las papas del 242, con el papel 14 % MÁS
+  // BARATO, el que tocaba "Revisado y seguir" sin mirar se bajaba el costo solo.
+  // Arranca ya en la opción del abrir —no en `null` hasta el efecto—, así la
+  // hoja nunca se dibuja una vez sin nada marcado.
+  const [aceptaPrecio, setAceptaPrecio] = useState(() =>
+    opcionAlAbrir({ fila, sugerida, saltoAceptable, deUnaUnidad })
+  );
   // Con una decisión vigente la hoja no pregunta: dice qué se decidió y ofrece
   // cambiarlo. Esto es el toque de "Cambiar", no una segunda decisión.
   const [cambiandoPrecio, setCambiandoPrecio] = useState(false);
@@ -571,25 +614,16 @@ export default function HojaCorregirLinea({
     // del 242, con el papel 14 % más barato que tu costo, eso significaba que
     // el que tocaba "Revisado y seguir" sin mirar se bajaba el costo solo.
     //
-    // Ahora: dentro de la variación normal del proveedor viene marcado EL MÁS
-    // ALTO de los dos; fuera de ella, o si la diferencia es el factor del
-    // bulto, NO VIENE MARCADO NADA y guardar no avanza hasta que alguien
-    // elija.
-    const decidida = decisionVigente(fila);
-    const bloqueada = aceptarEstaBloqueado(fila?.precio?.decision);
-    const porLaRegla =
-      sugerida.marcado === MARCA.ACEPTA ? true : sugerida.marcado === MARCA.DEJA ? false : null;
-    setAceptaPrecio(
-      bloqueada
-        ? false
-        : decidida
-          ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA
-          : porLaRegla
-    );
+    // Ahora viene marcado EL MÁS ALTO de los dos (Emanuel, 2026-10-29). En el
+    // salto de precio los dos que se comparan son los de UNA unidad, los
+    // mismos que dicen las dos opciones; si no, los de la regla del proveedor.
+    // Solo si la diferencia es el factor del bulto NO VIENE MARCADO NADA y
+    // guardar no avanza hasta que alguien elija. La cuenta es `opcionAlAbrir`.
+    setAceptaPrecio(opcionAlAbrir({ fila, sugerida, saltoAceptable, deUnaUnidad }));
     setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
-  }, [abierta, fila, sugerida.marcado]);
+  }, [abierta, fila, sugerida.marcado, saltoAceptable, deUnaUnidad?.papel, deUnaUnidad?.erp]);
 
   // ── ¿ESTE PRODUCTO ENTRA AL STOCK EN KILOS? ───────────────────────────
   //
@@ -776,8 +810,8 @@ export default function HojaCorregirLinea({
     // ESTE precio todavía tiene que aplicarse a ESTA línea del pedido — si no,
     // la mercadería entraría al costo viejo en silencio. Las dos rutas son
     // idempotentes sobre los mismos números.
-    // En el salto no viene marcado nada y no se exige elegir: sin elección
-    // entra la mercadería con el costo que estaba, como antes.
+    // En el salto viene marcado el más alto y se guarda lo marcado; sin
+    // elección —una decisión ya tomada bajo el freno— no se manda nada.
     if (cambio || (saltoAceptable && aceptaPrecio !== null)) {
       const r = aceptaPrecio ? await onAceptarPrecio?.(fila) : await onDejarMiPrecio?.(fila);
       if (r && r.ok === false) {
@@ -826,10 +860,12 @@ export default function HojaCorregirLinea({
   };
 
   // ── EL TÍTULO DEL BLOQUE DE PRECIO DICE EN CUÁL DE LOS CUATRO CASOS ESTÁ ──
+  // Sin comparación el título es solo "Precio": lo que pasa lo dice el cuerpo,
+  // sin advertencia en el título (Emanuel, 2026-10-29).
   const tituloDelPrecio = yaDecidioElFreno
     ? "Ya decidiste este precio"
     : sinComparacion
-    ? "El precio no se puede comparar"
+    ? "Precio"
     : yaDecidido && !cambiandoPrecio
       ? "Ya decidiste este precio"
       : cambio
@@ -838,15 +874,21 @@ export default function HojaCorregirLinea({
           }`.trim()
         : "El precio es el mismo";
 
-  /** Los dos números, en una línea. Es lo que se compara, en los cuatro casos. */
-  const losDosPrecios = (
+  /**
+   * Los dos números, en una línea. Es lo que se compara, en los cuatro casos.
+   * Al lado de lo que tenías, cómo está el ERP contra el papel, con la pieza
+   * del renglón ERP de la tarjeta (Emanuel, 2026-10-29). En el salto de precio
+   * van los de UNA unidad, que son los que la tarjeta compara.
+   */
+  const losDosPrecios = (tenias, trae, unidad) => (
     <span className="text-sm3 sunmi-text-muted">
       {/* Los dos en la misma unidad, dicha al lado de cada uno (Emanuel,
           2026-10-26): un precio por pack al lado de uno por unidad no se lee. */}
-      Tenías {formatearMoneda(tuPrecio)} / {unidadDelPrecio} · la factura trae{" "}
-      {formatearMoneda(fila.costoFactura)} / {unidadDelPrecio}
+      Tenías {formatearMoneda(tenias)} / {unidad} <PorcentajeDelErp erp={erpDeLaTarjeta} /> · la factura trae{" "}
+      {formatearMoneda(trae)} / {unidad}
     </span>
   );
+  const losDosPreciosDeSiempre = losDosPrecios(tuPrecio, fila.costoFactura, unidadDelPrecio);
 
   return (
     <SunmiModalLayout
@@ -1234,7 +1276,13 @@ export default function HojaCorregirLinea({
                     {textoDeDecision(DECISION_DE_PRECIO.DEJA_EL_MIO)} · {formatearMoneda(deUnaUnidad.erp)} la unidad
                   </span>
                 )}
-                <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
+                {/* En el salto de precio no va la frase: van los dos precios de
+                    una unidad con el porcentaje, igual que en la tarjeta. */}
+                {esSaltoDePrecio ? (
+                  losDosPrecios(deUnaUnidad.erp, deUnaUnidad.papel, "u")
+                ) : (
+                  <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
+                )}
                 {saltoAceptable ? (
                   <div className="flex flex-col gap-0.5">
                     <OpcionDePrecio
@@ -1276,7 +1324,7 @@ export default function HojaCorregirLinea({
               </span>
             ) : cambio ? (
               <>
-                {losDosPrecios}
+                {losDosPreciosDeSiempre}
 
                 {/* ── LO QUE SE HABÍA DECIDIDO, CUANDO YA NO APLICA ───────
                     Preguntar de cero sobre algo que ya se contestó una vez se
@@ -1300,9 +1348,9 @@ export default function HojaCorregirLinea({
                   </span>
                 )}
 
-                {/* ── CUANDO LA DIFERENCIA NO ES NORMAL PARA ESTE PROVEEDOR ──
-                    No viene marcado nada y guardar no avanza: el que mira el
-                    papel decide, y si decide se respeta. */}
+                {/* ── CUANDO LA DIFERENCIA ES EL FACTOR DEL BULTO ──────────
+                    No es un precio: no viene marcado nada y guardar no avanza
+                    hasta que el que mira el papel decida. */}
                 {avisoDeLaDiferencia && (
                   <p className="text-sm3 sunmi-text-warning break-words" aria-live="polite">
                     {avisoDeLaDiferencia}
@@ -1329,7 +1377,7 @@ export default function HojaCorregirLinea({
             ) : (
               // Los dos números son el mismo: se muestran igual, y no hay nada
               // que decidir. El bloque está para que la hoja no cambie de forma.
-              losDosPrecios
+              losDosPreciosDeSiempre
             )}
           </Bloque>
           )}

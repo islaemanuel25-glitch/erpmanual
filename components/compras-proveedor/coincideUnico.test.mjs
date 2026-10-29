@@ -65,9 +65,13 @@ const SANTA_JULIA = fila({
   decision: DEJA_EL_MIO(46680, 40140),
 });
 
-for (const [nombre, f, porUnidad, papel] of [
-  ["CHANDON DELICE XCAJA", CHANDON, 15000, 7700],
-  ["SANTA JULIA MALBEC", SANTA_JULIA, 6690, 3890],
+// El porcentaje del renglón ERP: Chandon es ESCALA —el papel cobra la mitad de
+// la botella— y no lleva; Santa Julia es un salto de PRECIO, cuya cantidad
+// cierra con el importe, y desde el 2026-10-29 sí lo lleva (Emanuel, PICNIC):
+// el ERP $6.690 contra el papel $3.890, sobre el ERP, +41,9 % en verde.
+for (const [nombre, f, porUnidad, papel, porcentaje] of [
+  ["CHANDON DELICE XCAJA", CHANDON, 15000, 7700, null],
+  ["SANTA JULIA MALBEC", SANTA_JULIA, 6690, 3890, "+41,9 %"],
 ]) {
   test(`2 · ${nombre}: CON «DEJO MI PRECIO» DICE LA DECISIÓN, NO «COINCIDE», Y LOS DOS PRECIOS POR UNIDAD`, () => {
     const html = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f, sinPedidoPrevio: true }));
@@ -77,17 +81,23 @@ for (const [nombre, f, porUnidad, papel] of [
     // Los dos precios en la misma unidad: el ERP ya no dice el pack como si fuera la unidad.
     assert.match(texto, new RegExp(`Papel ${escapar(formatearMoneda(papel))} / u`));
     assert.match(texto, new RegExp(`ERP ${escapar(formatearMoneda(porUnidad))} / u`));
-    // Con la escala sin resolver no hay porcentaje, y no vuelve a frenar.
-    assert.doesNotMatch(texto, /%/);
+    if (porcentaje === null) {
+      // Con la escala sin resolver no hay porcentaje.
+      assert.doesNotMatch(texto, /%/);
+    } else {
+      assert.match(html, new RegExp(`sunmi-text-success">${escapar(porcentaje)}<`));
+    }
+    // Y no vuelve a frenar.
     assert.doesNotMatch(texto, /revisá la cantidad|Fijate si es este producto/);
     assert.doesNotMatch(html, /sunmi-state-warning/, "no hay nada que resolver: no va en tono de alerta");
   });
 }
 
-test("2 · CONTRAPRUEBA: SIN LA DECISIÓN, SANTA JULIA FRENA Y DICE QUÉ NO CUADRA", () => {
+test("2 · CONTRAPRUEBA: SIN LA DECISIÓN, SANTA JULIA FRENA, SOLO CON EL TONO", () => {
   const html = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: { ...SANTA_JULIA, decisionPrecio: null }, sinPedidoPrevio: true }));
   assert.match(html, /sunmi-state-warning/);
-  assert.match(aLaVista(html), /Fijate si es este producto/);
+  // La alerta de un salto de precio es visual desde el 2026-10-29: sin frase.
+  assert.doesNotMatch(aLaVista(html), /Fijate si es este producto|El papel cobra/);
   assert.doesNotMatch(aLaVista(html), /Dejás tu precio/);
 });
 

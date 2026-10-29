@@ -54,6 +54,7 @@ import {
   escalaSinDeducir,
   frenoYaDecidido,
   loQueNoCuadra,
+  precioDistintoDentroDeLaVariacion,
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
@@ -75,6 +76,25 @@ const CLASE_CORREGIR = "sunmi-btn-accent-suave";
 // etiqueta chica y cuadrada.
 export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
+
+/**
+ * CÓMO ESTÁ EL ERP CONTRA EL PAPEL, AL LADO DEL RENGLÓN ERP: "+0,5 %" en verde
+ * cuando el ERP está más caro, "−52,6 %" en rojo cuando está más barato.
+ *
+ * Es el renglón ERP de esta tarjeta, sacado tal cual para que la hoja de
+ * Corregir lo muestre con la misma pieza (Emanuel, 2026-10-29). Recibe el `erp`
+ * de `renglonesDeLaTarjeta`; sin texto no dibuja nada.
+ */
+export function PorcentajeDelErp({ erp }) {
+  if (!erp?.texto) return null;
+  return (
+    <span
+      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDelPorcentaje(erp.pct)}`}
+    >
+      {erp.texto}
+    </span>
+  );
+}
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
 const fmtCant = (n) => {
@@ -201,9 +221,14 @@ export default function TarjetaLineaFactura({
     fila?.decisionPrecio?.decision === DECISION_DE_PRECIO.DEJA_EL_MIO &&
     (frenoYaDecidido(fila) || decisionVigente(fila) != null) &&
     renglones.erp != null;
+  // ── LA ALERTA ES PARA LO QUE SE PASA DE LA VARIACIÓN (Emanuel, 2026-10-29) ──
+  //
+  // Un precio distinto dentro de la variación normal del proveedor se decide en
+  // la hoja, pero no se pinta de alerta: el porcentaje del renglón ERP ya lo
+  // dice. Lo que sí la lleva es lo que se pasa —PICNIC 38g, −52,6 %—.
   const tono = esNoPedida && !sinPedidoPrevio
     ? "sunmi-state-danger"
-    : estado === ESTADO_LINEA.COINCIDE || dejaSuPrecio
+    : estado === ESTADO_LINEA.COINCIDE || dejaSuPrecio || precioDistintoDentroDeLaVariacion(fila)
       ? ""
       : "sunmi-state-warning";
 
@@ -228,10 +253,13 @@ export default function TarjetaLineaFactura({
           {/* Pablo #337: sin saber en qué viene —o con una cuenta que no da
               el importe del papel— no hay porcentaje ni costo, y se dice por
               qué. Mismo aviso y misma pieza que el de arriba. */}
-          {/* Lo que no cuadra de verdad —la escala o el precio—, y nada si ya
-              se decidió dejar el precio propio: no hay nada que resolver. */}
-          {fila?.corridaSospechada !== true && escalaSinDeducir(fila) && !frenoYaDecidido(fila) && (
-            <p className="text-sm2 sunmi-text-warning break-words">{loQueNoCuadra(fila)?.texto}</p>
+          {/* Lo que no cuadra de verdad, y nada si ya se decidió dejar el
+              precio propio: no hay nada que resolver. Un salto de PRECIO no
+              lleva frase (Emanuel, 2026-10-29): lo dicen el tono de la tarjeta
+              y el porcentaje del renglón ERP. La escala sí, porque pide
+              revisar la cantidad. */}
+          {fila?.corridaSospechada !== true && loQueNoCuadra(fila)?.que === "ESCALA" && !frenoYaDecidido(fila) && (
+            <p className="text-sm2 sunmi-text-warning break-words">{loQueNoCuadra(fila).texto}</p>
           )}
           {fila?.corridaSospechada !== true && !escalaSinDeducir(fila) && cuadraConElPapel(fila) === false && (
             <p className="text-sm2 sunmi-text-warning break-words">{AVISO_NO_DA_EL_PAPEL}</p>
@@ -351,13 +379,7 @@ export default function TarjetaLineaFactura({
                       {" "}/ {renglones.erp.unidad}
                     </span>
                   </span>
-                  {renglones.erp.texto && (
-                    <span
-                      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDelPorcentaje(renglones.erp.pct)}`}
-                    >
-                      {renglones.erp.texto}
-                    </span>
-                  )}
+                  <PorcentajeDelErp erp={renglones.erp} />
                 </p>
               )}
             </>
