@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-28 10:19
+**Última actualización:** 2026-10-29 01:53
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-29: feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
 - 2026-10-28: feat(pedidos): los dos depósitos de la empresa arman el mismo pedido, y cada renglón sale del stock del que lo resolvió
 - 2026-10-28: feat(pedidos): el depósito carga en kilos los productos por peso al preparar en el celular
 - 2026-10-28: fix(comprobantes): el lector interpretado pide los importes del pie, y un costo repartido por encima del importe prueba que el papel trae impuestos — Arcor #362

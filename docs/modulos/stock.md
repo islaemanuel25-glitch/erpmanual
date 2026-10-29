@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-29 00:34
+**Última actualización:** 2026-10-29 01:53
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-29: feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
 - 2026-10-29: feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
 - 2026-10-27: revert: se saca la lectura con cámara del Control de stock — vuelve a 78c98a2
 - 2026-10-27: fix(escaner): la cámara lee — zxing en todos los equipos, con el .wasm servido desde el sitio
