@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { precargaDelAlta } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import { codigoDelProveedorParaElAlta, precargaDelAlta } from "@/lib/compras-proveedor/altaDesdeElPapel";
 
 export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancelar }) {
   const { contexto } = useContextoActivo();
@@ -80,6 +80,7 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
         onSubmit={crear}
         catalogos={catalogos}
         initialData={precarga}
+        codigoProveedorAlCrear={codigoDelProveedorParaElAlta(fila)}
       />
     </>
   );

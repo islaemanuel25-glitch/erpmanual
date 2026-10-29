@@ -22,7 +22,11 @@ import FormProducto from "@/components/productos/FormProducto";
 import { UserProvider } from "@/app/context/UserContext";
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 import { precioFinalDelRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
-import { precargaDelAlta, costoDelRenglonParaElAlta } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import {
+  codigoDelProveedorParaElAlta,
+  costoDelRenglonParaElAlta,
+  precargaDelAlta,
+} from "@/lib/compras-proveedor/altaDesdeElPapel";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const codigoDe = (rel) =>
@@ -47,7 +51,10 @@ function renglon({ texto, cantidad = 2, importe = 70180, cargo = 0, codigoProvee
   return f;
 }
 
-const HELLMANNS = () => renglon({ texto: "HELLMANNS MAY LIVIANA DP 24X237G", cargo: 1234.5 });
+// El renglón de producción: 2 bultos de 24, que el papel cuenta como 48
+// unidades, por $57.970,55, con el código 457 de Myf.
+const HELLMANNS = () =>
+  renglon({ texto: "HELLMANNS MAY LIVIANA DP 24X237G", cantidad: 48, importe: 57970.55, codigoProveedor: "457" });
 
 test("en todo el catálogo, con permiso, aparece «Crear producto»; sin permiso, no", () => {
   const con = renderToStaticMarkup(React.createElement(BuscadorProducto, { onElegir() {}, onCancelar() {}, onCrearProducto() {} }));
@@ -66,15 +73,26 @@ test("cada precargado sale de donde corresponde", () => {
   const p = precargaDelAlta({ fila: f, proveedorId: MYF });
   assert.equal(p.nombre, "HELLMANNS MAY LIVIANA DP 24X237G", "el nombre es lo que dice el papel");
   assert.equal(p.proveedor_id, MYF, "el proveedor es el del comprobante");
+  // Con bulto la ficha es la del pack: "Pack", el factor del papel y el costo
+  // del bulto = el de la unidad que calcula la recepción × el factor.
+  assert.equal(p.unidad_medida, "pack");
   assert.equal(p.factor_pack, 24, "el bulto, porque el papel lo imprime");
-  // El costo es el de la recepción: costo final del renglón más su parte de los
-  // cargos, dividido por la cantidad.
-  assert.equal(p.precio_costo, precioFinalDelRenglon({ costoFinalRenglon: 70180, cargoDeLaLinea: 123450, divisor: 2 }));
-  assert.equal(p.precio_costo, 35707.25);
+  assert.equal(precioFinalDelRenglon({ costoFinalRenglon: 57970.55, divisor: 48 }), 1207.72);
+  assert.equal(p.precio_costo, 28985.28, "1.207,72 × 24, no el costo de un frasco");
   // Lo que el alta no asigna sola no se inventa.
   assert.equal("sku" in p, false, "el alta no asigna código interno: no se inventa uno del papel");
   assert.equal("precio_venta" in p, false, "sin margen cargado el alta no calcula la venta");
   assert.equal("id" in p, false, "sin id: sigue siendo un alta");
+});
+
+test("sin bulto queda como antes: unidad y costo por unidad", () => {
+  // El costo de la recepción también lleva la parte de los cargos.
+  const f = renglon({ texto: "MAYONESA SUELTA", cantidad: 2, importe: 70180, cargo: 1234.5 });
+  const p = precargaDelAlta({ fila: f, proveedorId: MYF });
+  assert.equal("factor_pack" in p, false);
+  assert.equal("unidad_medida" in p, false, "el alta pone «Unidad», como en cualquiera");
+  assert.equal(p.precio_costo, precioFinalDelRenglon({ costoFinalRenglon: 70180, cargoDeLaLinea: 123450, divisor: 2 }));
+  assert.equal(p.precio_costo, 35707.25);
 });
 
 test("lo que el papel no trae queda vacío", () => {
@@ -85,28 +103,57 @@ test("lo que el papel no trae queda vacío", () => {
   assert.equal("precio_costo" in precargaDelAlta({ fila: sinImporte, proveedorId: MYF }), false);
 });
 
-test("el formulario de alta se dibuja con lo precargado y lo demás vacío", () => {
-  const precarga = precargaDelAlta({ fila: HELLMANNS(), proveedorId: MYF });
-  // El formulario lee el perfil del usuario; el proveedor real lo da vacío
-  // hasta consultar la sesión, que es como se dibuja la primera vez.
-  const html = renderToStaticMarkup(
+// El formulario lee el perfil del usuario; el proveedor real lo da vacío hasta
+// consultar la sesión, que es como se dibuja la primera vez.
+const dibujarAlta = (initialData, codigoProveedorAlCrear = null) =>
+  renderToStaticMarkup(
     React.createElement(
       UserProvider,
       null,
       React.createElement(FormProducto, {
-        initialData: precarga,
+        initialData,
         catalogos: { CATEGORIAS: [], PROVEEDORES: [{ id: MYF, nombre: "Myf" }], AREAS: [] },
         onSubmit() {},
         onCancel() {},
         submitLabel: "Crear producto",
+        codigoProveedorAlCrear,
       })
     )
   );
+const AVISO_CODIGO = "Se guarda como código interno al crear";
+
+test("el formulario de alta se dibuja con lo precargado: pack, costo por bulto y unitario de referencia", () => {
+  const f = HELLMANNS();
+  const html = dibujarAlta(precargaDelAlta({ fila: f, proveedorId: MYF }), codigoDelProveedorParaElAlta(f));
   assert.match(html, /value="HELLMANNS MAY LIVIANA DP 24X237G"/);
-  assert.match(html, /value="35707.25"/);
+  assert.match(html, />Pack</, "el tipo de venta viene en Pack");
+  assert.match(html, /Costo \*[^<]*por bulto/);
+  assert.match(html, /value="28985.28"/);
+  assert.match(html, /value="1207.72"/, "el costo unitario de referencia es el de un frasco");
   assert.match(html, /value="24"/);
   assert.match(html, />Myf</, "el proveedor viene elegido");
   assert.match(html, /Crear producto/);
+});
+
+test("el código del proveedor se ve fijo en el alta precargada, y en ningún otro lado", () => {
+  const f = HELLMANNS();
+  assert.equal(codigoDelProveedorParaElAlta(f), "457");
+  const precargada = dibujarAlta(precargaDelAlta({ fila: f, proveedorId: MYF }), codigoDelProveedorParaElAlta(f));
+  assert.match(precargada, /Código del proveedor/);
+  assert.match(precargada, /value="457"[^>]*readOnly|readOnly[^>]*value="457"/i);
+  assert.match(precargada, new RegExp(AVISO_CODIGO));
+  // El alta de Productos no cambia.
+  assert.doesNotMatch(dibujarAlta(null), new RegExp(AVISO_CODIGO));
+  // Un renglón sin código no muestra nada.
+  const sinCodigo = renglon({ texto: "HELLMANNS MAY LIVIANA DP 24X237G", cantidad: 48, importe: 57970.55 });
+  assert.equal(codigoDelProveedorParaElAlta(sinCodigo), null);
+  assert.doesNotMatch(
+    dibujarAlta(precargaDelAlta({ fila: sinCodigo, proveedorId: MYF }), codigoDelProveedorParaElAlta(sinCodigo)),
+    new RegExp(AVISO_CODIGO)
+  );
+  // Y la recepción se lo pasa al alta.
+  assert.match(codigoDe("components/compras-proveedor/AltaDesdeElPapel.jsx"), /codigoProveedorAlCrear=\{codigoDelProveedorParaElAlta\(fila\)\}/);
+  assert.match(codigoDe("components/productos/ModalProductoFinal.jsx"), /codigoProveedorAlCrear=\{codigoProveedorAlCrear\}/);
 });
 
 test("el alta precargada se titula y se comporta como alta, no como edición", () => {

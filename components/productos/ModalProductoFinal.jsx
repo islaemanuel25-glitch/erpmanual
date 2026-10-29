@@ -14,6 +14,9 @@ export default function ModalProducto({
   // el alta y productos propios. El backend revalida en la edición.
   puedeEditarCosto = true,
   puedeEditarBase = true,
+  // Solo el alta que se abre desde la recepción: el código del proveedor del
+  // renglón, que el formulario muestra fijo. Ver `FormProducto`.
+  codigoProveedorAlCrear = null,
 }) {
   return (
     <SunmiModalLayout
@@ -64,6 +67,7 @@ export default function ModalProducto({
           editandoOverrideLocal={editandoOverrideLocal}
           puedeEditarCosto={puedeEditarCosto}
           puedeEditarBase={puedeEditarBase}
+          codigoProveedorAlCrear={codigoProveedorAlCrear}
         />
       )}
     </SunmiModalLayout>

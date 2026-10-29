@@ -117,6 +117,9 @@ export default function FormProducto({
   // OVERRIDE por local del recargo. false (alta o edición en depósito/base): se edita
   // el recargo POR DEFECTO del producto base. Evita mostrar un campo que la API ignora.
   editandoOverrideLocal = false,
+  // El código del proveedor del renglón, en el alta que se abre desde la
+  // recepción: se muestra fijo. Null en el alta de Productos, que no cambia.
+  codigoProveedorAlCrear = null,
 }) {
   // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
   const soloLocal = !puedeEditarBase;
@@ -1109,6 +1112,15 @@ export default function FormProducto({
                 }
               />
             </Field>
+
+            {/* Solo en el alta precargada desde la recepción: el código que el
+                proveedor le da al producto, fijo. Lo guarda el vínculo al crear. */}
+            {codigoProveedorAlCrear && !initialData?.id && (
+              <Field label="Código del proveedor" fieldKey="codigo_proveedor">
+                <SunmiInput value={codigoProveedorAlCrear} readOnly disabled />
+                <p className="text-xs sunmi-text-muted mt-1">Se guarda como código interno al crear</p>
+              </Field>
+            )}
           </div>
           </MaestroLock>
         </Section>
