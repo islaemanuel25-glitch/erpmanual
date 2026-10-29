@@ -16,14 +16,19 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **95 migraciones**, la última
-`20261028200000_detalle_resuelto_por_deposito`. Falta una:
+Ninguna. Producción está en **96 migraciones**, la última
+`20261029120000_maximo_stock_por_categoria`.
 
-- `20261029120000_maximo_stock_por_categoria` — ADITIVA: la tabla nueva
-  `MaximoStockCategoria` (ubicación + categoría + máximo, única por las dos) con
-  sus dos claves foráneas. Vacía al crearse; la lee el filtro "Stock alto" del
-  Control de stock. Verificada contra PostgreSQL con
-  `scripts/pruebas-db/controlStock.mjs`, sección 14.
+La `20261029120000_maximo_stock_por_categoria` —aditiva: la tabla nueva
+`MaximoStockCategoria` (ubicación + categoría + máximo, única por las dos) con
+sus dos claves foráneas— se aplicó con el despliegue de `a4ec1527` (2026-10-29),
+antes de levantar la imagen: el clasificador la dio por aditiva y pasó sin
+autorización manual, el contenedor descartable informó las **96** del árbol e
+imprimió "Applying migration", y `migrate status` cerró con "Database schema is
+up to date!". Comprobada contra la base: la tabla existe con sus seis columnas
+(`maximo` en `numeric(12,3)`), la clave primaria, las dos claves foráneas a
+`Local` y `Categoria`, el índice único por ubicación y categoría, y cero filas.
+Backup PRE: `pre-a4ec1527_20261029_021443.sql.gz`.
 
 La `20261028200000_detalle_resuelto_por_deposito` —aditiva: la columna nula
 `PosTransferenciaDetalle.resueltoPorDepositoId` y su clave foránea a `Local`— se
