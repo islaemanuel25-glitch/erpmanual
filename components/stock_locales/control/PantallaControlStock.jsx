@@ -33,6 +33,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -59,6 +60,7 @@ import { MS_MAX_ENTRE_TECLAS_ESCANER, esLecturaDeEscaner } from "@/lib/pos-venta
 import {
   DECISION_NO_CONTADOS,
   FILTRO_CONTROL,
+  UNIDAD_MAXIMO,
   VISTA_CONTROL,
   diaDelControl,
   textoQuedaronComoEstaban,
@@ -94,6 +96,7 @@ export default function PantallaControlStock({ c, puedeGestionar }) {
 
   if (c.vista === VISTA_CONTROL.TERMINAR) return <VistaTerminar c={c} local={local} />;
   if (c.vista === VISTA_CONTROL.DIFERENCIAS) return <VistaDiferencias c={c} local={local} />;
+  if (c.vista === VISTA_CONTROL.MAXIMOS) return <VistaMaximos c={c} />;
   return <VistaInicio c={c} local={local} puedeGestionar={puedeGestionar} />;
 }
 
@@ -159,7 +162,7 @@ export const textoSinAceptar = (n) => `Tenés ${n} ${n === 1 ? "cantidad" : "can
  * fila de conteo son las de siempre.
  */
 function ControlAbierto({ c, local, puedeGestionar }) {
-  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0, enNegativo: 0, categorias: [] };
+  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0, enNegativo: 0, stockAlto: 0, categorias: [] };
   const control = c.estado?.control;
   const esDeposito = c.estado?.local?.es_deposito === true;
   const idFijado = c.fijado?.id ?? null;
@@ -201,6 +204,8 @@ function ControlAbierto({ c, local, puedeGestionar }) {
     { clave: FILTRO_CONTROL.TODOS, texto: "Todos", cantidad: n.total },
     // Página 2 del carrusel: el stock del sistema de esta ubicación bajo cero.
     { clave: FILTRO_CONTROL.EN_NEGATIVO, texto: "En negativo", cantidad: n.enNegativo },
+    // Y al lado, lo que el sistema tiene por encima del máximo de su categoría.
+    { clave: FILTRO_CONTROL.STOCK_ALTO, texto: "Stock alto", cantidad: n.stockAlto },
   ];
 
   return (
@@ -335,6 +340,16 @@ function ControlAbierto({ c, local, puedeGestionar }) {
               }}
             >
               Ver diferencias
+            </SunmiButton>
+            <SunmiButton
+              color="slate"
+              className="w-full justify-center"
+              onClick={() => {
+                setMasAcciones(false);
+                c.irAMaximos();
+              }}
+            >
+              Stock alto · máximos
             </SunmiButton>
           </SunmiModalLayout>
           {avisoSalida ? (
@@ -631,6 +646,78 @@ export function ConfirmarTerminar({ abierto, aCero, sinContar, ocupado, onCancel
  * En escritorio el shell no tiene esa fila, y el mismo nodo se dibuja en la
  * tarjeta (`hidden md:block`, el corte de `LayoutBase`).
  */
+// ── STOCK ALTO · MÁXIMOS ───────────────────────────────────────────────────
+
+/**
+ * EL MÁXIMO DE CADA CATEGORÍA EN ESTA UBICACIÓN. Un renglón por categoría con
+ * productos acá, por nombre: el máximo en un campo chico —vacío es "sin
+ * máximo"— y su unidad, la de la mayoría de sus productos. Nada se guarda
+ * solo: "Guardar" manda todos y vuelve al control.
+ */
+export function VistaMaximos({ c }) {
+  const m = c.maximos;
+  const [escritos, setEscritos] = useState(null);
+  // Lo escrito arranca en lo guardado, la primera vez que llega. Con coma y sin
+  // separador de miles: es lo que se vuelve a mandar.
+  const valores =
+    escritos ?? Object.fromEntries((m?.categorias ?? []).map((cat) => [cat.id, cat.maximo == null ? "" : String(cat.maximo).replace(".", ",")]));
+  const escribir = (id, texto) => setEscritos({ ...valores, [id]: texto });
+  const guardar = () =>
+    c.guardarMaximos(
+      m.categorias.map((cat) => ({ categoriaId: cat.id, maximo: String(valores[cat.id] ?? "").trim() === "" ? null : valores[cat.id] }))
+    );
+
+  return (
+    <div className="space-y-3.5">
+      <EncabezadoDeDetalle
+        titulo="Stock alto"
+        onVolver={c.volverAlInicio}
+        contexto={`${m?.local?.nombre ?? ""} · Más de este máximo, el producto aparece en el filtro Stock alto. Sin máximo, no se revisa.`}
+      />
+      <Aviso texto={c.aviso} />
+      {!m ? (
+        c.aviso ? null : (
+          <div className="py-12">
+            <SunmiLoader />
+          </div>
+        )
+      ) : (
+        <>
+          <Bloque titulo="CATEGORÍAS">
+            {m.categorias.length === 0 ? (
+              <p className="text-sm2 sunmi-text-muted">No hay categorías con productos en esta ubicación.</p>
+            ) : (
+              m.categorias.map((cat) => (
+                <Renglon
+                  key={cat.id}
+                  rotulo={cat.nombre}
+                  valor={
+                    <span className="flex items-center gap-2">
+                      <SunmiInput
+                        type="text"
+                        inputMode={cat.unidad === UNIDAD_MAXIMO.KG ? "decimal" : "numeric"}
+                        value={valores[cat.id] ?? ""}
+                        onChange={(e) => escribir(cat.id, e.target.value)}
+                        placeholder="—"
+                        aria-label={`Máximo de ${cat.nombre}`}
+                        className="w-16 text-right"
+                      />
+                      <span className="sunmi-text-muted">{cat.unidad}</span>
+                    </span>
+                  }
+                />
+              ))
+            )}
+          </Bloque>
+          <BotonTesoreria onClick={guardar} disabled={c.ocupado}>
+            Guardar
+          </BotonTesoreria>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VistaDiferencias({ c, local }) {
   const d = c.diferencias;
   const control = d?.control;

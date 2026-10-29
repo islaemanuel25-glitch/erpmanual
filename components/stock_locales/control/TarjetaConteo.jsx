@@ -61,6 +61,7 @@ import {
   horaDelConteo,
   textoCantidad,
   textoDeLaDiferencia,
+  textoDelMaximo,
   textoNumero,
   totalDeCasilleros,
 } from "@/lib/stock/control/controlStock";
@@ -309,10 +310,22 @@ export default function TarjetaConteo({
     </div>
   );
 
-  // En el depósito con desglose, debajo del stock su total en unidades.
-  const notaDelStock = desglose ? (
-    <span className="text-xs2 sunmi-text-muted tabular-nums">{`= ${textoCantidad(stockDelSistema, casilleros.unidadFisica)}`}</span>
-  ) : null;
+  // En el depósito con desglose, debajo del stock su total en unidades. Y si
+  // está en Stock alto, el máximo de su categoría en el color de advertencia;
+  // el número sigue en su color.
+  const notaDelStock =
+    desglose || item?.stockAlto ? (
+      <>
+        {desglose ? (
+          <span className="text-xs2 sunmi-text-muted tabular-nums">{`= ${textoCantidad(stockDelSistema, casilleros.unidadFisica)}`}</span>
+        ) : null}
+        {item?.stockAlto ? (
+          <span data-maximo-stock="" className="text-xs2 sunmi-text-warning tabular-nums">
+            {textoDelMaximo(item.stockAlto)}
+          </span>
+        ) : null}
+      </>
+    ) : null;
 
   return (
     <TarjetaStockMovil

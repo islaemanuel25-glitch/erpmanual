@@ -52,6 +52,7 @@ function servidor({
   informe = real.diferenciasAbierto,
   revision = { ok: true, productos: [], aCorregir: 0 },
   listarSinDatos = null,
+  maximos = real.maximosMini,
 }) {
   const pedidos = [];
   globalThis.fetch = async (url, opciones = {}) => {
@@ -66,6 +67,7 @@ function servidor({
     else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "GET") datos = terminar;
     else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "POST") datos = terminado ?? { ok: true, controlId: informe.control.id };
     else if (u.pathname === "/api/stock_locales/control/revision") datos = revision;
+    else if (u.pathname === "/api/stock_locales/control/maximos") datos = maximos;
     // Un listado que el servidor contesta sin JSON —un 500 de Next, un 502 del
     // proxy—: `{ status, cuerpo }`.
     if (u.pathname === "/api/stock_locales/listar" && listarSinDatos) {
@@ -564,7 +566,8 @@ test("el buscador y los filtros de transferencias: 2 filas de 2, Sin contar de e
   const n = real.listaSinContarAntesDeEstaBien.resumenControl;
   assert.equal(paginas.length, 2, "dos páginas");
   assert.deepEqual([...paginas[0].querySelectorAll("button")].map(texto), [`Sin contar${n.sinContar}`, `Con diferencia${n.conDiferencia}`, `Contados${n.contados}`, `Todos${n.total}`]);
-  assert.deepEqual([...paginas[1].querySelectorAll("button")].map(texto), [`En negativo${n.enNegativo}`]);
+  // Página 2: En negativo y, al lado, Stock alto (2026-10-29); los otros dos casilleros vacíos.
+  assert.deepEqual([...paginas[1].querySelectorAll("button")].map(texto), [`En negativo${n.enNegativo}`, `Stock alto${n.stockAlto}`]);
   for (const p of paginas) assert.match(p.className, /\bgrid-cols-2 grid-rows-2\b/, "las dos páginas: dos filas de dos");
   const filtros = [...raiz.querySelectorAll("[role='group'] button")];
   assert.equal(filtros[0].getAttribute("aria-pressed"), "true", "de entrada, Sin contar");
@@ -618,6 +621,77 @@ test("En negativo: sigue en el filtro mientras el stock es negativo, y sale cuan
   assert.equal(sigueEnElChip(galletas, FILTRO_CONTROL.EN_NEGATIVO), true);
   assert.equal(sigueEnElChip(contada.item, FILTRO_CONTROL.EN_NEGATIVO), false);
   assert.equal(contada.resumen.enNegativo, 0);
+});
+
+// ── STOCK ALTO ─────────────────────────────────────────────────────────────
+
+test("Stock alto: pide `stock_alto`, y la tarjeta dice el máximo en advertencia debajo del número, que no se pinta", async () => {
+  const altos = real.listaStockAlto;
+  const { raiz, pedidos } = await montar({
+    lista: listadoReal({ todos: real.listaSinContarAntesDeEstaBien, sin_contar: real.listaSinContarAntesDeEstaBien, stock_alto: altos }),
+    guardado: real.estaBienDelAceite,
+  });
+  await tocarChip(raiz, "Stock alto");
+  assert.equal(listados(pedidos).at(-1).params.control, FILTRO_CONTROL.STOCK_ALTO);
+  assert.deepEqual(nombres(raiz), ["Jamón alto"]);
+  assert.equal(texto(chip(raiz, "Stock alto")), `Stock alto${altos.resumenControl.stockAlto}`);
+  const tarjeta = tarjetaDe(raiz, altos.items[0].id);
+  const maximo = tarjeta.querySelector("[data-maximo-stock]");
+  assert.equal(texto(maximo), "máx. 15 kg");
+  assert.match(maximo.className, /sunmi-text-warning/);
+  // Adentro del recuadro de STOCK, después del número, que queda sin color de estado.
+  const numero = maximo.previousElementSibling;
+  assert.match(texto(maximo.parentElement), /^STOCK/);
+  assert.doesNotMatch(numero.className, /sunmi-text-(danger|warning)/);
+});
+
+test("Stock alto: el máximo solo va en la tarjeta que el servidor marca, y sale del filtro al quedar debajo", () => {
+  const [jamon] = real.listaStockAlto.items;
+  const contado = real.contadoSaleDeStockAlto;
+  assert.equal(sigueEnElChip(jamon, FILTRO_CONTROL.STOCK_ALTO), true);
+  assert.equal(sigueEnElChip(contado.item, FILTRO_CONTROL.STOCK_ALTO), false);
+  assert.equal(contado.resumen.stockAlto, 0);
+  // Una tarjeta de cualquier otra lista no trae `stockAlto` y no dibuja la línea.
+  assert.ok(real.listaSinContarAntesDeEstaBien.items.every((i) => i.stockAlto === null));
+});
+
+test("Stock alto · máximos: desde '⋯', una fila por categoría con su unidad; nada se guarda hasta Guardar, que vuelve al control", async () => {
+  const m = real.maximosMini;
+  const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite }, { puedeGestionar: true });
+  await tocarBoton(raiz.querySelector("button[aria-label='Más acciones']"));
+  const opcion = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Stock alto · máximos");
+  assert.ok(opcion, "la opción está en la hoja de ⋯");
+  await tocarBoton(opcion);
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.equal(pedidos.filter((p) => p.ruta === "/api/stock_locales/control/maximos").length, 1);
+  assert.match(texto(raiz), new RegExp(`Stock alto\\s*${m.local.nombre} · Más de este máximo, el producto aparece en el filtro Stock alto\\. Sin máximo, no se revisa\\.`));
+  const campos = [...raiz.querySelectorAll("input[aria-label^='Máximo de ']")];
+  assert.deepEqual(campos.map((i) => i.getAttribute("aria-label")), m.categorias.map((cat) => `Máximo de ${cat.nombre}`), "por nombre, todas");
+  assert.deepEqual(campos.map((i) => i.value), m.categorias.map((cat) => (cat.maximo == null ? "" : String(cat.maximo))));
+  assert.ok(campos.every((i) => i.getAttribute("placeholder") === "—"), "vacío se ve como —");
+  assert.deepEqual(campos.map((i) => i.nextElementSibling.textContent), m.categorias.map((cat) => cat.unidad));
+  const kg = m.categorias.findIndex((cat) => cat.unidad === "kg");
+  assert.equal(campos[kg].getAttribute("inputmode"), "decimal");
+
+  await escribir(campos[kg], "12,5");
+  await escribir(campos[0], "40");
+  assert.equal(pedidos.filter((p) => p.metodo === "PUT").length, 0, "escribir no guarda");
+  const guardar = [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === "Guardar");
+  assert.ok(guardar.className.split(/\s+/).includes("w-full"), "Guardar a todo el ancho");
+  const listadosAntes = listados(pedidos).length;
+  await tocarBoton(guardar);
+  await act(async () => {
+    await esperar(50);
+  });
+  const put = pedidos.find((p) => p.metodo === "PUT" && p.ruta === "/api/stock_locales/control/maximos");
+  assert.deepEqual(
+    put.cuerpo.maximos,
+    m.categorias.map((cat, i) => ({ categoriaId: cat.id, maximo: i === kg ? "12,5" : i === 0 ? "40" : cat.maximo == null ? null : String(cat.maximo) }))
+  );
+  assert.ok(raiz.querySelector("[role='group']"), "volvió al control");
+  assert.ok(listados(pedidos).length > listadosAntes, "y pidió la lista de nuevo, con el contador recalculado");
 });
 
 test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control' va adentro de la cabecera, sin barra fija", async () => {

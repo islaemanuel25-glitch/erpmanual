@@ -664,7 +664,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // depósito. Es el pedido, no la transferencia ni su recepción.
   // Sube a 95 el 2026-10-28: `20261028200000_detalle_resuelto_por_deposito`, aditiva:
   // qué depósito resolvió cada renglón de un pedido. No toca la recepción.
-  assert.equal(migraciones.length, 95,"aparecio una migracion que nadie declaro aca");
+  // Sube a 96 el 2026-10-29: `20261029120000_maximo_stock_por_categoria`, aditiva:
+  // una tabla nueva para el filtro Stock alto del Control de stock. No toca la recepción.
+  assert.equal(migraciones.length, 96,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

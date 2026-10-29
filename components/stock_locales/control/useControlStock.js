@@ -416,6 +416,41 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     [pedir]
   );
 
+  // ── STOCK ALTO · MÁXIMOS ───────────────────────────────────────────────
+  //
+  // La pantalla de máximos trae la ubicación y sus categorías; nada se guarda
+  // hasta "Guardar", que manda todos juntos y vuelve al control con la lista y
+  // el contador de Stock alto pedidos de nuevo.
+  const [maximos, setMaximos] = useState(null);
+  const irAMaximos = useCallback(async () => {
+    setVista(VISTA_CONTROL.MAXIMOS);
+    setAviso(null);
+    setMaximos(null);
+    const r = await pedir(`${API}/maximos`);
+    if (!r.ok) {
+      setAviso(r.error);
+      return;
+    }
+    setMaximos({ local: r.local, categorias: r.categorias });
+  }, [pedir]);
+
+  /** `valores`: `[{ categoriaId, maximo }]`, con `maximo` en null para "sin máximo". */
+  const guardarMaximos = useCallback(
+    async (valores) => {
+      setOcupado(true);
+      const r = await pedir(`${API}/maximos`, { method: "PUT", body: JSON.stringify({ maximos: valores }) });
+      setOcupado(false);
+      if (!r.ok) {
+        setAviso(r.error);
+        return false;
+      }
+      setMaximos(null);
+      volverAlInicio();
+      return true;
+    },
+    [pedir, volverAlInicio]
+  );
+
   // `ocupado` deshabilita el botón, pero llega un render tarde: dos toques
   // seguidos alcanzarían a mandar dos pedidos. La llave es síncrona.
   const terminando = useRef(false);
@@ -491,5 +526,8 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     verDiferencias,
     volverAlInicio,
     confirmarTerminar,
+    maximos,
+    irAMaximos,
+    guardarMaximos,
   };
 }

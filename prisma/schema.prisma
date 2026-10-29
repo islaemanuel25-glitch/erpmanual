@@ -277,6 +277,8 @@ model Local {
   verificacionesEfectivo  VerificacionEfectivo[]    @relation("verificacion_efectivo_del_local")
   /// El catálogo de turnos operativos de esta ubicación.
   turnosOperativos        TurnoOperativo[]
+  /// El stock máximo realista de cada categoría en ESTA ubicación.
+  maximosStockCategoria   MaximoStockCategoria[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -457,6 +459,7 @@ model Categoria {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   productos ProductoBase[]
+  maximosStock MaximoStockCategoria[]
 }
 
 model Proveedor {
@@ -4261,6 +4264,26 @@ model ControlStock {
   diferencias DiferenciaControlStock[]
 
   @@index([localId, estado])
+}
+
+/// EL STOCK MÁXIMO REALISTA DE UNA CATEGORÍA EN UNA UBICACIÓN. Lo que tenga
+/// más que esto en el sistema aparece en el filtro "Stock alto" del Control de
+/// stock. En la unidad en que se venden los productos de la categoría —kg o
+/// un, la de la mayoría—; un producto de otra unidad no se revisa. Sin fila, la
+/// categoría no se revisa. Cada ubicación tiene los suyos: lo de un local no
+/// toca a otro ni al depósito.
+model MaximoStockCategoria {
+  id          Int      @id @default(autoincrement())
+  localId     Int
+  categoriaId Int
+  maximo      Decimal  @db.Decimal(12, 3)
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  local     Local     @relation(fields: [localId], references: [id], onDelete: Cascade)
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([localId, categoriaId])
 }
 
 model ConteoControlStock {

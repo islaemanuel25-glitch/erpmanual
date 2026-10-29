@@ -16,8 +16,14 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **95 migraciones**, las mismas que el árbol, la
-última `20261028200000_detalle_resuelto_por_deposito`.
+Producción está en **95 migraciones**, la última
+`20261028200000_detalle_resuelto_por_deposito`. Falta una:
+
+- `20261029120000_maximo_stock_por_categoria` — ADITIVA: la tabla nueva
+  `MaximoStockCategoria` (ubicación + categoría + máximo, única por las dos) con
+  sus dos claves foráneas. Vacía al crearse; la lee el filtro "Stock alto" del
+  Control de stock. Verificada contra PostgreSQL con
+  `scripts/pruebas-db/controlStock.mjs`, sección 14.
 
 La `20261028200000_detalle_resuelto_por_deposito` —aditiva: la columna nula
 `PosTransferenciaDetalle.resueltoPorDepositoId` y su clave foránea a `Local`— se

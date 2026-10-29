@@ -29,10 +29,11 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-29T00:28:35.536Z",
+        "en": "2026-10-29T01:47:14.699Z",
         "sistema": 5,
         "diferencia": -2
-      }
+      },
+      "stockAlto": null
     }
   },
   "listaAntesDelRecuento": {
@@ -66,10 +67,11 @@
         "conteo": {
           "total": 7,
           "contadoPor": "Ana",
-          "en": "2026-10-29T00:28:35.678Z",
+          "en": "2026-10-29T01:47:14.844Z",
           "sistema": 5,
           "diferencia": 2
-        }
+        },
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -81,6 +83,7 @@
       "sinContar": 7,
       "conDiferencia": 1,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -121,10 +124,11 @@
       "conteo": {
         "total": 7,
         "contadoPor": "Ana",
-        "en": "2026-10-29T00:28:35.788Z",
+        "en": "2026-10-29T01:47:14.951Z",
         "sistema": 5,
         "diferencia": 2
-      }
+      },
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 1,
@@ -133,6 +137,7 @@
       "sinContar": 7,
       "conDiferencia": 1,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -173,10 +178,11 @@
         "conteo": {
           "total": 5,
           "contadoPor": "Ana",
-          "en": "2026-10-29T00:28:35.851Z",
+          "en": "2026-10-29T01:47:15.015Z",
           "sistema": 4,
           "diferencia": 1
-        }
+        },
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -188,6 +194,7 @@
       "sinContar": 7,
       "conDiferencia": 1,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -225,7 +232,8 @@
       "pesoReferenciaKg": null,
       "pesoEsFijo": false,
       "modoVentaDeposito": "PESO",
-      "conteo": null
+      "conteo": null,
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 1,
@@ -234,6 +242,7 @@
       "sinContar": 8,
       "conDiferencia": 0,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -271,7 +280,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -283,6 +293,7 @@
       "sinContar": 7,
       "conDiferencia": 1,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -323,10 +334,11 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-29T00:28:36.082Z",
+        "en": "2026-10-29T01:47:15.211Z",
         "sistema": 2.5,
         "diferencia": -1.25
-      }
+      },
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 1,
@@ -335,6 +347,7 @@
       "sinContar": 6,
       "conDiferencia": 2,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -372,7 +385,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -384,6 +398,7 @@
       "sinContar": 5,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -422,7 +437,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 5,
@@ -449,7 +465,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 4,
@@ -476,7 +493,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 6,
@@ -503,7 +521,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 3,
@@ -530,7 +549,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 5,
@@ -542,6 +562,7 @@
       "sinContar": 5,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -582,10 +603,11 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-29T00:28:36.297Z",
+        "en": "2026-10-29T01:47:15.453Z",
         "sistema": 3,
         "diferencia": 0
-      }
+      },
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 1,
@@ -594,6 +616,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -631,7 +654,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 4,
@@ -658,7 +682,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 6,
@@ -685,7 +710,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 3,
@@ -712,7 +738,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 4,
@@ -724,6 +751,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -765,10 +793,11 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-29T00:28:36.297Z",
+          "en": "2026-10-29T01:47:15.453Z",
           "sistema": 3,
           "diferencia": 0
-        }
+        },
+        "stockAlto": null
       },
       {
         "id": 1,
@@ -798,10 +827,11 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-29T00:28:35.997Z",
+          "en": "2026-10-29T01:47:15.140Z",
           "sistema": 4,
           "diferencia": -2
-        }
+        },
+        "stockAlto": null
       },
       {
         "id": 2,
@@ -831,10 +861,11 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-29T00:28:36.082Z",
+          "en": "2026-10-29T01:47:15.211Z",
           "sistema": 2.5,
           "diferencia": -1.25
-        }
+        },
+        "stockAlto": null
       },
       {
         "id": 7,
@@ -864,10 +895,11 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-29T00:28:36.132Z",
+          "en": "2026-10-29T01:47:15.281Z",
           "sistema": 0,
           "diferencia": 2
-        }
+        },
+        "stockAlto": null
       }
     ],
     "total": 4,
@@ -879,6 +911,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -920,10 +953,11 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-29T00:28:35.997Z",
+          "en": "2026-10-29T01:47:15.140Z",
           "sistema": 4,
           "diferencia": -2
-        }
+        },
+        "stockAlto": null
       },
       {
         "id": 2,
@@ -953,10 +987,11 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-29T00:28:36.082Z",
+          "en": "2026-10-29T01:47:15.211Z",
           "sistema": 2.5,
           "diferencia": -1.25
-        }
+        },
+        "stockAlto": null
       },
       {
         "id": 7,
@@ -986,10 +1021,11 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-29T00:28:36.132Z",
+          "en": "2026-10-29T01:47:15.281Z",
           "sistema": 0,
           "diferencia": 2
-        }
+        },
+        "stockAlto": null
       }
     ],
     "total": 3,
@@ -1001,6 +1037,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1039,7 +1076,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -1051,6 +1089,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1092,10 +1131,11 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-29T00:28:35.997Z",
+          "en": "2026-10-29T01:47:15.140Z",
           "sistema": 4,
           "diferencia": -2
-        }
+        },
+        "stockAlto": null
       }
     ],
     "total": 1,
@@ -1107,6 +1147,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1131,6 +1172,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 1,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1169,7 +1211,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 12,
@@ -1194,7 +1237,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 2,
@@ -1206,6 +1250,7 @@
       "sinContar": 2,
       "conDiferencia": 0,
       "enNegativo": 0,
+      "stockAlto": 0,
       "categorias": []
     },
     "lecturaControl": null
@@ -1220,7 +1265,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-29T00:28:36.678Z",
+      "abiertoEn": "2026-10-29T01:47:15.877Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1257,7 +1302,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-29T00:28:35.454Z"
+      "abiertoEn": "2026-10-29T01:47:14.604Z"
     },
     "vendidos": [
       {
@@ -1302,7 +1347,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-29T00:28:35.454Z",
+      "abiertoEn": "2026-10-29T01:47:14.604Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1362,7 +1407,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-29T00:28:35.454Z",
+      "abiertoEn": "2026-10-29T01:47:14.604Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1422,16 +1467,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-29T00:28:35.454Z",
-      "terminadoEn": "2026-10-29T00:28:36.954Z",
+      "abiertoEn": "2026-10-29T01:47:14.604Z",
+      "terminadoEn": "2026-10-29T01:47:16.157Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-29T00:28:35.454Z",
-        "terminadoEn": "2026-10-29T00:28:36.954Z",
+        "abiertoEn": "2026-10-29T01:47:14.604Z",
+        "terminadoEn": "2026-10-29T01:47:16.157Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -1450,8 +1495,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-29T00:28:35.454Z",
-      "terminadoEn": "2026-10-29T00:28:36.954Z",
+      "abiertoEn": "2026-10-29T01:47:14.604Z",
+      "terminadoEn": "2026-10-29T01:47:16.157Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "EN_CERO",
       "noContadosComoEstaban": null
@@ -1531,7 +1576,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-29T00:28:37.059Z",
+      "abiertoEn": "2026-10-29T01:47:16.264Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -1539,6 +1584,7 @@
       "sinContar": 8,
       "conDiferencia": 0,
       "enNegativo": 0,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1579,7 +1625,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       },
       {
         "id": 13,
@@ -1606,7 +1653,8 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "conteo": null
+        "conteo": null,
+        "stockAlto": null
       }
     ],
     "total": 2,
@@ -1618,6 +1666,7 @@
       "sinContar": 10,
       "conDiferencia": 0,
       "enNegativo": 0,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1656,10 +1705,11 @@
       "conteo": {
         "total": 24,
         "contadoPor": "Admin Depo",
-        "en": "2026-10-29T00:28:37.729Z",
+        "en": "2026-10-29T01:47:16.973Z",
         "sistema": -24,
         "diferencia": 48
-      }
+      },
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 2,
@@ -1668,6 +1718,7 @@
       "sinContar": 4,
       "conDiferencia": 3,
       "enNegativo": 0,
+      "stockAlto": 0,
       "categorias": []
     }
   },
@@ -1675,7 +1726,7 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-29T00:28:36.678Z"
+      "abiertoEn": "2026-10-29T01:47:15.877Z"
     },
     "productos": [
       {
@@ -1709,7 +1760,7 @@
             "id": 58,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-29T00:28:38.327Z",
+            "instante": "2026-10-29T01:47:17.553Z",
             "cambio": -1
           }
         ],
@@ -1799,7 +1850,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-29T00:28:37.059Z"
+      "abiertoEn": "2026-10-29T01:47:16.264Z"
     },
     "vendidos": [
       {
@@ -1880,8 +1931,8 @@
     "control": {
       "id": 3,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-29T00:28:37.059Z",
-      "terminadoEn": "2026-10-29T00:28:38.590Z",
+      "abiertoEn": "2026-10-29T01:47:16.264Z",
+      "terminadoEn": "2026-10-29T01:47:17.822Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "COMO_ESTABAN",
       "noContadosComoEstaban": 7
@@ -1938,10 +1989,11 @@
       "conteo": {
         "total": 21,
         "contadoPor": "Ana",
-        "en": "2026-10-29T00:28:38.659Z",
+        "en": "2026-10-29T01:47:17.877Z",
         "sistema": 19,
         "diferencia": 2
-      }
+      },
+      "stockAlto": null
     },
     "resumen": {
       "controlId": 4,
@@ -1950,6 +2002,7 @@
       "sinContar": 11,
       "conDiferencia": 1,
       "enNegativo": 0,
+      "stockAlto": 0,
       "categorias": [
         {
           "id": 1,
@@ -1963,7 +2016,7 @@
     "ok": true,
     "control": {
       "id": 5,
-      "abiertoEn": "2026-10-29T00:28:38.798Z"
+      "abiertoEn": "2026-10-29T01:47:18.015Z"
     },
     "productos": [
       {
@@ -1978,7 +2031,7 @@
             "id": 73,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-29T00:28:38.833Z",
+            "instante": "2026-10-29T01:47:18.049Z",
             "cambio": -1
           }
         ],
@@ -2062,7 +2115,7 @@
             "id": 80,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-29T00:28:38.886Z",
+            "instante": "2026-10-29T01:47:18.095Z",
             "cambio": -2
           }
         ],
@@ -2104,7 +2157,7 @@
     "ok": true,
     "control": {
       "id": 5,
-      "abiertoEn": "2026-10-29T00:28:38.798Z"
+      "abiertoEn": "2026-10-29T01:47:18.015Z"
     },
     "productos": [
       {
@@ -2138,14 +2191,14 @@
             "id": 73,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-29T00:28:38.833Z",
+            "instante": "2026-10-29T01:47:18.049Z",
             "cambio": -1
           },
           {
             "id": 91,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-29T00:28:40.087Z",
+            "instante": "2026-10-29T01:47:19.070Z",
             "cambio": -1
           }
         ],
@@ -2210,7 +2263,7 @@
             "id": 80,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-29T00:28:38.886Z",
+            "instante": "2026-10-29T01:47:18.095Z",
             "cambio": -2
           }
         ],
@@ -2247,5 +2300,160 @@
     ],
     "aCorregir": 0,
     "noReconstruibles": 2
+  },
+  "listaStockAlto": {
+    "ok": true,
+    "items": [
+      {
+        "id": 38,
+        "localId": 1,
+        "baseId": 34,
+        "nombre": "Jamón alto",
+        "codigoBarra": "8000000000301",
+        "categoriaId": 2,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "kg",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 20,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null,
+        "stockAlto": {
+          "maximo": 15,
+          "unidad": "kg"
+        }
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 5,
+      "total": 23,
+      "contados": 6,
+      "sinContar": 17,
+      "conDiferencia": 5,
+      "enNegativo": 0,
+      "stockAlto": 1,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        },
+        {
+          "id": 2,
+          "nombre": "Fiambres SA",
+          "cantidad": 4
+        },
+        {
+          "id": 3,
+          "nombre": "Masitas SA",
+          "cantidad": 1
+        }
+      ]
+    },
+    "lecturaControl": null
+  },
+  "maximosMini": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7"
+    },
+    "categorias": [
+      {
+        "id": 1,
+        "nombre": "Bebidas",
+        "unidad": "un",
+        "maximo": null
+      },
+      {
+        "id": 2,
+        "nombre": "Fiambres SA",
+        "unidad": "kg",
+        "maximo": 15
+      },
+      {
+        "id": 3,
+        "nombre": "Masitas SA",
+        "unidad": "un",
+        "maximo": null
+      }
+    ]
+  },
+  "contadoSaleDeStockAlto": {
+    "ok": true,
+    "item": {
+      "id": 38,
+      "localId": 1,
+      "baseId": 34,
+      "nombre": "Jamón alto",
+      "codigoBarra": "8000000000301",
+      "categoriaId": 2,
+      "proveedorId": null,
+      "areaFisicaId": null,
+      "unidadMedida": "kg",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 12,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": {
+        "total": 12,
+        "contadoPor": "Emanuel",
+        "en": "2026-10-29T01:47:20.007Z",
+        "sistema": 20,
+        "diferencia": -8
+      },
+      "stockAlto": null
+    },
+    "resumen": {
+      "controlId": 5,
+      "total": 23,
+      "contados": 7,
+      "sinContar": 16,
+      "conDiferencia": 6,
+      "enNegativo": 0,
+      "stockAlto": 0,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        },
+        {
+          "id": 2,
+          "nombre": "Fiambres SA",
+          "cantidad": 4
+        },
+        {
+          "id": 3,
+          "nombre": "Masitas SA",
+          "cantidad": 1
+        }
+      ]
+    }
   }
 }

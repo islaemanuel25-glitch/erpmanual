@@ -104,6 +104,8 @@ try {
       "20261020200000_control_stock_diferencias",
       "20261020210000_control_stock_decision_no_contados",
       "20261022180000_control_stock_sistema_al_contar",
+      // Los máximos por categoría de "Stock alto".
+      "20261029120000_maximo_stock_por_categoria",
     ],
   });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
@@ -198,6 +200,7 @@ try {
     diferencias: await import("../../app/api/stock_locales/control/diferencias/route.js"),
     revision: await import("../../app/api/stock_locales/control/revision/route.js"),
     listar: await import("../../app/api/stock_locales/listar/route.js"),
+    maximos: await import("../../app/api/stock_locales/control/maximos/route.js"),
   };
 
   const sesion = (u, permisos, esDuenoLocal, localId = mini.id, esDeposito = false) =>
@@ -1127,6 +1130,94 @@ try {
     ok("el borrado no está en la revisión ni la tira abajo", !de(borrado.pl));
     const todos = await pedir(R.revision, "POST", `${B}/revision`, S.adminDepo, { todos: true });
     ok("'Corregir todos' con todo eso también contesta, sin tocar el borrado", todos.status === 200 && todos.ok === true, json(todos));
+  }
+
+  seccion("14. Stock alto: el máximo de cada categoría, por ubicación");
+  {
+    // Un control abierto en el Mini (las secciones de antes pueden haberlo
+    // terminado) y el del depósito, que sigue abierto desde la 5.
+    await pedir(R.abrir, "POST", `${B}/abrir`, S.dueno);
+    const maximos = (s) => pedir(R.maximos, "GET", `${B}/maximos`, s);
+    const ponerMaximos = (s, filas) => pedir(R.maximos, "PUT", `${B}/maximos`, s, { maximos: filas });
+    const fiambres = await c.categoria.create({ data: { nombre: "Fiambres SA" } });
+    const masitas = await c.categoria.create({ data: { nombre: "Masitas SA" } });
+    const conCategoria = async (localId, nombre, codigo, unidad, stock, categoriaId) => {
+      const b = await c.productoBase.create({
+        data: { grupoId: grupo.id, nombre, codigo_barra: codigo, unidad_medida: unidad, precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true, categoria_id: categoriaId },
+      });
+      const pl = await c.productoLocal.create({ data: { localId, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
+      await c.stockLocal.create({ data: { localId, productoId: pl.id, cantidad: stock } });
+      return { pl: pl.id, base: b.id, localId };
+    };
+    // Fiambres es de kilos: tres de kg contra uno por unidad.
+    const jamonAlto = await conCategoria(mini.id, "Jamón alto", "8000000000301", "kg", 20, fiambres.id);
+    const jamonJusto = await conCategoria(mini.id, "Jamón justo", "8000000000302", "kg", 15, fiambres.id);
+    await conCategoria(mini.id, "Salamín", "8000000000303", "kg", 10, fiambres.id);
+    const fiambreUnidad = await conCategoria(mini.id, "Fiambre en unidad", "8000000000304", "unidad", 99, fiambres.id);
+    const masita = await conCategoria(mini.id, "Masita", "8000000000305", "unidad", 500, masitas.id);
+    const jamonDepo = await conCategoria(depo.id, "Jamón del depósito", "8000000000306", "kg", 20, fiambres.id);
+
+    const conPin = await ponerMaximos(S.ana, [{ categoriaId: fiambres.id, maximo: 15 }]);
+    ok("con PIN no se configuran: 403, como terminar", conPin.status === 403, json(conPin));
+    const malo = await ponerMaximos(S.dueno, [{ categoriaId: masitas.id, maximo: "1,5" }]);
+    ok("un máximo con coma en una categoría de un: 400 y no guarda nada", malo.status === 400 && (await c.maximoStockCategoria.count()) === 0, json(malo));
+    const guardado = await ponerMaximos(S.dueno, [
+      { categoriaId: fiambres.id, maximo: "15" },
+      { categoriaId: masitas.id, maximo: null },
+    ]);
+    const deCategoria = (r, id) => r.categorias?.find((x) => x.id === id);
+    ok(
+      "el dueño guarda: Fiambres en kg con 15, Masitas en un sin máximo",
+      guardado.status === 200 && deCategoria(guardado, fiambres.id)?.unidad === "kg" && deCategoria(guardado, fiambres.id)?.maximo === 15 &&
+        deCategoria(guardado, masitas.id)?.unidad === "un" && deCategoria(guardado, masitas.id)?.maximo === null,
+      json(guardado)
+    );
+
+    const alto = await lista(S.dueno, "stock_alto");
+    guardar("listaStockAlto", alto);
+    const enAlto = ids(alto.items);
+    ok("arriba del máximo entra: el jamón con 20 sobre 15", enAlto.includes(jamonAlto.pl), json(alto.items?.map((i) => i.nombre)));
+    ok("igual al máximo no entra: el jamón con 15", !enAlto.includes(jamonJusto.pl), json(alto.items?.map((i) => i.nombre)));
+    ok("el de otra unidad que su categoría no se revisa: el fiambre por unidad con 99", !enAlto.includes(fiambreUnidad.pl));
+    ok("una categoría sin máximo no se revisa: la masita con 500", !enAlto.includes(masita.pl));
+    ok(
+      "el contador dice 1 y la tarjeta trae el máximo: 15 kg",
+      json(enAlto) === json([jamonAlto.pl]) && alto.resumenControl?.stockAlto === 1 && json(alto.items?.[0]?.stockAlto) === json({ maximo: 15, unidad: "kg" }),
+      json({ resumen: alto.resumenControl?.stockAlto, tarjeta: alto.items?.[0]?.stockAlto })
+    );
+    const conTexto = await lista(S.dueno, "stock_alto", "q=salam");
+    ok("respeta el buscador: con 'salam' no queda nada", conTexto.items?.length === 0, json(conTexto.items?.map((i) => i.nombre)));
+
+    const enDepo = await lista(S.adminDepo, "stock_alto");
+    ok(
+      "el máximo del Mini no se aplica en el depósito: el jamón del depósito con 20 no entra",
+      enDepo.status === 200 && !ids(enDepo.items).includes(jamonDepo.pl) && enDepo.resumenControl?.stockAlto === 0,
+      json({ items: enDepo.items?.map((i) => i.nombre), resumen: enDepo.resumenControl?.stockAlto })
+    );
+    const delDepo = await ponerMaximos(S.adminDepo, [{ categoriaId: fiambres.id, maximo: "30,5" }]);
+    const delMini = await maximos(S.dueno);
+    guardar("maximosMini", delMini);
+    ok(
+      "lo que configura el depósito no toca al Mini: el depósito 30,5 y el Mini sigue en 15",
+      delDepo.status === 200 && deCategoria(delDepo, fiambres.id)?.maximo === 30.5 && deCategoria(delMini, fiambres.id)?.maximo === 15,
+      json({ depo: deCategoria(delDepo, fiambres.id), mini: deCategoria(delMini, fiambres.id) })
+    );
+    ok("y el Mini lee su ubicación: nombre y solo sus categorías", delMini.local?.nombre === "Mini el 7" && deCategoria(delMini, fiambres.id) && deCategoria(delMini, masitas.id), json(delMini.local));
+
+    const contado = await pedir(R.conteos, "PUT", `${B}/conteos`, S.dueno, { productoLocalId: jamonAlto.pl, total: 12 });
+    guardar("contadoSaleDeStockAlto", contado);
+    const despues = await lista(S.dueno, "stock_alto");
+    ok(
+      "al aceptar 12 queda debajo del máximo: sale de Stock alto, la tarjeta sin máximo y el contador en 0",
+      contado.status === 200 && contado.item?.stockAlto === null && contado.resumen?.stockAlto === 0 && !ids(despues.items).includes(jamonAlto.pl) && despues.resumenControl?.stockAlto === 0,
+      json({ status: contado.status, tarjeta: contado.item?.stockAlto, resumen: contado.resumen?.stockAlto, despues: despues.resumenControl?.stockAlto })
+    );
+    const borrado = await ponerMaximos(S.dueno, [{ categoriaId: fiambres.id, maximo: null }]);
+    ok(
+      "vaciar el máximo lo borra: Fiambres queda sin máximo en el Mini, y el depósito conserva el suyo",
+      borrado.status === 200 && deCategoria(borrado, fiambres.id)?.maximo === null && (await c.maximoStockCategoria.count({ where: { localId: depo.id } })) === 1,
+      json(deCategoria(borrado, fiambres.id))
+    );
   }
 
   if (process.env.ESCRIBIR_FIXTURE_CONTROL) {
