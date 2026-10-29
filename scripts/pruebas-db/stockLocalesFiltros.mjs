@@ -152,7 +152,7 @@ try {
     // Los números que da la versión anterior sobre esta misma siembra (corrida
     // con el código de antes del 2026-10-29: 1, 2, 5 y 1).
     ok(
-      "Bajo mínimo 1, Sin stock 2, Límites sin ajustar 5, Sobre máximo 1, en el orden del diseño",
+      "Bajo mínimo 1, Sin stock 2, Sin límites 5, Sobre máximo 1, en el orden del diseño",
       r.status === 200 &&
         json(r.estados?.map((e) => e.id)) === json(["bajo-minimo", "sin-stock", "limites-sin-ajustar", "sobre-maximo"]) &&
         json(n) === json({ "bajo-minimo": 1, "sin-stock": 2, "limites-sin-ajustar": 5, "sobre-maximo": 1 }),
