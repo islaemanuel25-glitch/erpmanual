@@ -186,9 +186,14 @@ export async function GET(req) {
     // código del local trae ese producto solo, y si no, el ranking literal de la
     // caja sobre los productos activos del local. Los filtros de la pantalla se
     // aplican encima, y con texto el orden es el de la caja.
+    //
+    // Con el estado en inactivos o todos (2026-10-29) la búsqueda es la misma
+    // pero sobre más productos: también los inactivos y las fichas sin alta en
+    // esta ubicación, que si no, no se podían encontrar escribiendo. Con
+    // activos —el default— es exactamente la de la caja.
     let ordenDeLaCaja = null;
     if (q) {
-      const encontrados = await buscarComoLaCaja(prisma, { localId, q });
+      const encontrados = await buscarComoLaCaja(prisma, { localId, q, incluirInactivosYSinAlta: activoFilter !== true, grupoId });
       ordenDeLaCaja = new Map();
       for (const p of encontrados) if (!ordenDeLaCaja.has(p.baseId)) ordenDeLaCaja.set(p.baseId, ordenDeLaCaja.size);
     }

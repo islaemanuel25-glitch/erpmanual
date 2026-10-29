@@ -90,6 +90,17 @@ try {
     data: { grupoId: grupo.id, proveedorId: proveedor.id, productoBaseId: jamonCocido.id, codigoInterno: "PAL-123", activo: true },
   });
   void queso;
+  // Para los inactivos y los sin alta (2026-10-29): una yerba activa, una
+  // INACTIVA —ficha y producto del local dados de baja, como los deja
+  // Productos— y una SIN ALTA en el Mini —solo la tiene el depósito—.
+  const yerbaActiva = await producto("Yerba Taragüi", "7790000000501");
+  const yerbaInactiva = await producto("Yerba Playadito", "7790000000502");
+  await c.productoBase.update({ where: { id: yerbaInactiva.id }, data: { activo: false } });
+  await c.productoLocal.updateMany({ where: { baseId: yerbaInactiva.id }, data: { activo: false } });
+  const yerbaSinAlta = await c.productoBase.create({
+    data: { grupoId: grupo.id, nombre: "Yerba Rosamonte", codigo_barra: "7790000000503", unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+  });
+  await c.productoLocal.create({ data: { localId: deposito.id, baseId: yerbaSinAlta.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
 
   // ── La aplicación, contra ESTA base ─────────────────────────────────────
   process.env.DATABASE_URL = urlPrueba;
@@ -145,6 +156,31 @@ try {
   console.log("\n── Los filtros de Productos se aplican encima de la búsqueda ─────────────");
   const conProveedor = await enProductos("jamon", `&proveedorId=${proveedor.id}`);
   ok("\"jamon\" con el proveedor Paladini: solo el cocido", json(conProveedor.ids) === json([jamonCocido.id]), json(conProveedor.nombres));
+
+  console.log("\n── Con inactivos o todos, busca también los inactivos y los sin alta ─────");
+  const mismos = (a, b) => json([...a].sort()) === json([...b].sort());
+  const todos = await enProductos("yerba", "&estado=todos");
+  ok("con Todos, «yerba» trae la activa, la INACTIVA y la SIN ALTA", todos.status === 200 && mismos(todos.ids, [yerbaActiva.id, yerbaInactiva.id, yerbaSinAlta.id]), json(todos));
+  const inactivos = await enProductos("yerba", "&estado=inactivos");
+  ok("con Inactivos, «yerba» trae la inactiva", inactivos.status === 200 && json(inactivos.ids) === json([yerbaInactiva.id]), json(inactivos));
+  const inactivosMayus = await enProductos("PLAYADITO", "&estado=inactivos");
+  ok("con Inactivos, las mismas reglas de la caja: «PLAYADITO» la encuentra", json(inactivosMayus.ids) === json([yerbaInactiva.id]), json(inactivosMayus));
+  const porCodigoInactiva = await enProductos("7790000000502", "&estado=todos");
+  ok("con Todos, por código, la inactiva", json(porCodigoInactiva.ids) === json([yerbaInactiva.id]), json(porCodigoInactiva));
+  const porCodigoSinAlta = await enProductos("7790000000503", "&estado=todos");
+  ok("con Todos, por código, la sin alta", json(porCodigoSinAlta.ids) === json([yerbaSinAlta.id]), json(porCodigoSinAlta));
+  // El orden sigue siendo el de la caja: la que empieza con lo buscado primero.
+  const ordenTodos = await enProductos("yerba ros", "&estado=todos");
+  ok("con Todos, «yerba ros» trae solo la sin alta", json(ordenTodos.ids) === json([yerbaSinAlta.id]), json(ordenTodos));
+
+  const activos = await enProductos("yerba");
+  ok("sin el filtro (activos, el de siempre), «yerba» trae solo la activa", json(activos.ids) === json([yerbaActiva.id]), json(activos));
+  const activosPorCodigo = await enProductos("7790000000503");
+  ok("sin el filtro, el código de la sin alta no trae nada", activosPorCodigo.total === 0, json(activosPorCodigo));
+  const cajaYerba = await enLaCaja("yerba");
+  ok("la caja sigue trayendo solo la activa", cajaYerba.status === 200 && json(cajaYerba.ids) === json([yerbaActiva.id]), json(cajaYerba));
+  const cajaCodigo = await enLaCaja("7790000000502");
+  ok("y por código la caja sigue sin traer la inactiva", cajaCodigo.status === 200 && cajaCodigo.ids.length === 0, json(cajaCodigo));
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);
