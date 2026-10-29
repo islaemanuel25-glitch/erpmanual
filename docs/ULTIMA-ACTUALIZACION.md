@@ -1,16 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-29 10:38
+**Fecha:** 2026-10-29 12:00
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- fix(productos): el buscador del catálogo busca como la caja
+- Archivos: 1 modificados (1 total)
+
+### productos
+- fix(productos): el buscador del catálogo busca como la caja, feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)
+- Archivos: 2 modificados (2 total)
 
 ### stock
 - feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla), feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla), feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
 - Archivos: 1 nuevos, 10 modificados (11 total)
-
-### productos
-- feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)
-- Archivos: 1 modificados (1 total)
 
 ### transferencias
 - feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
