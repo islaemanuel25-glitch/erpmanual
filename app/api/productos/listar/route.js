@@ -19,6 +19,7 @@ import {
 } from "@/lib/productos/presentaciones";
 import { traerFilasParaControles } from "@/lib/productos/sqlControles";
 import { sellosDeOfertaVigente } from "@/lib/ofertas/servidor";
+import { buscarComoLaCaja } from "@/lib/productos/busquedaComoLaCaja";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 
@@ -175,72 +176,23 @@ export async function GET(req) {
     // Filtro de proveedor (proveedor 1), igual que siempre.
     const proveedorFilter = proveedorId ? { proveedor_id: proveedorId } : {};
 
-    // Busqueda: prioridad a match exacto por codigo_barra/codigo_barra_secundario/sku (alineado con POS).
-    // El exact-vs-contains se evalúa dentro del alcance del proveedor (como hoy).
-    let searchFilter = {};
+    // ── EL BUSCADOR ES EL DE LA CAJA ────────────────────────────────────────
+    //
+    // Hasta el 2026-10-29 Productos buscaba por su lado: un `contains` de la
+    // frase tal cual —sin ignorar acentos, así "jamon" no encontraba "Jamón"—,
+    // el SKU, el código interno del proveedor solo con el filtro de proveedor
+    // puesto, y el resultado ordenado por nombre, no por cuánto se parece. La
+    // caja lo hacía bien. Ahora es la misma búsqueda (`buscarComoLaCaja`): un
+    // código del local trae ese producto solo, y si no, el ranking literal de la
+    // caja sobre los productos activos del local. Los filtros de la pantalla se
+    // aplican encima, y con texto el orden es el de la caja.
+    let ordenDeLaCaja = null;
     if (q) {
-      // Código propio por ubicación: se matchea vía relación `locales.some` acotada
-      // al localId activo (por-local). No reemplaza los globales de la base.
-      const exactCount = await prisma.productoBase.count({
-        where: {
-          AND: [
-            ...generalFilters,
-            proveedorFilter,
-            { OR: [
-              { codigo_barra: { equals: q, mode: "insensitive" } },
-              { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
-              { locales: { some: { localId, codigo_barra_propio: { equals: q, mode: "insensitive" } } } },
-              { sku: { equals: q, mode: "insensitive" } },
-            ] },
-          ],
-        },
-      });
-
-      searchFilter = exactCount > 0
-        ? { OR: [
-            { codigo_barra: { equals: q, mode: "insensitive" } },
-            { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
-            { locales: { some: { localId, codigo_barra_propio: { equals: q, mode: "insensitive" } } } },
-            { sku: { equals: q, mode: "insensitive" } },
-          ] }
-        : { OR: [
-            { nombre: { contains: q, mode: "insensitive" } },
-            { codigo_barra: { contains: q, mode: "insensitive" } },
-            { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
-            { locales: { some: { localId, codigo_barra_propio: { contains: q, mode: "insensitive" } } } },
-            { sku: { contains: q, mode: "insensitive" } },
-          ] };
+      const encontrados = await buscarComoLaCaja(prisma, { localId, q });
+      ordenDeLaCaja = new Map();
+      for (const p of encontrados) if (!ordenDeLaCaja.has(p.baseId)) ordenDeLaCaja.set(p.baseId, ordenDeLaCaja.size);
     }
-
-    // Código interno por proveedor (Opción C): SOLO si hay proveedorId + q.
-    // Trae ProductoBase vinculados a ese proveedor por codigoInterno EXACTO,
-    // aunque no tengan proveedor_id = proveedorId.
-    let baseIdsCodigo = [];
-    if (q && proveedorId) {
-      const matches = await prisma.productoCodigoProveedor.findMany({
-        where: {
-          grupoId,
-          proveedorId,
-          activo: true,
-          codigoInterno: { equals: q, mode: "insensitive" },
-        },
-        select: { productoBaseId: true },
-      });
-      baseIdsCodigo = [...new Set(matches.map((m) => m.productoBaseId))];
-    }
-
-    // Opción C:
-    //   (generales) AND ( (proveedor AND búsqueda) OR (id IN códigos internos) )
-    // Sin q: solo aplica el filtro de proveedor (comportamiento actual, sin ampliar).
-    let searchClause;
-    if (q) {
-      const proveedorYTexto = { AND: [proveedorFilter, searchFilter] };
-      searchClause = baseIdsCodigo.length
-        ? { OR: [proveedorYTexto, { id: { in: baseIdsCodigo } }] }
-        : proveedorYTexto;
-    } else {
-      searchClause = proveedorFilter;
-    }
+    const searchClause = ordenDeLaCaja ? { AND: [proveedorFilter, { id: { in: [...ordenDeLaCaja.keys()] } }] } : proveedorFilter;
 
     const where = { AND: [...generalFilters, searchClause] };
 
@@ -340,7 +292,19 @@ export async function GET(req) {
       where.AND.push({ id: { in: idsMarcados } });
     }
 
-    const total = await prisma.productoBase.count({ where });
+    // Con texto, el orden es el de la caja: se traen los ids que pasan los
+    // filtros, se ordenan por el ranking y se pagina sobre eso.
+    let idsDeLaPagina = null;
+    let total;
+    if (ordenDeLaCaja) {
+      const ids = (await prisma.productoBase.findMany({ where, select: { id: true } }))
+        .map((r) => r.id)
+        .sort((a, b) => ordenDeLaCaja.get(a) - ordenDeLaCaja.get(b));
+      total = ids.length;
+      idsDeLaPagina = ids.slice((page - 1) * pageSize, page * pageSize);
+    } else {
+      total = await prisma.productoBase.count({ where });
+    }
 
     // Ordenamiento dinámico
     const sortMapping = SORT_FIELDS[sortKey];
@@ -349,10 +313,7 @@ export async function GET(req) {
 
     // Consulta principal
     const rows = await prisma.productoBase.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy,
+      ...(idsDeLaPagina ? { where: { id: { in: idsDeLaPagina } } } : { where, skip: (page - 1) * pageSize, take: pageSize, orderBy }),
       include: {
         categoria: { select: { id: true, nombre: true } },
         proveedor: { select: { id: true, nombre: true } },
@@ -405,6 +366,9 @@ export async function GET(req) {
         },
       },
     });
+
+    // La página de una búsqueda, en el orden de la caja.
+    if (idsDeLaPagina) rows.sort((a, b) => ordenDeLaCaja.get(a.id) - ordenDeLaCaja.get(b.id));
 
     // MAP — limpiar snake_case del output final
     const items = rows.map((p) => {

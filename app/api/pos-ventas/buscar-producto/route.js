@@ -11,7 +11,7 @@ import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
 import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
 import {
-  SELECT_CANDIDATO_DE_BUSQUEDA,
+  candidatosDeLaCaja,
   codigosDeBusqueda,
   nombreDeBusqueda,
   rankearComoLaCaja,
@@ -23,7 +23,6 @@ import { ofertasVigentesPorProductoLocal } from "@/lib/ofertas/servidor";
 import { descuentoPctDesdePrecios } from "@/lib/ofertas/precio";
 import { CONDICION_PAGO_LABEL } from "@/lib/ofertas/vigencia";
 
-const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
 
 export async function GET(req) {
@@ -131,17 +130,10 @@ export async function GET(req) {
     // LIKE clásico hacía take:30 sin orderBy y dejaba afuera productos válidos
     // (ej. "leche" no encontraba "Leche Cotar" porque caía después del 30).
     // Ahora cargamos todo el catálogo activo del local y rankeamos en memoria.
-    const candidatos = await prisma.productoLocal.findMany({
-      where: {
-        localId,
-        activo: true,
-        base: { activo: true },
-      },
-      // Qué se trae, qué nombre se compara y qué códigos cuentan viven en
-      // `lib/productos/busquedaComoLaCaja.js`: el Control de stock busca igual.
-      select: SELECT_CANDIDATO_DE_BUSQUEDA,
-      take: FUZZY_CANDIDATE_LIMIT,
-    });
+    // Qué se trae, de qué universo, qué nombre se compara y qué códigos cuentan
+    // viven en `lib/productos/busquedaComoLaCaja.js`: el Control de stock y
+    // Productos buscan igual.
+    const candidatos = await candidatosDeLaCaja(prisma, localId);
 
     const getNombre = nombreDeBusqueda;
     const getCodigo = codigosDeBusqueda;
