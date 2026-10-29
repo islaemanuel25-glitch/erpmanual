@@ -16,10 +16,13 @@ import { SELECT_CANDIDATO_DE_BUSQUEDA, rankearComoLaCaja } from "@/lib/productos
 import { whereUniversoStock } from "@/lib/stock/universoStock";
 import { listadoDelControl } from "@/lib/stock/control/controlStockServer";
 import {
+  FILTRO_EXTRA_STOCK,
   condicionesPrisma,
   condicionesSql,
   esEstadoValido,
+  esFiltroExtraStock,
 } from "@/lib/stock/estadosDeStock";
+import { stockAltoDeUbicacion, whereEnNegativo } from "@/lib/stock/stockAlto";
 
 const PAGE_SIZE = 25;
 
@@ -123,6 +126,18 @@ export async function GET(req) {
 
     const esDeposito = local.es_deposito === true;
 
+    // ── EN NEGATIVO Y STOCK ALTO, LA PÁGINA 2 DE LOS FILTROS ────────────────
+    //
+    // Llegan por el mismo `estado` que los cuatro de siempre y se resuelven con
+    // la cuenta del Control de stock (`lib/stock/stockAlto.js`). Con Stock
+    // alto, cada producto trae además su máximo para la línea de la tarjeta.
+    const filtroExtra = esFiltroExtraStock(estadoCrudo) ? estadoCrudo : null;
+    const altos =
+      filtroExtra === FILTRO_EXTRA_STOCK.STOCK_ALTO ? (await stockAltoDeUbicacion(prisma, localId, esDeposito)).stockAlto : null;
+    const clausulaExtra =
+      filtroExtra === FILTRO_EXTRA_STOCK.EN_NEGATIVO ? whereEnNegativo(localId) : altos ? { id: { in: [...altos.keys()] } } : null;
+    const conMaximo = (items) => (altos ? items.map((i) => ({ ...i, stockAlto: altos.get(i.id) ?? null })) : items);
+
     // ── EL CONTROL DE STOCK USA ESTE MISMO LISTADO ──────────────────────────
     //
     // Con `?control=`, el chip del control filtra encima de los filtros de
@@ -138,7 +153,7 @@ export async function GET(req) {
     const responder = async (items, total, totalPages, lecturaControl = null) =>
       NextResponse.json({
         ok: true,
-        items: ctrl ? await ctrl.enriquecer(items) : items,
+        items: ctrl ? await ctrl.enriquecer(items) : conMaximo(items),
         total,
         totalPages,
         ...(ctrl ? { resumenControl: ctrl.resumen, lecturaControl } : {}),
@@ -231,6 +246,8 @@ export async function GET(req) {
           estadoStockClauses.push({ id: { in: ids } });
         }
       }
+
+      if (clausulaExtra) estadoStockClauses.push(clausulaExtra);
 
       // WHERE único, compartido por count(), findMany paginado y camino hybrid.
       // Un código en el control muestra ese producto aunque el chip no lo incluya.
@@ -449,6 +466,7 @@ export async function GET(req) {
         }
       }
 
+      if (clausulaExtra) estadoStockClausesDepo.push(clausulaExtra);
       if (ctrl?.clausula && !plIdPorCodigoDepo) estadoStockClausesDepo.push(ctrl.clausula);
 
       // Regla A, adentro del universo: defensa por si quedara alguna PL cáscara

@@ -46,7 +46,8 @@ import {
 // por eso no puede disparar dos veces por el mismo cambio.
 export function useResumenStock({ localSeleccionado, listadoListo }) {
   const [estados, setEstados] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  // Los de la página 2: `{ enNegativo, stockAlto }`, o null mientras no se sabe.
+  const [extras, setExtras] = useState(null);
   const [error, setError] = useState("");
 
   // Igual que en Productos: dos primitivos y no un objeto. React descarta un
@@ -88,7 +89,6 @@ export function useResumenStock({ localSeleccionado, listadoListo }) {
     const vigente = () => haceElUltimoPedido(tokenRef, miToken);
 
     (async () => {
-      setCargando(true);
       try {
         const res = await fetch(
           `/api/stock_locales/resumen?localId=${localSeleccionado}`,
@@ -101,27 +101,30 @@ export function useResumenStock({ localSeleccionado, listadoListo }) {
 
         if (json.ok) {
           setEstados(json.estados || []);
+          setExtras({ enNegativo: json.enNegativo, stockAlto: json.stockAlto });
           setError("");
         } else {
           // No se muestran cuatro ceros: cuatro ceros AFIRMAN que el stock está
           // sano, y acá no se sabe nada.
           pedidoRef.current = null;
           setEstados([]);
+          setExtras(null);
           setError(json.error || "No se pudieron contar los estados de stock.");
         }
       } catch (err) {
         if (vigente()) {
           pedidoRef.current = null;
           setEstados([]);
+          setExtras(null);
           setError("No se pudieron contar los estados de stock.");
         }
         console.error("useResumenStock:", err);
-      } finally {
-        if (vigente()) setCargando(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSeleccionado, termino, respondioPara, generacion]);
 
-  return { estados, cargando, error };
+  // Sin `cargando`: el "calculando…" era de las cards viejas. Mientras no hay
+  // respuesta los filtros se dibujan sin número, que no afirma nada.
+  return { estados, extras, error };
 }

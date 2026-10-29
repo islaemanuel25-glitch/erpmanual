@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import CarruselControles from "@/components/productos/CarruselControles";
 import { useResumenStock } from "@/hooks/useResumenStock";
+import { ESTADOS, FILTRO_EXTRA_STOCK } from "@/lib/stock/estadosDeStock";
+import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
@@ -90,12 +91,25 @@ export default function StockLocalesPage() {
   const localSeleccionadoParaResumen = contexto?.localId || null;
   const {
     estados,
-    cargando: cargandoResumen,
+    extras,
     error: errorResumen,
   } = useResumenStock({
     localSeleccionado: localSeleccionadoParaResumen,
     listadoListo,
   });
+
+  // ── LOS SEIS FILTROS, CON LA PIEZA DEL CONTROL DE STOCK ──────────────────
+  //
+  // Página 1, los cuatro de siempre en el orden del dominio (`ESTADOS`), con el
+  // número que cuenta el resumen. Página 2, En negativo y Stock alto, contados
+  // con la cuenta del Control de stock. Sin respuesta del resumen van sin
+  // número: un cero afirmaría que está sano.
+  const cantidadPorEstado = Object.fromEntries(estados.map((e) => [e.id, e.cantidad]));
+  const opcionesEstado = [
+    ...ESTADOS.map((e) => ({ clave: e.id, texto: e.titulo, cantidad: cantidadPorEstado[e.id] })),
+    { clave: FILTRO_EXTRA_STOCK.EN_NEGATIVO, texto: "En negativo", cantidad: extras?.enNegativo },
+    { clave: FILTRO_EXTRA_STOCK.STOCK_ALTO, texto: "Stock alto", cantidad: extras?.stockAlto },
+  ];
 
   const [openAjuste, setOpenAjuste] = useState(false);
   const [productoAjuste, setProductoAjuste] = useState(null);
@@ -147,15 +161,16 @@ export default function StockLocalesPage() {
         />
 
         {/* ── ESTADO DEL STOCK: VA ARRIBA DEL BUSCADOR ────────────────────
-            Es el orden del diseño aprobado. Las cards filtran el listado y no
+            Es el orden del diseño aprobado. Los filtros filtran el listado y no
             tocan datos: son controles de revisión, y por eso se superponen
-            entre sí en vez de repartir el catálogo. */}
-        <CarruselControles
-          titulo="Estado del stock"
-          controles={estados}
-          activo={estadoActivo}
-          onSelect={alTocarCard}
-          cargando={cargandoResumen}
+            entre sí en vez de repartir el catálogo. La pieza y el carrusel de
+            a cuatro son los del Control de stock. */}
+        <SunmiFiltroEstado
+          opciones={opcionesEstado}
+          valor={estadoActivo}
+          onCambiar={alTocarCard}
+          ariaLabel="Estado del stock"
+          porPagina={4}
         />
         {errorResumen && (
           <p className="text-xs sunmi-text-danger" role="status">

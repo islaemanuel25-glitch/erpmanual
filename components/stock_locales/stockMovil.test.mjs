@@ -116,15 +116,39 @@ test("MOV6. LA CANTIDAD SE FORMATEA CON LA MISMA PIEZA QUE LA TABLA", () => {
   assert.match(TABLA, /presentacionCantidadStock/);
 });
 
-test("MOV7. LAS CARDS VAN ARRIBA DEL BUSCADOR Y REUSAN EL CARRUSEL", () => {
-  // El orden es el del diseño aprobado. Y el carrusel es el de Productos: si se
-  // escribiera uno nuevo al lado, las dos pantallas empezarían a verse distinto
-  // el día que una cambie.
-  assert.match(PANTALLA, /CarruselControles/, "las cards no reusan el carrusel del kit");
-  const iCards = PANTALLA.indexOf("CarruselControles");
+test("MOV7. LOS FILTROS VAN ARRIBA DEL BUSCADOR Y SON LA PIEZA DEL CONTROL DE STOCK", () => {
+  // El orden es el del diseño aprobado. Y desde el 2026-10-29 la pieza es la
+  // del Control de stock —`SunmiFiltroEstado` con el carrusel de a cuatro—, no
+  // las cards de Productos: si cada pantalla tuviera la suya, empezarían a
+  // verse distinto el día que una cambie.
+  assert.match(PANTALLA, /<SunmiFiltroEstado[\s\S]*?porPagina=\{4\}/, "los filtros no son la pieza del control");
+  assert.doesNotMatch(PANTALLA, /CarruselControles/, "quedaron las cards viejas");
+  const iFiltrosEstado = PANTALLA.indexOf("<SunmiFiltroEstado");
   const iFiltros = PANTALLA.indexOf("<FiltrosStock");
-  assert.ok(iCards > 0 && iFiltros > 0, "no se encontraron las dos piezas");
-  assert.ok(iCards < iFiltros, "las cards quedaron debajo del buscador");
+  assert.ok(iFiltrosEstado > 0 && iFiltros > 0, "no se encontraron las dos piezas");
+  assert.ok(iFiltrosEstado < iFiltros, "los filtros quedaron debajo del buscador");
+});
+
+test("MOV7b. SEIS FILTROS: LOS CUATRO DE SIEMPRE, Y EN NEGATIVO Y STOCK ALTO EN LA PÁGINA 2", () => {
+  // Página 1 en el orden del dominio, con el número del resumen; página 2 con
+  // los dos que cuenta `lib/stock/stockAlto.js`. Sin respuesta, sin número.
+  assert.match(PANTALLA, /\.\.\.ESTADOS\.map\(\(e\) => \(\{ clave: e\.id, texto: e\.titulo, cantidad: cantidadPorEstado\[e\.id\] \}\)\)/);
+  assert.match(PANTALLA, /\{ clave: FILTRO_EXTRA_STOCK\.EN_NEGATIVO, texto: "En negativo", cantidad: extras\?\.enNegativo \}/);
+  assert.match(PANTALLA, /\{ clave: FILTRO_EXTRA_STOCK\.STOCK_ALTO, texto: "Stock alto", cantidad: extras\?\.stockAlto \}/);
+  assert.match(PANTALLA, /valor=\{estadoActivo\}\s*onCambiar=\{alTocarCard\}/, "tocar un filtro no filtra la lista");
+  assert.match(RESUMEN_HOOK, /setExtras\(\{ enNegativo: json\.enNegativo, stockAlto: json\.stockAlto \}\)/);
+  // Con error, nada de ceros: los extras vuelven a null.
+  assert.equal((RESUMEN_HOOK.match(/setExtras\(null\)/g) || []).length, 2);
+});
+
+test("MOV7c. LA TARJETA DE STOCK ALTO DICE EL MÁXIMO, CON LA LÍNEA DEL CONTROL DE STOCK", () => {
+  assert.match(
+    TABLA,
+    /p\.stockAlto \? \(\s*<span data-maximo-stock="" className="text-xs2 sunmi-text-warning tabular-nums">\s*\{textoDelMaximo\(p\.stockAlto\)\}/,
+    "la tarjeta no dibuja la línea del máximo"
+  );
+  const CONTROL = leer("components/stock_locales/control/TarjetaConteo.jsx");
+  assert.match(CONTROL, /<span data-maximo-stock="" className="text-xs2 sunmi-text-warning tabular-nums">/, "la línea se separó de la del control");
 });
 
 test("MOV8. TOCAR LA CARD ACTIVA LA APAGA, y solo una puede estar prendida", () => {

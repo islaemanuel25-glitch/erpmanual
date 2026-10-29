@@ -40,6 +40,8 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { ESTADOS, condicionesSql } from "@/lib/stock/estadosDeStock";
+import { stockAltoDeUbicacion, whereEnNegativo } from "@/lib/stock/stockAlto";
+import { whereUniversoStock } from "@/lib/stock/universoStock";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +148,19 @@ export async function GET(req) {
     const filas = await prisma.$queryRawUnsafe(sql, localId);
     const r = filas?.[0] || {};
 
+    // ── EN NEGATIVO Y STOCK ALTO, LA PÁGINA 2 ──────────────────────────────
+    //
+    // Fuera de la consulta de arriba, que queda como estaba: se cuentan con la
+    // cuenta del Control de stock (`lib/stock/stockAlto.js`) sobre el MISMO
+    // universo con que los filtra el listado (`whereUniversoStock`), así el
+    // número y la lista no se separan.
+    const local = await prisma.local.findUnique({ where: { id: localId }, select: { es_deposito: true } });
+    const esDeposito = local?.es_deposito === true;
+    const [enNegativo, { stockAlto }] = await Promise.all([
+      prisma.productoLocal.count({ where: { ...whereUniversoStock(localId, esDeposito), ...whereEnNegativo(localId) } }),
+      stockAltoDeUbicacion(prisma, localId, esDeposito),
+    ]);
+
     // `COUNT` vuelve como BigInt: `Number` explícito para que el JSON no explote
     // con "Do not know how to serialize a BigInt".
     const n = (v) => Number(v ?? 0);
@@ -165,12 +180,11 @@ export async function GET(req) {
       estados: ESTADOS.map((e) => ({
         id: e.id,
         titulo: e.titulo,
-        detalle: e.detalle,
-        detalleSano: e.detalleSano,
-        rol: e.rol,
         cantidad: porId[e.id] ?? 0,
       })),
       total: n(r.total),
+      enNegativo,
+      stockAlto: stockAlto.size,
     });
   } catch (err) {
     console.error("stock_locales/resumen:", err);

@@ -17,6 +17,7 @@ import {
   formatLimiteStock,
   palabraDeBultos,
 } from "@/lib/stock/presentacion";
+import { textoDelMaximo } from "@/lib/stock/control/controlStock";
 
 // ── Componente ──────────────────────────────────────────────────────────
 export default function TablaStock({
@@ -193,6 +194,15 @@ export default function TablaStock({
             onLimites={onEditarLimites}
             puedeAjustar={puedeAjustar}
             localEsDeposito={localEsDeposito}
+            // Con el filtro Stock alto el listado trae el máximo de su
+            // categoría: la línea es la de la tarjeta del Control de stock.
+            notaDelStock={
+              p.stockAlto ? (
+                <span data-maximo-stock="" className="text-xs2 sunmi-text-warning tabular-nums">
+                  {textoDelMaximo(p.stockAlto)}
+                </span>
+              ) : null
+            }
           />
         ))}
         </SunmiListaProductoCards>

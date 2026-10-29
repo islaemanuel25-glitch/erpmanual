@@ -58,9 +58,9 @@ function enPaginas(items) {
  * obliga a acordarse de un segundo campo.
  *
  * Comprobado que no mueve lo que ya existía: los cuatro controles de "Para
- * revisar" y los cuatro estados de Stock declaran `detalleSano` —hay un candado
- * en `lib/stock/estadosDeStock.test.mjs` que lo exige—, así que las dos
- * pantallas se dibujan exactamente igual que antes.
+ * revisar" declaran `detalleSano`, así que la pantalla se dibuja exactamente
+ * igual que antes. (Stock Locales también usaba este carrusel hasta el
+ * 2026-10-29; hoy dibuja sus filtros con `SunmiFiltroEstado`.)
  */
 const afirmaSaludEnCero = (control) =>
   control?.detalleSano !== undefined && control?.detalleSano !== null;
