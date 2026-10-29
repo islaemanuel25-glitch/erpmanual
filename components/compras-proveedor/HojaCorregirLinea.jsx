@@ -97,6 +97,9 @@ import {
   piezasContadasDeLaFila,
   piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
+  saltoDePrecioAceptable,
+  textoSiAceptaElSalto,
+  textoSiNoAceptaElSalto,
   unidadesFisicasEsperadas,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
@@ -392,6 +395,14 @@ export default function HojaCorregirLinea({
   // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
   // es dejar el propio, que es la única que corresponde.
   const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision);
+  // ── UN SALTO DE PRECIO GRANDE SE PUEDE ACEPTAR (Emanuel, 2026-10-29) ───
+  //
+  // PICNIC 38g: $375,35 contra $246,00, y el aumento era real. Antes la hoja
+  // decía "tu costo no se toca" y no había forma de tomarlo. Ahora se ofrecen
+  // las mismas dos opciones que en el caso normal, con el aviso arriba. Lo ya
+  // decidido bajo el freno sigue diciéndose como decidido, y una baja que la
+  // regla frena sigue sin ofrecerse, igual que en el caso normal.
+  const saltoAceptable = saltoDePrecioAceptable(fila) && !yaDecidioElFreno && !noSePuedeAceptar;
 
   // ── LA REGLA DEL PROVEEDOR, SOBRE LOS DOS PRECIOS DE ESTE RENGLÓN ─────
   //
@@ -765,7 +776,9 @@ export default function HojaCorregirLinea({
     // ESTE precio todavía tiene que aplicarse a ESTA línea del pedido — si no,
     // la mercadería entraría al costo viejo en silencio. Las dos rutas son
     // idempotentes sobre los mismos números.
-    if (cambio) {
+    // En el salto no viene marcado nada y no se exige elegir: sin elección
+    // entra la mercadería con el costo que estaba, como antes.
+    if (cambio || (saltoAceptable && aceptaPrecio !== null)) {
       const r = aceptaPrecio ? await onAceptarPrecio?.(fila) : await onDejarMiPrecio?.(fila);
       if (r && r.ok === false) {
         setError(r.error || "No se pudo guardar la decisión de precio.");
@@ -1222,9 +1235,31 @@ export default function HojaCorregirLinea({
                   </span>
                 )}
                 <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
-                <span className="text-sm3 sunmi-text-muted break-words">
-                  La mercadería entra igual y tu costo no se toca.
-                </span>
+                {saltoAceptable ? (
+                  <div className="flex flex-col gap-0.5">
+                    <OpcionDePrecio
+                      elegida={aceptaPrecio === true}
+                      titulo="Aceptar el precio nuevo"
+                      detalle={textoSiAceptaElSalto(deUnaUnidad.papel)}
+                      onElegir={() => setAceptaPrecio(true)}
+                    />
+                    <OpcionDePrecio
+                      elegida={aceptaPrecio === false}
+                      titulo="Dejar el que tenía"
+                      detalle={textoSiNoAceptaElSalto({
+                        entra: entraEnKilos
+                          ? formatearKgExacto(entraAlStock)
+                          : `${limpio(entraAlStock)} ${entraAlStock === 1 ? "unidad" : "unidades"}`,
+                        erp: deUnaUnidad.erp,
+                      })}
+                      onElegir={() => setAceptaPrecio(false)}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm3 sunmi-text-muted break-words">
+                    La mercadería entra igual y tu costo no se toca.
+                  </span>
+                )}
               </>
             ) : yaDecidido && !cambiandoPrecio ? (
               // Ya contestada: se dice qué quedó. Volver a mostrar las dos

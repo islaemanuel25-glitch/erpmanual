@@ -116,7 +116,9 @@ test("2 · CON «DEJO MI PRECIO» YA DECIDIDO, EL FRENO NO ES UN AVISO NI BLOQUE
   // Y el servidor no rechaza "dejo mi precio" bajo el freno: era el rojo de la hoja.
   const ruta = codigoDe("app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
   assert.match(ruta, /const dejaElMioBajoFreno = decisionPedida === DECISION_DE_PRECIO\.DEJA_EL_MIO && escalaSinDeducir\(comparacion\);/);
-  assert.match(ruta, /if \(sinComparacion && !dejaElMioBajoFreno\) \{/);
+  // Desde el 2026-10-29 la guarda deja pasar también un salto de precio que se
+  // acepta (`picnicSaltoDePrecio.test.mjs`); "dejo mi precio" sigue pasando.
+  assert.match(ruta, /if \(sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
   // CONTRAPRUEBA: sin la decisión, la tarjeta sí avisa.
   const sinDecidir = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: santaJulia30() }));
   assert.match(sinDecidir, /Fijate si es este producto/);

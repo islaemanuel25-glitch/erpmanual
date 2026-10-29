@@ -65,6 +65,7 @@ import {
   elCatalogoSeMovio,
   escalaSinDeducir,
   motivoSinComparacion,
+  saltoDePrecioAceptable,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
@@ -318,9 +319,37 @@ export async function POST(req) {
     // "Dejo mi precio" no escribe ningún costo, así que un freno de escala o de
     // precio no lo bloquea: es justamente lo que el freno deja hacer (Emanuel,
     // 2026-10-26, Pablo #337). Rechazarlo pintaba el freno en rojo en la hoja
-    // sobre una decisión ya tomada. Aceptar el precio del papel sigue frenado.
+    // sobre una decisión ya tomada.
     const dejaElMioBajoFreno = decisionPedida === DECISION_DE_PRECIO.DEJA_EL_MIO && escalaSinDeducir(comparacion);
-    if (sinComparacion && !dejaElMioBajoFreno) {
+
+    // ── LA MISMA CONCILIACIÓN QUE DIBUJA LA PANTALLA ─────────────────────
+    //
+    // Se carga una vez y sirve para dos preguntas: si este renglón puede estar
+    // corrido, más abajo, y si lo que frena es un salto de PRECIO, acá. Esa
+    // segunda no se puede contestar con `comparacion`, que no trae ni la
+    // cantidad ni el importe del papel: sin ellos `loQueNoCuadra` dice siempre
+    // "escala". Se pregunta sobre la fila de la hoja, con la misma función.
+    const conciliacion =
+      decisionPedida !== DECISION_DE_PRECIO.DEJA_EL_MIO && linea.comprobante.pedidoId
+        ? await cargarConciliacion(prisma, { grupoId, localId, pedidoId: linea.comprobante.pedidoId })
+        : null;
+    const filaDeLaHoja = (conciliacion?.grupos ?? []).flatMap((g) => g.filas ?? []).find((f) => f.lineaId === linea.id);
+
+    // ── UN SALTO DE PRECIO GRANDE SE ACEPTA (Emanuel, 2026-10-29) ─────────
+    //
+    // PICNIC 38g: $375,35 contra $246,00, y era un aumento real. Antes esta
+    // guarda lo rechazaba con el resto de lo que no se puede comparar. Ahora
+    // pasa si es lo ÚNICO que frena, preguntado como lo pregunta la hoja; una
+    // escala sin saber, un papel corrido o uno que no cierra siguen rechazados.
+    const aceptaUnSalto =
+      filaDeLaHoja != null &&
+      // Con lo que la ruta de la pantalla le agrega a la fila y cambia la respuesta.
+      saltoDePrecioAceptable({
+        ...filaDeLaHoja,
+        corridaSospechada: lineasSospechadasDeCorrimiento(conciliacion).has(linea.id),
+        variacionNormalPct: conciliacion.variacionNormalPct,
+      });
+    if (sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto) {
       return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
     }
 
@@ -383,8 +412,7 @@ export async function POST(req) {
     // #298). Se pregunta con la MISMA conciliación que dibuja la pantalla
     // (`cargarConciliacion`): si la tarjeta dice que no se propone, acá no se
     // acepta.
-    if (linea.comprobante.pedidoId) {
-      const conciliacion = await cargarConciliacion(prisma, { grupoId, localId, pedidoId: linea.comprobante.pedidoId });
+    if (conciliacion) {
       if (lineasSospechadasDeCorrimiento(conciliacion).has(linea.id)) {
         return NextResponse.json(
           { ok: false, error: AVISO_PAPEL_CORRIDO, queHacer: AVISO_PAPEL_CORRIDO },
