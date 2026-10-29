@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-29 15:19
+**Fecha:** 2026-10-29 18:26
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta, fix(productos): el buscador del catálogo busca como la caja, feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)
-- Archivos: 2 modificados (2 total)
+- feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo, fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta, fix(productos): el buscador del catálogo busca como la caja
+- Archivos: 4 modificados (4 total)
 
 ### pos-ventas
 - fix(productos): el buscador del catálogo busca como la caja
