@@ -18,7 +18,10 @@ export default function ModalProducto({
   return (
     <SunmiModalLayout
       open={open}
-      title={initialData ? "Editar producto" : "Nuevo producto"}
+      // Editar es tener `id`. Un `initialData` sin id es un alta precargada —la
+      // de "Crear producto" desde un renglón de la recepción— y se titula como
+      // alta. Las dos de siempre no cambian: editar trae id y el alta trae null.
+      title={initialData?.id ? "Editar producto" : "Nuevo producto"}
       onClose={onClose}
       // TODO EXPLÍCITO, incluso lo que hoy coincide con el default del kit: en
       // esta misma tanda los defaults del `alto`, del `z` y del espaciado se
@@ -57,7 +60,7 @@ export default function ModalProducto({
           catalogos={catalogos}
           onSubmit={onSubmit}
           onCancel={onClose}
-          submitLabel={initialData ? "Guardar cambios" : "Crear producto"}
+          submitLabel={initialData?.id ? "Guardar cambios" : "Crear producto"}
           editandoOverrideLocal={editandoOverrideLocal}
           puedeEditarCosto={puedeEditarCosto}
           puedeEditarBase={puedeEditarBase}

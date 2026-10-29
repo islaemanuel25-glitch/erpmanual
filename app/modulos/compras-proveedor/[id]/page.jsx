@@ -1155,6 +1155,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Solo con permiso de editar productos: son dos permisos distintos, y un
   // botón incondicional rebotaría en la cara de quien no lo tiene.
   const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
+  // "Crear producto" en la hoja, para un renglón que no existe en el catálogo.
+  // Es el permiso que exige `/api/productos/crear`, que lo revalida igual.
+  const puedeCrearProductoP = esAdminP || permisosP.includes("productos.crear");
   // Anular pide el permiso que exige la ruta: sin él el botón no se ofrece, y
   // si igual llegara el pedido, el servidor lo rechaza.
   const puedeAnularP = esAdminP || permisosP.includes("compras.crear");
@@ -1750,6 +1753,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}
               onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}
+              puedeCrearProducto={puedeCrearProductoP}
               // El eco optimista manda mientras exista; si no, lo que dice la
               // base. La misma regla que usa la lista, y por eso el botón
               // "Desmarcar" aparece justo cuando el tilde está puesto.

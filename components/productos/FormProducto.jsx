@@ -89,7 +89,8 @@ const FOCUS_ORDER = [
  * FormProducto — formulario reutilizable para crear/editar producto.
  *
  * Props:
- *  - initialData: objeto con datos del producto (null/undefined = nuevo vacío)
+ *  - initialData: objeto con datos del producto (null/undefined = nuevo vacío;
+ *      sin `id` = alta precargada, la de "Crear producto" en la recepción)
  *  - catalogos: { CATEGORIAS, PROVEEDORES, AREAS }
  *  - onSubmit(payload): callback con payload listo para API
  *  - onCancel(): callback para cancelar
@@ -1146,7 +1147,9 @@ export default function FormProducto({
                       modoPedido = "BULTO";
                     }
                     let modoEnvio = p.modo_envio;
-                    if (!initialData || !p.modo_envio) {
+                    // Alta es no tener `id`: un alta precargada desde la
+                    // recepción sigue el default igual que una vacía.
+                    if (!initialData?.id || !p.modo_envio) {
                       modoEnvio = defaultModoEnvio(v);
                     }
                     // Si cambia de kg a otro, resetear modoCompraProveedor

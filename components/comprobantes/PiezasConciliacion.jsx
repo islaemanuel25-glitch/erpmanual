@@ -37,6 +37,7 @@ import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel
  *    decir uno por el otro manda a buscar el problema donde no está.
  */
 export const TEXTO_TODO_EL_CATALOGO = "Buscar en todo el catálogo";
+export const TEXTO_CREAR_PRODUCTO = "Crear producto";
 
 export function BuscadorProducto({
   onElegir,
@@ -57,6 +58,11 @@ export function BuscadorProducto({
   proveedorNombre = null,
   /** Lo que ya viene escrito al abrir, para no tipear lo que dice el papel. */
   textoInicial = "",
+  /**
+   * "Crear producto", al pie de la búsqueda en todo el catálogo: si el producto
+   * no está ahí, no existe. Null —sin permiso de crear productos— y no aparece.
+   */
+  onCrearProducto = null,
 }) {
   const [q, setQ] = useState(textoInicial);
   const [items, setItems] = useState([]);
@@ -181,6 +187,16 @@ export function BuscadorProducto({
           </SunmiButton>
         ))}
       </div>
+      {enTodoElCatalogo && onCrearProducto && !buscando && (
+        <SunmiButton
+          color="slate"
+          type="button"
+          className="mt-1 w-full justify-center"
+          onClick={onCrearProducto}
+        >
+          {TEXTO_CREAR_PRODUCTO}
+        </SunmiButton>
+      )}
     </div>
   );
 }

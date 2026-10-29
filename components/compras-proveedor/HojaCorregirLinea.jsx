@@ -73,6 +73,7 @@ import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
+import AltaDesdeElPapel from "@/components/compras-proveedor/AltaDesdeElPapel";
 // El porcentaje del renglón ERP es la pieza de la tarjeta, no una parecida.
 import { PorcentajeDelErp } from "@/components/compras-proveedor/TarjetaLineaFactura";
 import { formatearMoneda, formatearKgExacto } from "@/lib/moneda";
@@ -240,7 +241,14 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
  * el buscador del catálogo, que es la misma pieza que usa la conciliación de
  * escritorio: no se escribe un segundo buscador.
  */
-function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre }) {
+function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre, puedeCrearProducto }) {
+  // ── Y SI NO EXISTE, SE CREA SIN IRSE DE LA RECEPCIÓN ───────────────────
+  //
+  // Myf #383: "HELLMANNS MAY LIVIANA DP 24X237G" no estaba en el catálogo y
+  // había que irse de la recepción. "Crear producto" abre el alta de siempre
+  // precargada con el papel (`AltaDesdeElPapel`); el producto nuevo se vincula
+  // por `elegir`, el mismo camino que escribe el alias del proveedor.
+  const [creando, setCreando] = useState(false);
   // ── SIN NINGÚN CANDIDATO, SE ABRE DIRECTO EL BUSCADOR ──────────────────
   //
   // Si la cascada no encontró nada en ningún escalón, una hoja con un solo
@@ -285,6 +293,7 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
           textoInicial={textoParaBuscarAMano(fila?.textoCrudo)}
           onElegir={(p) => elegir(p.baseId ?? p.productoBaseId ?? p.id)}
           onCancelar={() => setBuscando(false)}
+          onCrearProducto={puedeCrearProducto ? () => setCreando(true) : null}
         />
       ) : (
         <>
@@ -323,6 +332,20 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
       )}
 
       {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
+
+      {creando && (
+        <AltaDesdeElPapel
+          fila={fila}
+          proveedorId={proveedorId}
+          onCancelar={() => setCreando(false)}
+          onCreado={async (producto) => {
+            // El producto ya existe: el alta se cierra pase lo que pase con el
+            // vínculo, y si el vínculo falla lo dice esta hoja.
+            setCreando(false);
+            await elegir(producto.id);
+          }}
+        />
+      )}
 
       <SunmiButton
         color="slate"
@@ -383,6 +406,11 @@ export default function HojaCorregirLinea({
    * stock ni costo— por la misma ruta que lo corregido, que lo registra.
    */
   onNoVino = null,
+  /**
+   * Si quien recibe tiene el permiso de crear productos: con él, la búsqueda en
+   * todo el catálogo ofrece "Crear producto". El servidor lo revalida igual.
+   */
+  puedeCrearProducto = false,
 }) {
   // La fila la armó `filaSinPapel`: es una línea del pedido que llegó sin
   // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
@@ -950,6 +978,7 @@ export default function HojaCorregirLinea({
           onVincular={onVincular}
           onCerrar={cambiandoProducto ? () => setCambiandoProducto(false) : onCerrar}
           guardando={guardando}
+          puedeCrearProducto={puedeCrearProducto}
         />
       ) : (
         <>
