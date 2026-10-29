@@ -81,7 +81,7 @@ import {
   VARIACION_POR_DEFECTO,
 } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
-import { ORIGEN_VINCULO } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
@@ -212,7 +212,13 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
  * escritorio: no se escribe un segundo buscador.
  */
 function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre }) {
-  const [buscando, setBuscando] = useState(false);
+  // ── SIN NINGÚN CANDIDATO, SE ABRE DIRECTO EL BUSCADOR ──────────────────
+  //
+  // Si la cascada no encontró nada en ningún escalón, una hoja con un solo
+  // botón "Buscar" es un toque de más. Se abre buscando, con las palabras
+  // significativas del papel ya escritas.
+  const sinCandidatos = fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length;
+  const [buscando, setBuscando] = useState(sinCandidatos);
   const [error, setError] = useState("");
   // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
   //
@@ -247,6 +253,7 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
         <BuscadorProducto
           proveedorId={proveedorId}
           proveedorNombre={proveedorNombre}
+          textoInicial={textoParaBuscarAMano(fila?.textoCrudo)}
           onElegir={(p) => elegir(p.baseId ?? p.productoBaseId ?? p.id)}
           onCancelar={() => setBuscando(false)}
         />

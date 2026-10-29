@@ -55,8 +55,10 @@ export function BuscadorProducto({
    */
   proveedorId = null,
   proveedorNombre = null,
+  /** Lo que ya viene escrito al abrir, para no tipear lo que dice el papel. */
+  textoInicial = "",
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(textoInicial);
   const [items, setItems] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [fallo, setFallo] = useState(null);
