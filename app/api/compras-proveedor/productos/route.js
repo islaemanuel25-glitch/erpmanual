@@ -5,6 +5,7 @@ import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { checkPerm } from "@/lib/authorize";
+import { condicionesDeNombre, ordenarPorPalabras } from "@/lib/compras-proveedor/busquedaPorPalabras";
 
 export async function GET(req) {
   try {
@@ -53,6 +54,8 @@ export async function GET(req) {
     const url = new URL(req.url);
     const proveedorId = Number(url.searchParams.get("proveedorId") || 0);
     const search = (url.searchParams.get("search") || "").trim();
+    // Lo pide solo "Buscar otro…" de la recepción: ver `busquedaPorPalabras`.
+    const porPalabras = url.searchParams.get("porPalabras") === "1";
 
     if (!proveedorId) {
       return NextResponse.json(
@@ -152,7 +155,7 @@ export async function GET(req) {
       baseWhere.AND = [
         {
           OR: [
-            { nombre: { contains: search, mode: "insensitive" } },
+            ...condicionesDeNombre(search, { porPalabras }),
             { sku: { contains: search, mode: "insensitive" } },
             { codigo_barra: { contains: search, mode: "insensitive" } },
             { codigo_barra_secundario: { contains: search, mode: "insensitive" } },
@@ -210,7 +213,7 @@ export async function GET(req) {
       take: 1000,
     });
 
-    const items = productosLocal.map((pl) => {
+    const todos = productosLocal.map((pl) => {
       const st = pl.stock[0] || null;
       const cantidadRaw = Number(st?.cantidad ?? 0);
       const stockMinRaw = st?.stockMin != null ? Number(st.stockMin) : null;
@@ -283,6 +286,7 @@ export async function GET(req) {
         pesoPromedioKg: pl.base.pesoPromedioKg ? Number(pl.base.pesoPromedioKg) : null,
       };
     });
+    const items = porPalabras && search ? ordenarPorPalabras(todos, search) : todos;
 
     // Priorizar arriba los que matchean exacto por código interno (Etapa 4).
     // sort es estable: dentro de cada grupo se preserva el orden por nombre.

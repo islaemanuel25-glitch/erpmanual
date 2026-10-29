@@ -95,7 +95,7 @@ export function BuscadorProducto({
         const url = enTodoElCatalogo
           ? `/api/productos/listar?q=${encodeURIComponent(texto)}&pageSize=8`
           : `/api/compras-proveedor/productos?proveedorId=${proveedorId}` +
-            `&search=${encodeURIComponent(texto)}`;
+            `&search=${encodeURIComponent(texto)}&porPalabras=1`;
         const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
         const d = await r.json().catch(() => null);
         if (!r.ok) {
