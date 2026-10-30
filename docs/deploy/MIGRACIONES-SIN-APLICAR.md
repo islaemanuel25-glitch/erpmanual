@@ -16,17 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **96 migraciones**, la última
-`20261029120000_maximo_stock_por_categoria`. Falta una:
+Ninguna. Producción está en **97 migraciones**, la última
+`20261030220000_precios_bajo_su_regla`.
 
-- `20261030220000_precios_bajo_su_regla` — DE DATOS: sube el precio de venta de
-  768 filas de `ProductoLocal` (y la ficha de 23 del depósito) a lo que da su
-  propia regla; en 96 de ellas, sin regla o con margen ≤ 0, guarda margen 30.
-  Antes copia todas las filas activas a
-  `respaldo.backup_precios_ubicacion_20261030`. Cada UPDATE exige el precio, el
-  costo y el margen de la exportación. El clasificador la va a marcar por los
-  `UPDATE`: va con autorización manual, por el pedido explícito de Emanuel del
-  2026-10-30. Quinto chequeo del backup: aplica.
+La `20261030220000_precios_bajo_su_regla` —de datos: sube a lo que da su propia
+regla el precio de venta de 768 filas de `ProductoLocal` y la ficha de 23 del
+depósito, y guarda margen 30 en 85 filas y 11 fichas sin regla o con margen
+≤ 0— se aplicó con el despliegue de `022ba446` (2026-10-30), antes de levantar
+la imagen. El clasificador la marcó NO ADITIVA por los `UPDATE` y se aplicó con
+`DEPLOY_MIGRACION_AUTORIZADA=1`, por el pedido explícito de Emanuel de corregir
+esos precios en producción; quedó en la bitácora. El contenedor informó las
+**97** del árbol e imprimió "Applying migration", y `migrate status` cerró con
+"Database schema is up to date!". Quinto chequeo del backup: la fila 13982
+(Amstel del depósito) estaba en `pre-022ba446` a $46.100. Comprobada contra la
+base, cruzando ids: las 768 quedaron con el precio esperado, ninguna otra fila
+cambió de precio, ninguna bajó, y `respaldo.backup_precios_ubicacion_20261030`
+tiene las 11.698 filas activas.
 
 La `20261029120000_maximo_stock_por_categoria` —aditiva: la tabla nueva
 `MaximoStockCategoria` (ubicación + categoría + máximo, única por las dos) con
