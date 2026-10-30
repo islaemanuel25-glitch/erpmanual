@@ -670,7 +670,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // precios de venta de `ProductoLocal` a lo que da su regla. No toca la recepción.
   // Sube a 98 el 2026-10-30: `20261030230000_precios_sin_regla`, de datos: precio y
   // margen de las filas de `ProductoLocal` sin margen. No toca la recepción.
-  assert.equal(migraciones.length, 98,"aparecio una migracion que nadie declaro aca");
+  // Sube a 99 el 2026-10-30: `20261030235000_promociones_vuelven`, de datos: 12 combos
+  // vuelven a su precio de antes. No toca la recepción.
+  assert.equal(migraciones.length, 99,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
