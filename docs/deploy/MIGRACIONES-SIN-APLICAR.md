@@ -16,14 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **98 migraciones**, la última
-`20261030230000_precios_sin_regla`. Falta una:
+Ninguna. Producción está en **99 migraciones**, la última
+`20261030235000_promociones_vuelven`.
 
-- `20261030235000_promociones_vuelven` — DE DATOS: 12 combos que las dos
-  correcciones de precios del 2026-10-30 subieron vuelven al precio, margen y
-  regla del respaldo `respaldo.backup_precios_ubicacion_20261030`. Antes copia
-  todo a `respaldo.backup_precios_ubicacion_20261030_e`. Autorización manual
-  dada por Emanuel.
+La `20261030235000_promociones_vuelven` —de datos: los 12 combos que las dos
+correcciones de precios del día habían subido vuelven al precio, margen y regla
+de `respaldo.backup_precios_ubicacion_20261030`— se aplicó con el despliegue de
+`ac3c1f61` (2026-10-30), con `DEPLOY_MIGRACION_AUTORIZADA=1` dada por Emanuel.
+Comprobada contra la base: los 12 quedaron iguales al respaldo y ninguna otra
+fila cambió respecto de `respaldo.backup_precios_ubicacion_20261030_e`.
 
 La `20261030230000_precios_sin_regla` —de datos: 1.479 filas de `ProductoLocal`
 sin margen o con margen ≤ 0, más las 252 que la medición llamó "de escala";
