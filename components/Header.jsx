@@ -131,13 +131,19 @@ export default function Header({ onOpenMobileMenu }) {
             aria-label="Ir al inicio"
           >
             <Home size={isLauncher ? 18 : 16} />
-            <span className={isLauncher ? "inline" : "hidden sm:inline"}>Inicio</span>
+            {/* En el teléfono va solo la casa: con el texto la barra no entraba
+                y el avatar quedaba cortado afuera a la derecha. */}
+            <span className="hidden sm:inline">Inicio</span>
           </Link>
         )}
       </div>
 
       {/* DERECHA */}
-      <div className="flex items-center gap-3 sm:gap-4">
+      {/* `min-w-0` deja que este bloque se achique dentro del encabezado; sin él
+          su mínimo es el ancho de todo su contenido y empuja al avatar afuera.
+          Lo que cede es el chip del contexto, que es el único con `min-w-0`:
+          operador y usuario llevan `shrink-0` y quedan siempre enteros. */}
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
 
         {/* NOTIFICACIONES */}
         <CampanaNotificaciones iconClassName={theme.header.text} />
@@ -197,7 +203,7 @@ export default function Header({ onOpenMobileMenu }) {
         )}
 
         {/* OPERADOR — siempre visible */}
-        <div className="relative" ref={operadorRef}>
+        <div className="relative shrink-0" ref={operadorRef}>
           {/* Una cuenta exenta que hizo PIN para usar una caja se muestra como
               cualquier operador: con su nombre y la opción de cambiar. */}
           {esCuentaPropia && !operador ? (
@@ -268,7 +274,7 @@ export default function Header({ onOpenMobileMenu }) {
         </div>
 
         {/* USUARIO */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <div
             onClick={() => setOpen(!open)}
             className="flex items-center gap-2 cursor-pointer select-none"

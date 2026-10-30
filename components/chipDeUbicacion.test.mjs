@@ -68,3 +68,32 @@ test("el ícono no se deforma cuando el texto se achica", () => {
     assert.match(i, /shrink-0/, `${i.slice(0, 20)}… se va a aplastar al truncar el texto`);
   }
 });
+
+// ── LA BARRA NO DESBORDA EN EL TELÉFONO ───────────────────────────────────
+//
+// Fuera del Panel la barra suma el botón Inicio, y a 390 px el avatar quedaba
+// cortado afuera a la derecha. El `min-w-0` del chip no alcanzaba solo: su
+// bloque padre tenía el mínimo automático —el ancho de todo su contenido—, así
+// que el chip nunca llegaba a achicarse. Y el texto "Inicio" se ve solo de `sm`
+// para arriba en los dos modos de menú.
+
+test("el bloque derecho puede achicarse, así el chip cede en vez de empujar al avatar", () => {
+  const i = SRC.indexOf("<CampanaNotificaciones");
+  assert.ok(i > 0, "no encontré la campana en el encabezado");
+  const apertura = SRC.slice(SRC.lastIndexOf("<div", i), i);
+  assert.match(apertura, /min-w-0/, "sin `min-w-0` el bloque no se achica y saca al avatar de la barra");
+});
+
+test("operador y usuario no se achican: quedan siempre enteros", () => {
+  for (const ref of ["operadorRef", "menuRef"]) {
+    const div = SRC.match(new RegExp(`<div[^>]*ref=\\{${ref}\\}[^>]*>`));
+    assert.ok(div, `no encontré el bloque de ${ref}`);
+    assert.match(div[0], /shrink-0/, `el bloque de ${ref} se puede aplastar`);
+  }
+});
+
+test("en el teléfono el botón Inicio es solo la casa", () => {
+  const spans = SRC.match(/<span[^>]*>\s*Inicio\s*<\/span>/g) || [];
+  assert.equal(spans.length, 1, "esperaba un solo texto Inicio en el encabezado");
+  assert.match(spans[0], /className="hidden sm:inline"/, "el texto Inicio se ve en angosto");
+});
