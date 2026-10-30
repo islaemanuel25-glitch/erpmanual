@@ -26,48 +26,7 @@
 
 import fs from "node:fs";
 import { decidirCorreccion, ACCION } from "./preciosBajoSuRegla.mjs";
-import { ofertaVigente } from "../../lib/ofertas/vigencia.js";
-
-function argumento(nombre) {
-  const i = process.argv.indexOf(`--${nombre}`);
-  if (i < 0 || !process.argv[i + 1]) {
-    console.error(`Falta --${nombre}`);
-    process.exit(2);
-  }
-  return process.argv[i + 1];
-}
-
-/** CSV con comillas, como lo escribe `\copy ... csv header`. */
-function leerCsv(texto) {
-  const filas = [];
-  let campo = "";
-  let fila = [];
-  let entreComillas = false;
-  for (let i = 0; i < texto.length; i++) {
-    const c = texto[i];
-    if (entreComillas) {
-      if (c === '"' && texto[i + 1] === '"') { campo += '"'; i++; }
-      else if (c === '"') entreComillas = false;
-      else campo += c;
-    } else if (c === '"') entreComillas = true;
-    else if (c === ",") { fila.push(campo); campo = ""; }
-    else if (c === "\n") { fila.push(campo); filas.push(fila); fila = []; campo = ""; }
-    else if (c !== "\r") campo += c;
-  }
-  if (campo !== "" || fila.length) { fila.push(campo); filas.push(fila); }
-  const [cabecera, ...resto] = filas;
-  return resto.filter((f) => f.length === cabecera.length).map((f) => Object.fromEntries(cabecera.map((h, i) => [h, f[i]])));
-}
-
-const num = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
-/** El de la ubicación si es un número de verdad y no cero; si no, el de la ficha (`precioDeLaUbicacion`). */
-const deLaUbicacion = (local, ficha) => (num(local) ? num(local) : num(ficha));
-const sql = (v) => (v === null || v === undefined ? "NULL" : String(Number(v)));
-const conZona = (v) => (v == null ? null : /[zZ]|[+-]\d\d:?\d\d$/.test(v) ? v : `${v}Z`);
-const moneda = (v) => {
-  const s = Number(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `$${s.endsWith(",00") ? s.slice(0, -3) : s}`;
-};
+import { argumento, basesEnOfertaVigente, deLaUbicacion, leerCsv, moneda, num, sql } from "./comun.mjs";
 
 const medicion = leerCsv(fs.readFileSync(argumento("csv"), "utf8"));
 const universo = new Set(
@@ -78,12 +37,7 @@ const universo = new Set(
 const filas = JSON.parse(fs.readFileSync(argumento("filas"), "utf8"));
 const ofertas = JSON.parse(fs.readFileSync(argumento("ofertas"), "utf8")) ?? [];
 
-const ahora = new Date();
-const basesEnOferta = new Set(
-  ofertas
-    .filter((o) => ofertaVigente({ ...o, publicadaEn: conZona(o.publicadaEn), finalizadaEn: conZona(o.finalizadaEn), inicioEn: conZona(o.inicioEn), finEn: conZona(o.finEn) }, ahora))
-    .flatMap((o) => o.bases ?? [])
-);
+const basesEnOferta = basesEnOfertaVigente(ofertas);
 
 const aplicar = [];
 const lista = [];

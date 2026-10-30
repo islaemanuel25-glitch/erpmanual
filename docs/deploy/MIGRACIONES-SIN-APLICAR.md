@@ -16,8 +16,18 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **97 migraciones**, la última
-`20261030220000_precios_bajo_su_regla`.
+Producción está en **97 migraciones**, la última
+`20261030220000_precios_bajo_su_regla`. Falta una:
+
+- `20261030230000_precios_sin_regla` — DE DATOS: las filas de `ProductoLocal`
+  sin margen o con margen ≤ 0 —y las 252 que la medición llamó "de escala"—.
+  Ganando menos de 30 % suben a 30 con margen 30; ganando más, conservan el
+  precio y anclan el margen a un entero; las de escala que sí tienen regla
+  suben con la suya. Alinea la ficha de 370 filas del depósito. Antes copia
+  todas las filas activas y su ficha a
+  `respaldo.backup_precios_ubicacion_20261030_b`. Cada UPDATE exige los valores
+  exportados. Va con autorización manual, dada por el pedido de Emanuel del
+  2026-10-30. Quinto chequeo del backup: aplica.
 
 La `20261030220000_precios_bajo_su_regla` —de datos: sube a lo que da su propia
 regla el precio de venta de 768 filas de `ProductoLocal` y la ficha de 23 del
