@@ -910,6 +910,26 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   }, [id]);
 
+  // Quitar el producto: la misma ruta que vincular, con DELETE. Al volver, la
+  // línea queda sin producto y la hoja se cierra, igual que al vincular.
+  const quitarProductoDeLinea = useCallback(async (fila) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/vincular", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineaId: fila?.lineaId, pedidoId: Number(id), textoCrudo: fila?.textoCrudo ?? null }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo quitar el producto." };
+      setRecargarConciliacion((n) => n + 1);
+      setLineaACorregir(null);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo quitar el producto." };
+    }
+  }, [id]);
+
   // BORRADOR (PENDIENTE) se edita SOLO en /nueva. Si el pedido está en borrador,
   // redirigir al editor único en vez de mantener un editor duplicado acá.
   useEffect(() => {
@@ -1751,6 +1771,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 }
               }}
               onVincular={vincularLinea}
+              onQuitarProducto={quitarProductoDeLinea}
               onDesmarcar={desmarcarLinea}
               onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}
               puedeCrearProducto={puedeCrearProductoP}

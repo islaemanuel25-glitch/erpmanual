@@ -411,6 +411,12 @@ export default function HojaCorregirLinea({
    * todo el catálogo ofrece "Crear producto". El servidor lo revalida igual.
    */
   puedeCrearProducto = false,
+  /**
+   * Quitar el producto de la línea: `(fila)` → `{ ok, error? }`. La deja sin
+   * producto y da de baja el par del proveedor que la vinculaba. Null y no hay
+   * botón.
+   */
+  onQuitarProducto = null,
 }) {
   // La fila la armó `filaSinPapel`: es una línea del pedido que llegó sin
   // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
@@ -789,6 +795,12 @@ export default function HojaCorregirLinea({
       ? "Bultos"
       : "Unidades";
 
+  const quitarProducto = async () => {
+    setError("");
+    const r = await onQuitarProducto?.(fila);
+    if (r && r.ok === false) setError(r.error || "No se pudo quitar el producto.");
+  };
+
   const guardar = async () => {
     setError("");
     if (cantidadDifiere && !motivo) {
@@ -1040,6 +1052,20 @@ export default function HojaCorregirLinea({
               >
                 Cambiar
               </SunmiButton>
+              {/* Quitar: la línea queda sin producto y el par que la llevaba
+                  ahí se da de baja, para que la próxima factura no lo repita. */}
+              {onQuitarProducto && (
+                <SunmiButton
+                  color="slate"
+                  type="button"
+                  disabled={guardando}
+                  aria-label="Quitar el producto vinculado"
+                  onClick={quitarProducto}
+                  className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
+                >
+                  Quitar producto
+                </SunmiButton>
+              )}
             </div>
           </div>
           )}

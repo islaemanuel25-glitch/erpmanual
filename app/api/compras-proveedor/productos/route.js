@@ -5,7 +5,12 @@ import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { checkPerm } from "@/lib/authorize";
-import { condicionesDeNombre, ordenarPorPalabras } from "@/lib/compras-proveedor/busquedaPorPalabras";
+import {
+  condicionesDeNombre,
+  esBusquedaPorCodigo,
+  ordenarPorCodigo,
+  ordenarPorPalabras,
+} from "@/lib/compras-proveedor/busquedaPorPalabras";
 
 export async function GET(req) {
   try {
@@ -286,7 +291,8 @@ export async function GET(req) {
         pesoPromedioKg: pl.base.pesoPromedioKg ? Number(pl.base.pesoPromedioKg) : null,
       };
     });
-    const items = porPalabras && search ? ordenarPorPalabras(todos, search) : todos;
+    const porCodigo = porPalabras && esBusquedaPorCodigo(search);
+    let items = porPalabras && search && !porCodigo ? ordenarPorPalabras(todos, search) : todos;
 
     // Priorizar arriba los que matchean exacto por código interno (Etapa 4).
     // sort es estable: dentro de cada grupo se preserva el orden por nombre.
@@ -296,6 +302,9 @@ export async function GET(req) {
         (a, b) => (prioridad.has(a.baseId) ? 0 : 1) - (prioridad.has(b.baseId) ? 0 : 1)
       );
     }
+    // Un código en la hoja: el exacto va primero, por encima de una terminación
+    // del código interno que la prioridad de arriba también sube.
+    if (porCodigo) items = ordenarPorCodigo(items, search);
 
     // Códigos internos que matchean pero cuyo ProductoBase no tiene ProductoLocal
     // habilitado en el depósito: no se agregan, se informan (Etapa 4).

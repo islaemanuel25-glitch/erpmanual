@@ -20,7 +20,13 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { aliasAEscribir, resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
-import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
+import {
+  aplanarDetalles,
+  buscarProductoDeLaLinea,
+  cargarContexto,
+} from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
+import { productoBaseDeLaLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
+import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import {
@@ -28,6 +34,68 @@ import {
   yaEsDelProveedor,
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import {
+  parDelTextoRechazado,
+  parRechazado,
+  paresQueReconocenLaLinea,
+} from "@/lib/compras-proveedor/comprobante/paresDeLaLinea";
+
+/**
+ * El renglón, y si se le puede tocar el vínculo. Lo comparten vincular y quitar
+ * el producto: las dos cambian lo mismo y frenan en los mismos casos.
+ *
+ * @returns `{ linea }` o `{ rechazo }`, la respuesta ya armada.
+ */
+async function lineaQueSePuedeVincular({ grupoId, lineaId, body }) {
+  // El alcance por relación: una línea de otro grupo no existe. Y el
+  // renglón se encuentra aunque el papel se haya vuelto a leer, que es lo
+  // que dejaba a esta ruta contestando "No existe esa línea." sobre un
+  // renglón que la pantalla estaba mostrando.
+  const { linea, motivo: motivoDeLaLinea } = await resolverLineaDelPapel(prisma, {
+    grupoId,
+    lineaId,
+    pedidoId: body?.pedidoId,
+    textoCrudo: body?.textoCrudo,
+    select: {
+      id: true, textoCrudo: true, codigoProveedor: true,
+      // Lo que colgaba del vínculo ANTERIOR. Si el producto cambia, esto hay
+      // que deshacerlo: si no, queda un costo aceptado escrito sobre la línea
+      // de pedido equivocada y nadie se entera.
+      productoLocalId: true, pedidoDetalleId: true,
+      precioPedidoPrevio: true, costoFinalUnitario: true,
+      // `pedidoId` para poder resolver a qué línea del pedido corresponde.
+      comprobante: {
+        select: { id: true, pedidoId: true, proveedorId: true, estado: true, confirmadoEn: true },
+      },
+    },
+  });
+  if (!linea) {
+    return { rechazo: NextResponse.json({ ok: false, error: motivoDeLaLinea, queHacer: motivoDeLaLinea }, { status: 409 }) };
+  }
+  if (linea.comprobante.estado === "ANULADO") {
+    return {
+      rechazo: NextResponse.json(
+        { ok: false, error: "El comprobante está anulado.", queHacer: "No se puede vincular sobre un anulado." },
+        { status: 409 }
+      ),
+    };
+  }
+  if (linea.comprobante.confirmadoEn) {
+    // Ya alguien lo dio por bueno en una recepción: cambiar el vínculo ahora
+    // movería el costo de otro producto sin que nadie lo revise.
+    return {
+      rechazo: NextResponse.json(
+        {
+          ok: false,
+          error: "Este comprobante ya fue confirmado en una recepción.",
+          queHacer: "Para cambiarlo hay que revisarlo desde la segunda revisión del dueño.",
+        },
+        { status: 409 }
+      ),
+    };
+  }
+  return { linea };
+}
 
 export async function POST(req) {
   try {
@@ -50,52 +118,8 @@ export async function POST(req) {
       );
     }
 
-    // El alcance por relación: una línea de otro grupo no existe. Y el
-    // renglón se encuentra aunque el papel se haya vuelto a leer, que es lo
-    // que dejaba a esta ruta contestando "No existe esa línea." sobre un
-    // renglón que la pantalla estaba mostrando.
-    const { linea, motivo: motivoDeLaLinea } = await resolverLineaDelPapel(prisma, {
-      grupoId,
-      lineaId,
-      pedidoId: body?.pedidoId,
-      textoCrudo: body?.textoCrudo,
-      select: {
-        id: true, textoCrudo: true,
-        // Lo que colgaba del vínculo ANTERIOR. Si el producto cambia, esto hay
-        // que deshacerlo: si no, queda un costo aceptado escrito sobre la línea
-        // de pedido equivocada y nadie se entera.
-        productoLocalId: true, pedidoDetalleId: true,
-        precioPedidoPrevio: true, costoFinalUnitario: true,
-        // `pedidoId` para poder resolver a qué línea del pedido corresponde.
-        comprobante: {
-          select: { id: true, pedidoId: true, proveedorId: true, estado: true, confirmadoEn: true },
-        },
-      },
-    });
-    if (!linea) {
-      return NextResponse.json(
-        { ok: false, error: motivoDeLaLinea, queHacer: motivoDeLaLinea },
-        { status: 409 }
-      );
-    }
-    if (linea.comprobante.estado === "ANULADO") {
-      return NextResponse.json(
-        { ok: false, error: "El comprobante está anulado.", queHacer: "No se puede vincular sobre un anulado." },
-        { status: 409 }
-      );
-    }
-    if (linea.comprobante.confirmadoEn) {
-      // Ya alguien lo dio por bueno en una recepción: cambiar el vínculo ahora
-      // movería el costo de otro producto sin que nadie lo revise.
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Este comprobante ya fue confirmado en una recepción.",
-          queHacer: "Para cambiarlo hay que revisarlo desde la segunda revisión del dueño.",
-        },
-        { status: 409 }
-      );
-    }
+    const { linea, rechazo } = await lineaQueSePuedeVincular({ grupoId, lineaId, body });
+    if (rechazo) return rechazo;
 
     // El producto tiene que existir EN ESTE GRUPO y tener fila en esta
     // ubicación: el vínculo apunta a `productoLocalId`, que es por local.
@@ -251,6 +275,28 @@ export async function POST(req) {
       // El alias va en la MISMA transacción. Que quede el vínculo sin el alias
       // haría que la próxima factura volviera a preguntar lo mismo, y que quede
       // el alias sin el vínculo dejaría un macheo automático que nadie confirmó.
+      // ── CAMBIAR REEMPLAZA: QUEDA UN SOLO PAR, EL NUEVO ──────────────────
+      //
+      // El upsert de abajo solo pisa el par con la MISMA clave. Si el renglón
+      // lo reconocía otro par —el "TXT:…" que guarda la vinculación automática
+      // junto al código, o un código de la lista por la escalera—, ese seguía
+      // apuntando al producto viejo: dos alias para el mismo texto, y la próxima
+      // factura frenaba por "más de un producto". Se dan de baja los que
+      // apuntan a otro producto (`paresQueReconocenLaLinea`).
+      const viejos = paresQueReconocenLaLinea({
+        linea: { codigoProveedor: body?.codigoProveedor ?? null, textoCrudo: linea.textoCrudo },
+        vinculos: await tx.productoCodigoProveedor.findMany({
+          where: { grupoId, proveedorId: linea.comprobante.proveedorId, activo: true },
+          select: { id: true, productoBaseId: true, codigoInterno: true, descripcionProveedor: true, activo: true },
+        }),
+      }).filter((v) => Number(v.productoBaseId) !== Number(productoBaseId));
+      if (viejos.length) {
+        await tx.productoCodigoProveedor.updateMany({
+          where: { id: { in: viejos.map((v) => v.id) } },
+          data: { activo: false },
+        });
+      }
+
       let aliasGuardado = null;
       if (alias) {
         aliasGuardado = await tx.productoCodigoProveedor.upsert({
@@ -330,6 +376,120 @@ export async function POST(req) {
     return NextResponse.json({ ok: false, error: errorInesperado({
         operacion: "vincular el producto del papel con el tuyo",
         quedo: "Puede que el vínculo haya quedado hecho: volvé a abrir el detalle y fijate antes de repetirlo.",
+      }) }, { status: 500 });
+  }
+}
+
+// DELETE /api/compras-proveedor/comprobantes/vincular
+//
+// QUITAR EL PRODUCTO DE UNA LÍNEA. Arcor: "HW MOGUL MINI GUSANITOS 10×50G"
+// quedó con "Mogul extreme mini gustnitos" y Emanuel dijo que está mal; solo
+// había "Cambiar". Quitar deja el renglón sin producto, como recién leído, y
+// da de baja los pares del proveedor que lo llevaban a ESE producto —también
+// si venían de una lista—, para que la próxima factura no lo vuelva a vincular
+// mal. Mismo permiso que vincular.
+export async function DELETE(req) {
+  try {
+    const ctx = await resolveLocalAndGrupo(req);
+    if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    const { grupoId, localId, session } = ctx;
+
+    const perm = checkPerm(session, "compras.recibir");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    const body = await req.json().catch(() => ({}));
+    const lineaId = Number(body?.lineaId);
+    if (!Number.isFinite(lineaId)) {
+      return NextResponse.json({ ok: false, error: "Falta el producto del papel." }, { status: 400 });
+    }
+    const { linea, rechazo } = await lineaQueSePuedeVincular({ grupoId, lineaId, body });
+    if (rechazo) return rechazo;
+
+    // ── EL PRODUCTO QUE LA PANTALLA MUESTRA, CON LAS PIEZAS DE LA PANTALLA ──
+    //
+    // El vínculo hecho a mano gana; si no hay, el que la cascada da por bueno
+    // solo —código o alias exactos—, igual que `analizarLineas`. Sin el pedido:
+    // lo que vincula solo no depende de él.
+    const proveedorId = linea.comprobante.proveedorId;
+    const contexto = await cargarContexto(prisma, { grupoId, localId, proveedorId });
+    const { productoBaseId } = productoBaseDeLaLinea({
+      linea,
+      baseDelLocal: new Map([...(await productosDeLasFilas(prisma, [linea]))].map(([id, p]) => [id, p.baseId])),
+      sugeridoBaseId:
+        linea.productoLocalId == null
+          ? buscarProductoDeLaLinea({
+              linea: { codigoProveedor: linea.codigoProveedor, descripcion: linea.textoCrudo },
+              contexto,
+            })?.vinculoAutomatico?.productoBaseId ?? null
+          : null,
+    });
+    if (!productoBaseId) {
+      const sinProducto = "El producto del papel ya no está vinculado a ninguno tuyo.";
+      return NextResponse.json({ ok: false, error: sinProducto, queHacer: sinProducto }, { status: 409 });
+    }
+
+    const renglon = { codigoProveedor: linea.codigoProveedor, textoCrudo: linea.textoCrudo };
+    const bajas = await prisma.$transaction(async (tx) => {
+      // Un precio aceptado sobre la línea del pedido se deshace, igual que al
+      // cambiar de producto: era la factura aplicada a ESTE producto.
+      if (linea.pedidoDetalleId != null && linea.costoFinalUnitario != null && linea.precioPedidoPrevio != null) {
+        await tx.pedidoProveedorDetalle.update({
+          where: { id: linea.pedidoDetalleId },
+          data: { precioCosto: linea.precioPedidoPrevio },
+        });
+      }
+      await tx.comprobanteLinea.update({
+        where: { id: linea.id },
+        data: {
+          productoLocalId: null,
+          pedidoDetalleId: null,
+          precioPedidoPrevio: null,
+          costoFinalUnitario: null,
+          claseDiferencia: null,
+          diferenciaPct: null,
+        },
+      });
+
+      const delProveedor = await tx.productoCodigoProveedor.findMany({
+        where: { grupoId, proveedorId, productoBaseId },
+        select: { id: true, productoBaseId: true, codigoInterno: true, descripcionProveedor: true, activo: true },
+      });
+      const pares = paresQueReconocenLaLinea({ linea: renglon, vinculos: delProveedor.filter((v) => v.activo) });
+      if (pares.length) {
+        await tx.productoCodigoProveedor.updateMany({
+          where: { id: { in: pares.map((v) => v.id) } },
+          data: { activo: false },
+        });
+      }
+
+      // Y que quede dicho por TEXTO, que es lo que mira la vinculación
+      // automática contra el pedido (`parRechazado`). Si ningún par lo decía
+      // —venía solo por un código—, se guarda el del texto ya dado de baja.
+      const ahora = delProveedor.map((v) => (pares.some((p) => p.id === v.id) ? { ...v, activo: false } : v));
+      if (!parRechazado({ linea: renglon, vinculos: ahora, productoBaseId })) {
+        const rechazado = parDelTextoRechazado({ linea: renglon, grupoId, proveedorId, productoBaseId });
+        const existe = rechazado
+          ? await tx.productoCodigoProveedor.findUnique({
+              where: { codigo_interno_unico_por_proveedor: { grupoId, proveedorId, codigoInterno: rechazado.codigoInterno } },
+              select: { id: true },
+            })
+          : null;
+        if (rechazado && !existe) await tx.productoCodigoProveedor.create({ data: rechazado });
+      }
+      return pares.length;
+    });
+
+    return NextResponse.json({
+      ok: true,
+      lineaId: linea.id,
+      paresDadosDeBaja: bajas,
+      queHacer: "Quitado. El producto del papel queda sin vincular, y la próxima factura no lo va a vincular solo a ese producto.",
+    });
+  } catch (err) {
+    console.error("Error comprobantes/vincular (quitar):", err);
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "quitar el producto vinculado",
+        quedo: "Puede que el producto haya quedado quitado: volvé a abrir el detalle y fijate antes de repetirlo.",
       }) }, { status: 500 });
   }
 }

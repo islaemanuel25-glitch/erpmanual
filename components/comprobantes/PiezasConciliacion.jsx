@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
+import { coincideElCodigo, esBusquedaPorCodigo } from "@/lib/compras-proveedor/busquedaPorPalabras";
 
 // ── ACÁ ESTABAN `estadoDeVinculo`, `Revisar`, `Unidad` y `Precio` ──────────
 //
@@ -110,7 +111,25 @@ export function BuscadorProducto({
           setFallo(textoDeFallo(d, r.status));
           return;
         }
-        setItems(d?.items || d?.productos || []);
+        const encontrados = d?.items || d?.productos || [];
+        // ── UN CÓDIGO, EN TODO EL CATÁLOGO ─────────────────────────────────
+        //
+        // El catálogo ya encuentra el código de barras exacto —busca como la
+        // caja—, pero no sabe del código del proveedor: ése vive en sus
+        // vínculos. Se le pregunta a la ruta del proveedor, que lo conoce, y
+        // sus coincidencias exactas van primero (`coincideElCodigo`).
+        if (enTodoElCatalogo && proveedorId && esBusquedaPorCodigo(texto)) {
+          const rp = await fetch(
+            `/api/compras-proveedor/productos?proveedorId=${proveedorId}&search=${encodeURIComponent(texto)}&porPalabras=1`,
+            { credentials: "include", signal: ctrl.signal }
+          ).catch(() => null);
+          const dp = rp?.ok ? await rp.json().catch(() => null) : null;
+          const exactos = (dp?.items ?? []).filter((i) => coincideElCodigo(i, texto));
+          const yaEstan = new Set(exactos.map((i) => i.baseId));
+          setItems([...exactos, ...encontrados.filter((p) => !yaEstan.has(p.baseId ?? p.base?.id ?? p.id))]);
+          return;
+        }
+        setItems(encontrados);
       } catch (e) {
         setItems([]);
         setFallo(
