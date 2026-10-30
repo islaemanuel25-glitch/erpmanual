@@ -16,18 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **97 migraciones**, la última
-`20261030220000_precios_bajo_su_regla`. Falta una:
+Ninguna. Producción está en **98 migraciones**, la última
+`20261030230000_precios_sin_regla`.
 
-- `20261030230000_precios_sin_regla` — DE DATOS: las filas de `ProductoLocal`
-  sin margen o con margen ≤ 0 —y las 252 que la medición llamó "de escala"—.
-  Ganando menos de 30 % suben a 30 con margen 30; ganando más, conservan el
-  precio y anclan el margen a un entero; las de escala que sí tienen regla
-  suben con la suya. Alinea la ficha de 370 filas del depósito. Antes copia
-  todas las filas activas y su ficha a
-  `respaldo.backup_precios_ubicacion_20261030_b`. Cada UPDATE exige los valores
-  exportados. Va con autorización manual, dada por el pedido de Emanuel del
-  2026-10-30. Quinto chequeo del backup: aplica.
+La `20261030230000_precios_sin_regla` —de datos: 1.479 filas de `ProductoLocal`
+sin margen o con margen ≤ 0, más las 252 que la medición llamó "de escala";
+673 suben a 30, 687 conservan el precio con el margen anclado, 119 de escala
+suben con su propia regla, y 370 fichas del depósito se alinean— se aplicó con
+el despliegue de `dbd79e23` (2026-10-30), antes de levantar la imagen. El
+clasificador la marcó NO ADITIVA por los `UPDATE` y se aplicó con
+`DEPLOY_MIGRACION_AUTORIZADA=1`, dada por el pedido de Emanuel; quedó en la
+bitácora. El contenedor informó las **98** del árbol, y `migrate status` cerró
+con "Database schema is up to date!". Quinto chequeo del backup: la fila 6086
+(Chester 20 del depósito) estaba en `pre-dbd79e23` a $49.000. Comprobada contra
+la base, cruzando ids: las 1.479 quedaron con el precio y el margen esperados,
+ninguna otra fila cambió, ninguna bajó, y
+`respaldo.backup_precios_ubicacion_20261030_b` tiene las 11.698 filas activas.
 
 La `20261030220000_precios_bajo_su_regla` —de datos: sube a lo que da su propia
 regla el precio de venta de 768 filas de `ProductoLocal` y la ficha de 23 del
