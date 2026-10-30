@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-10-30] - Actualización: productos, pos-ventas, stock, transferencias
+
+### Modificado
+- **productos**: fix(recepcion): el alta desde el papel viene en Pack con el costo del bulto, y muestra el código del proveedor
+- **productos**: feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo
+- **productos**: fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta
+- **productos**: fix(productos): el buscador del catálogo busca como la caja
+- **productos**: feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)
+- **pos-ventas**: fix(productos): el buscador del catálogo busca como la caja
+- **stock**: feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)
+- **stock**: feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
+- **stock**: feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
+- **transferencias**: feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
+
+
 ## [2026-10-29] - Actualización: stock, pos-ventas, pos-transferencias, transferencias
 
 ### Modificado
