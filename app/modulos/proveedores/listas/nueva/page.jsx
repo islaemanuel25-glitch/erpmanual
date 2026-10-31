@@ -271,6 +271,30 @@ export default function SubirListaPage() {
     }
   };
 
+  // ── VER EL ARCHIVO ANTES DE SUBIRLO ──────────────────────────────────────
+  // Una URL local del archivo que está en el teléfono: no sale nada a la red.
+  // Se crea una por archivo elegido y se libera cuando se cambia, se quita o
+  // se deja la pantalla; si no, cada archivo elegido queda retenido en memoria.
+  const [urlLocalArchivo, setUrlLocalArchivo] = useState(null);
+  useEffect(() => {
+    if (!archivo) {
+      setUrlLocalArchivo(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(archivo);
+    setUrlLocalArchivo(url);
+    return () => URL.revokeObjectURL(url);
+  }, [archivo]);
+
+  // El botón vive adentro de la zona, que es el `<label>` del selector. Sin
+  // cortar el evento, tocar "Ver" también abriría "Tocá para cambiar".
+  const verArchivo = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!urlLocalArchivo) return;
+    window.open(urlLocalArchivo, "_blank", "noopener");
+  };
+
   const elegirArchivo = (e) => {
     const f = e.target.files?.[0] ?? null;
     setErrorEnvio(null);
@@ -574,6 +598,17 @@ export default function SubirListaPage() {
                   ? `${tipoDeArchivo(archivo.name)} · ${tamanoArchivo(archivo.size)} · Tocá para cambiar`
                   : `Hasta ${Math.round(LIMITES.tamanoMaxBytes / 1024 / 1024)} MB`}
               </span>
+              {archivo && urlLocalArchivo && (
+                <SunmiButton
+                  type="button"
+                  color="slate"
+                  onClick={verArchivo}
+                  aria-label={`Ver ${archivo.name}`}
+                  className="mt-2 min-h-toque"
+                >
+                  Ver
+                </SunmiButton>
+              )}
             </label>
             <input
               ref={inputArchivo}
