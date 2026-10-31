@@ -53,8 +53,18 @@ export async function POST(req) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();
+    const esPdf = body.formato === "pdf";
+    const localIdPedido = Number(body.localId) || null;
 
-    const scope = await resolveScope(req, { explicitLocalId: Number(body.localId) || null });
+    // ── LA LISTA DE PRECIOS, SOLO DE LA UBICACIÓN ACTUAL ──────────────────
+    //
+    // Decidido por Emanuel el 2026-10-31: la lista en PDF se baja de la
+    // ubicación donde el usuario está parado —la del encabezado de la app—, y
+    // eso vale también para el administrador. Por eso, para el PDF, la
+    // ubicación se resuelve SIN el `localId` del pedido (la de la sesión, o el
+    // contexto activo), y si el pedido trae otra se rechaza en vez de cambiarla
+    // en silencio. El Excel sigue dejando elegir al administrador.
+    const scope = await resolveScope(req, { explicitLocalId: esPdf ? null : localIdPedido });
     if (scope.error) {
       return NextResponse.json(
         { ok: false, error: scope.error, ...(scope.needsContexto ? { needsContexto: true } : {}) },
@@ -62,13 +72,24 @@ export async function POST(req) {
       );
     }
     const { localId, grupoId } = scope;
+    if (esPdf && localIdPedido && localIdPedido !== localId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "La lista de precios se baja solo de la ubicación en la que estás. " +
+            "Cambiaste de ubicación en otra pestaña: volvé a abrir el catálogo.",
+        },
+        { status: 403 }
+      );
+    }
 
     const proveedorId = body.proveedorId ? Number(body.proveedorId) : null;
     const categoriaId = body.categoriaId ? Number(body.categoriaId) : null;
 
     const hoy = new Date().toISOString().split("T")[0];
 
-    if (body.formato === "pdf") {
+    if (esPdf) {
       const datos = await datosDeLaListaDePrecios(prisma, { grupoId, localId, proveedorId, categoriaId });
       const bytes = await armarListaDePreciosPdf(datos);
       return new NextResponse(bytes, {

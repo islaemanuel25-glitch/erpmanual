@@ -3528,7 +3528,7 @@ export default function ProductosPage() {
         <PanelListaDePrecios
           open={panelListaDePrecios}
           onClose={() => setPanelListaDePrecios(false)}
-          localId={localId}
+          ubicacion={contexto}
           catalogos={catalogos}
         />
       )}

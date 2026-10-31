@@ -3,22 +3,20 @@
 // EL PANEL DE "DESCARGAR LISTA DE PRECIOS".
 //
 // Se abre desde el catálogo —el botón de escritorio y la hoja "Más" del
-// celular— y pide tres cosas antes de bajar el PDF: la ubicación, el proveedor
-// y el tipo. El PDF lo arma el servidor (`/api/productos/export` con
+// celular— y pide dos cosas antes de bajar el PDF: el proveedor y la
+// categoría. El PDF lo arma el servidor (`/api/productos/export` con
 // `formato: "pdf"`), con los mismos filtros que el Excel de Import / Export.
 //
 // Todo lo que dibuja ya estaba en la pantalla: `SunmiModalLayout` para la capa,
-// `SunmiSelectAdv` para los campos —el proveedor y el tipo son
-// `CamposDeExportacion`, los mismos de la solapa— y `SunmiButton` para la
-// acción. No hay ninguna pieza nueva.
+// `CamposDeExportacion` —los mismos campos de la solapa, acá con el buscador de
+// `SunmiSelectAdv` prendido— y `SunmiButton` para la acción.
 //
-// ── LA UBICACIÓN SE PUEDE CAMBIAR, PERO SOLO ENTRE LAS QUE SE PUEDEN VER ───
+// ── LA UBICACIÓN ES LA DEL ENCABEZADO, Y NO SE ELIGE ───────────────────────
 //
-// Arranca en la que está elegida en el catálogo. Las opciones salen de
-// `/api/locales/opciones`, la misma lista de la pantalla de elegir ubicación:
-// un usuario que no es administrador tiene una sola, la suya. Y el servidor lo
-// vuelve a controlar con `resolveScope`, así que una opción que no corresponde
-// no baja nada aunque alguien la mande.
+// Decidido por Emanuel el 2026-10-31: la lista se baja solo de la ubicación
+// donde el usuario está parado, administrador incluido. El panel la muestra
+// fija y la manda; el servidor la compara contra la actual del usuario y
+// rechaza cualquier otra.
 //
 // ── UN ERROR SE DICE ACÁ, NO SE TRAGA ─────────────────────────────────────
 //
@@ -28,7 +26,6 @@
 
 import { useEffect, useState } from "react";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import CamposDeExportacion from "@/components/productos/CamposDeExportacion";
 import { descargar } from "@/lib/compartir/compartirArchivo";
@@ -37,35 +34,21 @@ import { nombreDeUbicacion } from "@/lib/ubicacionActiva";
 /**
  * @param {bool} open
  * @param {func} onClose
- * @param {number} localId     la ubicación elegida en el catálogo
+ * @param {object} ubicacion   el contexto activo de la pantalla: `{ localId, nombre, esDeposito }`
  * @param {object} catalogos   `{ PROVEEDORES, CATEGORIAS }`, los de la pantalla
  */
-export default function PanelListaDePrecios({ open, onClose, localId, catalogos }) {
-  const [ubicaciones, setUbicaciones] = useState([]);
-  const [ubicacionId, setUbicacionId] = useState(localId ? String(localId) : "");
+export default function PanelListaDePrecios({ open, onClose, ubicacion, catalogos }) {
   const [proveedorId, setProveedorId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [bajando, setBajando] = useState(false);
   const [error, setError] = useState("");
 
-  // Cada vez que se abre, arranca en la ubicación del catálogo y sin error.
+  // Cada vez que se abre, sin el error de la vez anterior.
   useEffect(() => {
-    if (!open) return;
-    setUbicacionId(localId ? String(localId) : "");
-    setError("");
-    let vigente = true;
-    fetch("/api/locales/opciones", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!vigente) return;
-        if (data.ok) setUbicaciones(data.items || []);
-        else setError(data.error || "No se pudieron cargar las ubicaciones.");
-      })
-      .catch(() => vigente && setError("No se pudieron cargar las ubicaciones: sin conexión."));
-    return () => {
-      vigente = false;
-    };
-  }, [open, localId]);
+    if (open) setError("");
+  }, [open]);
+
+  const localId = Number(ubicacion?.localId) || null;
 
   const bajar = async () => {
     setBajando(true);
@@ -77,7 +60,7 @@ export default function PanelListaDePrecios({ open, onClose, localId, catalogos 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           formato: "pdf",
-          localId: Number(ubicacionId) || null,
+          localId,
           proveedorId: proveedorId ? Number(proveedorId) : null,
           categoriaId: categoriaId ? Number(categoriaId) : null,
         }),
@@ -110,7 +93,7 @@ export default function PanelListaDePrecios({ open, onClose, localId, catalogos 
       maxWidth="max-w-xl"
       footer={
         <div className="flex flex-col gap-2">
-          <SunmiButton color="cyan" onClick={bajar} disabled={bajando || !ubicacionId} className="w-full">
+          <SunmiButton color="cyan" onClick={bajar} disabled={bajando || !localId} className="w-full">
             {bajando ? "Armando el PDF..." : "Descargar PDF"}
           </SunmiButton>
           {error && <p className="text-sm2 sunmi-text-danger">{error}</p>}
@@ -119,11 +102,7 @@ export default function PanelListaDePrecios({ open, onClose, localId, catalogos 
     >
       <div>
         <label className="text-sm2 sunmi-text-muted mb-1 block">Ubicación</label>
-        <SunmiSelectAdv value={ubicacionId} onChange={(val) => setUbicacionId(val)}>
-          {ubicaciones.map((u) => (
-            <option key={u.id} value={String(u.id)}>{nombreDeUbicacion(u)}</option>
-          ))}
-        </SunmiSelectAdv>
+        <p className="text-sm3 sunmi-text-strong">{ubicacion ? nombreDeUbicacion(ubicacion) : "—"}</p>
       </div>
       <CamposDeExportacion
         catalogos={catalogos}
@@ -131,8 +110,7 @@ export default function PanelListaDePrecios({ open, onClose, localId, catalogos 
         onProveedor={setProveedorId}
         categoriaId={categoriaId}
         onCategoria={setCategoriaId}
-        rotuloCategoria="Tipo"
-        textoTodasCategorias="Todos"
+        buscable
       />
     </SunmiModalLayout>
   );

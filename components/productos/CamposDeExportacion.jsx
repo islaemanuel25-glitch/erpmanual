@@ -20,10 +20,10 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
  * @param {object} catalogos      `{ PROVEEDORES, CATEGORIAS }`, los de la pantalla
  * @param {string} proveedorId    "" es todos
  * @param {string} categoriaId    "" es todas
- * @param {string} [rotuloCategoria] la lista de precios la llama "Tipo": es lo
- *                                que Emanuel pidió poder elegir —frío,
- *                                almacén— y en este catálogo eso es la categoría.
- * @param {string} [textoTodasCategorias]
+ * @param {boolean} [buscable]    prende el buscador de `SunmiSelectAdv` —el
+ *                                mismo de los filtros del catálogo— arriba de
+ *                                cada lista. Lo pide la lista de precios; la
+ *                                solapa del Excel queda como estaba.
  */
 export default function CamposDeExportacion({
   catalogos,
@@ -31,8 +31,7 @@ export default function CamposDeExportacion({
   onProveedor,
   categoriaId,
   onCategoria,
-  rotuloCategoria = "Categoría",
-  textoTodasCategorias = "Todas",
+  buscable = false,
 }) {
   return (
     <>
@@ -41,6 +40,7 @@ export default function CamposDeExportacion({
         <SunmiSelectAdv
           value={proveedorId}
           onChange={(val) => onProveedor(val)}
+          searchable={buscable}
         >
           <option value="">Todos</option>
           {catalogos.PROVEEDORES.map((p) => (
@@ -50,12 +50,13 @@ export default function CamposDeExportacion({
       </div>
 
       <div>
-        <label className="text-sm2 sunmi-text-muted mb-1 block">{rotuloCategoria}</label>
+        <label className="text-sm2 sunmi-text-muted mb-1 block">Categoría</label>
         <SunmiSelectAdv
           value={categoriaId}
           onChange={(val) => onCategoria(val)}
+          searchable={buscable}
         >
-          <option value="">{textoTodasCategorias}</option>
+          <option value="">Todas</option>
           {catalogos.CATEGORIAS.map((c) => (
             <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
