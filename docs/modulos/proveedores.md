@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-31 17:01
+**Última actualización:** 2026-10-31 17:12
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-31: fix: una receta que lee bien se reaplica sin preguntar, tenga títulos o no (SIN VERIFICAR en la ruta)
 - 2026-10-31: fix: la receta sin títulos no se reaplica en silencio, ni la que descarta de más (SIN VERIFICAR en la ruta)
 - 2026-10-31: feat: botón "Ver" en el archivo elegido al subir una lista (SIN VERIFICAR en el teléfono)
 - 2026-10-24: feat: listas — "Te quedan precios sin aplicar" muestra cada producto con su «✓ Usar» y aplica esos N — SIN VERIFICAR EN PANTALLA

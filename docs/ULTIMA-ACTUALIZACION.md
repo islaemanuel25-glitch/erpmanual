@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-31 17:01
+**Fecha:** 2026-10-31 17:12
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: la receta sin títulos no se reaplica en silencio, ni la que descarta de más (SIN VERIFICAR en la ruta), feat: botón "Ver" en el archivo elegido al subir una lista (SIN VERIFICAR en el teléfono)
+- fix: una receta que lee bien se reaplica sin preguntar, tenga títulos o no (SIN VERIFICAR en la ruta), fix: la receta sin títulos no se reaplica en silencio, ni la que descarta de más (SIN VERIFICAR en la ruta), feat: botón "Ver" en el archivo elegido al subir una lista (SIN VERIFICAR en el teléfono)
 - Archivos: 2 modificados (2 total)
 
 ### productos
