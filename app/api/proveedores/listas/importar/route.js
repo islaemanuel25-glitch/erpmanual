@@ -57,6 +57,8 @@ import {
 import { proponerMapeo } from "@/lib/proveedores/listas/lectura/deteccionDeColumnas";
 import {
   recetaAplicable,
+  descartaMasDeLoQueLee,
+  MOTIVO_RECETA,
   TEXTO_MOTIVO_RECETA,
   diferenciaDeEstructura,
 } from "@/lib/proveedores/listas/lectura/recetaDeLista";
@@ -109,14 +111,22 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
     valores: tabla.filas.map((f) => f.valores[indice]),
   }));
   const propuesta = proponerMapeo(columnas);
-  const uso = recetaAplicable({
+  // ── ¿ESTA LECTURA VIENE DE LA PANTALLA DE "¿LEÍ BIEN LA LISTA?"? ─────────
+  //
+  // Esa pantalla manda `columnaPrecio` siempre; una subida nueva no lo manda.
+  // Hace falta saberlo para no volver a preguntar lo que la persona acaba de
+  // contestar mirando este mismo archivo: ver `recienConfirmada` en
+  // `recetaAplicable` y el control de descartes de más abajo.
+  const recienConfirmada = form.get("columnaPrecio") !== null;
+  let uso = recetaAplicable({
     guardada: proveedor.listaRecetaLectura,
     huella: proveedor.listaRecetaHuella,
     titulos: tabla.titulos,
+    recienConfirmada,
   });
 
-  const descartes = {};
-  for (const d of tabla.filasDescartadas) descartes[d.motivo] = (descartes[d.motivo] ?? 0) + 1;
+  const descartesDelLector = {};
+  for (const d of tabla.filasDescartadas) descartesDelLector[d.motivo] = (descartesDelLector[d.motivo] ?? 0) + 1;
 
   // ── EL MAPA CON EL QUE SE CUENTA Y SE MUESTRA LA VISTA PREVIA ────────────
   //
@@ -133,12 +143,32 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
   // fila" sobre un archivo con tres títulos de rubro —el 1 era el encabezado— y
   // más arriba mostraba GOLOSINAS como si fuera un producto, con "Código —" y
   // "$ 0,00". Las dos cosas en la misma pantalla y a tres renglones de distancia.
-  const mapeoParaContar = uso.ok ? uso.receta : propuesta.mapeo;
-  const lectura = filasDelArchivo({
-    tabla,
-    mapeo: mapeoParaContar,
-    hojaNombre: leido.detalle?.hoja ?? null,
-  });
+  const leerCon = (mapeo) => filasDelArchivo({ tabla, mapeo, hojaNombre: leido.detalle?.hoja ?? null });
+  let lectura = leerCon(uso.ok ? uso.receta : propuesta.mapeo);
+
+  // ── UNA RECETA QUE DESCARTA MÁS DE LO QUE LEE NO SE USA ──────────────────
+  //
+  // Tenga títulos o no. En la importación #22 la receta guardada leyó 17
+  // renglones y descartó 104 "sin precio", y se importó igual. Ahora se vuelve a
+  // la pantalla de confirmar columnas COMO SI FUERA LA PRIMERA VEZ: con la
+  // propuesta, y contando con la propuesta.
+  //
+  // No se aplica a la lectura que sigue a la confirmación: la persona ya vio el
+  // contador en esa pantalla y siguió igual, y preguntarle de nuevo sería un
+  // círculo sin salida.
+  if (
+    uso.ok &&
+    !recienConfirmada &&
+    descartaMasDeLoQueLee({
+      leidas: lectura.filas.length,
+      descartadas: tabla.filasDescartadas.length + lectura.descartadas.length,
+    })
+  ) {
+    uso = { ok: false, motivo: MOTIVO_RECETA.DESCARTA_MAS_DE_LO_QUE_LEE, huellaNueva: uso.huellaNueva };
+    lectura = leerCon(propuesta.mapeo);
+  }
+
+  const descartes = { ...descartesDelLector };
   for (const d of lectura.descartadas) descartes[d.motivo] = (descartes[d.motivo] ?? 0) + 1;
   const salteadas = tabla.filasDescartadas.length + lectura.descartadas.length;
 
@@ -251,7 +281,7 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
       : null;
 
   // Las filas de producto ya se separaron arriba, con este mismo mapa: cuando la
-  // receta aplica, `mapeoParaContar` ES `uso.receta`. No se vuelve a calcular
+  // receta aplica, `lectura` se armó con `uso.receta`. No se vuelve a calcular
   // —leer el archivo dos veces con el mismo mapa daría lo mismo hasta el día que
   // no, y ese día habría dos respuestas y ninguna forma de saber cuál se guardó.
   const productos = lectura.filas;
