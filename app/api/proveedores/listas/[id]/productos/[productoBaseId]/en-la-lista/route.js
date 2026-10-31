@@ -47,6 +47,7 @@ import { filaAPersistir, OPCIONES_TX, esImportacionAbierta } from "@/lib/proveed
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import {
   candidatasConPuntaje,
+  whereDeBusquedaDeRenglones,
   desactivarCodigosDelProducto,
   guardarCodigoDeLaFila,
   filaParaElMotor,
@@ -91,6 +92,7 @@ const CAMPOS_CANDIDATA = {
   descripcionProveedor: true,
   unidadProveedor: true,
   unidadesPorBulto: true,
+  contenidoMl: true,
   precioConIva: true,
   productoBaseId: true,
   productoBase: { select: { id: true, nombre: true } },
@@ -133,19 +135,11 @@ export async function GET(req, context) {
     // el renglón que el proveedor escribe en otro orden o abreviado —"SOLITAS
     // ANIMACION" contra "GALL SOLITAS ANIM"—, que es justo el que se busca. Con
     // cualquier palabra entran más, y el orden lo pone el parecido al nombre.
-    const palabras = buscar.split(/\s+/).filter((p) => p.length >= 2);
+    //
+    // El `where` vive en `whereDeBusquedaDeRenglones`, el mismo de «No es este
+    // producto»: un tamaño ("1.125") encuentra además por la presentación.
     const filas = await prisma.importacionListaFila.findMany({
-      where: {
-        importacionId,
-        ...(palabras.length
-          ? {
-              OR: palabras.flatMap((p) => [
-                { descripcionProveedor: { contains: p, mode: "insensitive" } },
-                { codigoCrudo: { contains: p, mode: "insensitive" } },
-              ]),
-            }
-          : {}),
-      },
+      where: whereDeBusquedaDeRenglones({ importacionId, buscar }),
       select: CAMPOS_CANDIDATA,
       orderBy: { filaExcel: "asc" },
     });

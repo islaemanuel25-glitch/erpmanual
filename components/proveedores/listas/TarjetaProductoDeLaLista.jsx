@@ -66,6 +66,7 @@ import {
 export const CLASE_TARJETA_FUERA_DE_RANGO = "border-1.5 sunmi-border-warning";
 import { ACCION_USAR, ESTADO_TU_PRODUCTO } from "@/lib/proveedores/listas/tusProductos";
 import { cuentaPorKilo } from "@/lib/proveedores/listas/explicarLectura";
+import { presentacionDelRenglon } from "@/lib/proveedores/listas/presentacion";
 
 export const TEXTO_USAR = "✓ Usar";
 export const TEXTO_VINCULAR = "Vincular";
@@ -156,7 +157,10 @@ export default function TarjetaProductoDeLaLista({
         <>
           <p className="text-sm2 sunmi-text-strong break-words">{preguntaDeLaSugerencia(sugerencia)}</p>
           <p className="text-xs sunmi-text-muted tabular-nums break-words">
-            {`${money(sugerencia.precio)} · hoy ${money(item.costoHoy)}`}
+            {/* Con la presentación leída al lado del precio ("6 × 750 ml"), si la hay. */}
+            {`${money(sugerencia.precio)}${
+              presentacionDelRenglon(sugerencia) ? ` · ${presentacionDelRenglon(sugerencia)}` : ""
+            } · hoy ${money(item.costoHoy)}`}
           </p>
         </>
       ) : item.renglon ? (
@@ -172,7 +176,14 @@ export default function TarjetaProductoDeLaLista({
       ) : (
         <p className="text-sm2 sunmi-text-warning">{TEXTO_NO_ESTA}</p>
       )}
-      {!sugerencia && <p className="text-xs sunmi-text-muted tabular-nums break-words">{cuentaDe(item)}</p>}
+      {!sugerencia && (
+        <p className="text-xs sunmi-text-muted tabular-nums break-words">
+          {/* La presentación del renglón vinculado ("6 × 750 ml"), adelante de
+              la cuenta que empieza con su precio. Sin presentación, nada. */}
+          {item.renglon && presentacionDelRenglon(item.renglon) ? `${presentacionDelRenglon(item.renglon)} · ` : null}
+          {cuentaDe(item)}
+        </p>
+      )}
     </>
   );
 

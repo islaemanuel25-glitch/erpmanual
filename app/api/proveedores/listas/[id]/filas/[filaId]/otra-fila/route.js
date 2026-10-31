@@ -57,6 +57,7 @@ import { modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
 // guardado para un producto — o sea qué costo se le escribe el mes que viene.
 import {
   candidatasConPuntaje,
+  whereDeBusquedaDeRenglones,
   guardarCodigoDeLaFila,
   filaParaElMotor,
   productoParaElMotor,
@@ -142,26 +143,17 @@ export async function GET(req, context) {
 
     // Cualquiera de las palabras, no la frase entera: la hoja de vincular
     // arranca con las primeras palabras del nombre ya escritas, y es la misma
-    // hoja por las dos puertas (`en-la-lista` lo explica largo).
-    const palabras = buscar.split(/\s+/).filter((p) => p.length >= 2);
+    // hoja por las dos puertas (`en-la-lista` lo explica largo). Un tamaño
+    // ("1.125") encuentra además por la presentación: `whereDeBusquedaDeRenglones`.
     const candidatas = await prisma.importacionListaFila.findMany({
-      where: {
-        importacionId,
-        ...(palabras.length
-          ? {
-              OR: palabras.flatMap((p) => [
-                { descripcionProveedor: { contains: p, mode: "insensitive" } },
-                { codigoCrudo: { contains: p, mode: "insensitive" } },
-              ]),
-            }
-          : {}),
-      },
+      where: whereDeBusquedaDeRenglones({ importacionId, buscar }),
       select: {
         id: true,
         codigoCrudo: true,
         descripcionProveedor: true,
         unidadProveedor: true,
         unidadesPorBulto: true,
+        contenidoMl: true,
         precioConIva: true,
         productoBaseId: true,
         productoBase: { select: { id: true, nombre: true } },

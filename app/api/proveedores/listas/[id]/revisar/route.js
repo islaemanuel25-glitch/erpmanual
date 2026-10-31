@@ -299,6 +299,8 @@ export async function GET(req, context) {
         precio: numero(fila.precioConIva),
         unidad: fila.unidadProveedor,
         cantidad: fila.unidadesPorBulto,
+        // El tamaño de la presentación ("6X750" → 750), al lado del precio.
+        contenidoMl: fila.contenidoMl ?? null,
       },
       // Lo que ya está guardado para este producto con este proveedor, si lo
       // hay. La pantalla lo usa para decir "esto ya lo contestaste".

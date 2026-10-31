@@ -33,6 +33,7 @@ import {
   money,
 } from "@/components/proveedores/listas/PiezasPantallas";
 import { primerasPalabras } from "@/lib/proveedores/listas/tusProductos";
+import { despuesDelPrecio } from "@/lib/proveedores/listas/presentacion";
 // La decisión de lectura, sin su hoja: es la misma pieza que abre «Corregir».
 import { DecisionDeLectura } from "@/components/proveedores/listas/HojaRevisarPrecio";
 
@@ -261,7 +262,8 @@ export default function HojaVincularConLaLista({
                     </span>
                     <span className="block text-sm2 sunmi-text-muted tabular-nums">
                       {money(c.precio)}
-                      {c.cantidad > 1 ? ` por ${c.cantidad}` : ""}
+                      {/* " · 6 × 750 ml" si se leyó la presentación; si no, " por 6". */}
+                      {despuesDelPrecio(c)}
                     </span>
                   </span>
                   {marcada && <MarcaDeElegida />}

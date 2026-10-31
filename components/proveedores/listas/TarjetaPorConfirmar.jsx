@@ -16,6 +16,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import { TarjetaDeRevision, CLASE_ACCION_CORREGIR } from "@/components/revision/PiezasDeRevision";
 import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import { money } from "@/components/proveedores/listas/PiezasPantallas";
+import { presentacionDelRenglon } from "@/lib/proveedores/listas/presentacion";
 import { preguntaDeLaSugerencia, TEXTO_OTRO, TEXTO_SI } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
 
 export const TEXTO_NO = "No";
@@ -32,7 +33,11 @@ export default function TarjetaPorConfirmar({ item, abierta = true, trabajando =
         <>
           <p className="text-xs sunmi-text-muted">{item.proveedoresDeHoy}</p>
           <p className="text-sm2 sunmi-text-strong break-words">{preguntaDeLaSugerencia(item.renglon)}</p>
-          <p className="text-xs sunmi-text-muted tabular-nums">{money(item.renglon?.precio)}</p>
+          <p className="text-xs sunmi-text-muted tabular-nums">
+            {money(item.renglon?.precio)}
+            {/* La presentación leída ("6 × 750 ml"); sin ella, nada. */}
+            {presentacionDelRenglon(item.renglon ?? {}) ? ` · ${presentacionDelRenglon(item.renglon)}` : null}
+          </p>
         </>
       }
       accionArriba={

@@ -43,6 +43,7 @@ import {
 // porque lo que decide es qué significa un 0 a 0.
 import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 import { TEXTO_FALTAN_LOS_KILOS } from "@/lib/proveedores/listas/tusProductos";
+import { presentacionDelRenglon } from "@/lib/proveedores/listas/presentacion";
 import PreguntaQueFalta from "@/components/proveedores/listas/PreguntaQueFalta";
 
 /** El porqué de la hoja cuando faltan las unidades de la caja. */
@@ -394,7 +395,11 @@ export function DecisionDeLectura({
                 <p className="text-sm2 sunmi-text-muted leading-snug tabular-nums">
                   {money(fila.enLaLista.precio)}
                   {fila.enLaLista.unidad ? ` · ${fila.enLaLista.unidad}` : ""}
-                  {fila.enLaLista.cantidad > 1 ? ` · por ${fila.enLaLista.cantidad}` : ""}
+                  {/* La presentación leída ("6 × 750 ml") si la hay; si no, "por 6"
+                      como antes. Sin ella no se distinguía el de 750 del de 1.125. */}
+                  {presentacionDelRenglon(fila.enLaLista)
+                    ? ` · ${presentacionDelRenglon(fila.enLaLista)}`
+                    : fila.enLaLista.cantidad > 1 ? ` · por ${fila.enLaLista.cantidad}` : ""}
                 </p>
               </div>
               <SunmiButton
