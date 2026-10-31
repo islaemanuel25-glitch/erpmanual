@@ -675,7 +675,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 100 el 2026-10-31: `20261031120000_transferencia_presentacion_valorizada`,
   // seis columnas nullable en `TransferenciaDetalle` con la presentación con la
   // que se valorizó cada línea, y su relleno. No cambia cómo se cuenta lo recibido.
-  assert.equal(migraciones.length, 100,"aparecio una migracion que nadie declaro aca");
+  // Sube a 101 el 2026-10-31: `20261031180000_fila_lista_contenido_ml`, aditiva: una
+  // columna nula en `ImportacionListaFila`. Es de listas de proveedor, no de la recepción.
+  assert.equal(migraciones.length, 101,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
