@@ -33,6 +33,7 @@ import {
 } from "@/lib/transferencias/cuentaDelPeriodoServer";
 import { importeDeLaTransferenciaCentavos } from "@/lib/transferencias/bloquesPorLocal";
 import { desdeCentavos } from "@/lib/transferencias/agregadosPeriodo";
+import { presentacionParaGuardar } from "@/lib/transferencias/costoTransferencia";
 import { parseContextoFinanzas } from "@/lib/finanzas/contextoFinanzas";
 import { UNIDAD_FINANCIERA_POR_DEFECTO } from "@/lib/finanzas/periodoFinanciero";
 import { VISTA_PENDIENTES } from "@/lib/transferencias/contextoDelTablero";
@@ -82,6 +83,8 @@ const linea = (recibido) => ({
   revisadoEnRecepcion: recibido != null,
   productoId: 70,
   producto: { precio_costo: "99999.99", nombre: "COCA COLA 2L", base: BASE },
+  // La presentación con la que se valorizó, guardada al crear la línea.
+  ...presentacionParaGuardar(BASE),
 });
 const DEPOSITO = Object.freeze({ id: 1, nombre: "Depósito", es_deposito: true });
 const fila = ({ id, estado, envio, recepcion = null, recibido = 4 }) => ({

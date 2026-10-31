@@ -17,6 +17,7 @@
 // host local y NODE_ENV distinto de production, y aborta con código 2 si no.
 
 import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
+import { presentacionDeLaFicha } from "../lib/presentacionDeLaFicha.mjs";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
@@ -290,6 +291,7 @@ async function correr(f) {
         data: {
           transferenciaId: t.id, productoId: l.producto.productoLocalId,
           cantidad: l.cantidad, unidadEnviada: l.unidad || "UNIDAD",
+          ...(await presentacionDeLaFicha(prisma, l.producto.productoLocalId)),
         },
       });
       // El envío ya descontó del origen y cargó el tránsito: se reproduce ese

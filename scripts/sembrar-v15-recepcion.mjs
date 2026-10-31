@@ -70,6 +70,7 @@ import {
   UNIDADES,
   rangoDelPeriodoCerrado,
 } from "../lib/transferencias/periodoDePago.js";
+import { presentacionDeLaFicha } from "./lib/presentacionDeLaFicha.mjs";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
@@ -357,6 +358,7 @@ for (const l of LINEAS) {
     data: {
       transferenciaId: transferencia.id,
       productoId: local[l.clave].id,
+      ...(await presentacionDeLaFicha(prisma, local[l.clave].id)),
       cantidad: l.cantidad,
       recibido: l.recibido,
       recibidoUnidadesSueltas: l.recibidoUnidadesSueltas,
@@ -415,6 +417,7 @@ for (const l of [
     data: {
       transferenciaId: recibida.id,
       productoId: local[l.clave].id,
+      ...(await presentacionDeLaFicha(prisma, local[l.clave].id)),
       cantidad: l.cantidad,
       recibido: l.recibido,
       precioCosto: l.precioCosto,
@@ -513,6 +516,7 @@ async function sembrarEnElCerrado({ iso, estado, recibidoDelSegundo }) {
       data: {
         transferenciaId: t.id,
         productoId: local[l.clave].id,
+        ...(await presentacionDeLaFicha(prisma, local[l.clave].id)),
         cantidad: l.cantidad,
         recibido: l.recibido,
         precioCosto: l.precioCosto,

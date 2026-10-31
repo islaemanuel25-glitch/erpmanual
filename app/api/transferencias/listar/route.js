@@ -21,7 +21,7 @@ import {
   MAX_TRANSFERENCIAS,
   MAX_PRODUCTOS,
 } from "@/lib/transferencias/agregadosPeriodo";
-import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
+import { origenEsDepositoDe, SELECT_DE_VALORIZACION } from "@/lib/transferencias/costoTransferencia";
 
 const PAGE_SIZE = 25;
 
@@ -114,6 +114,9 @@ export async function GET(req) {
       factorPresentacion: true,
       sueltasEnviadas: true,
       pesoPiezaKg: true,
+      // La presentación con la que se valorizó el precio de la línea: sin ella
+      // la valorización lanza, no cae a la ficha.
+      ...SELECT_DE_VALORIZACION,
       // `productoId` y los dos nombres alimentan "Productos más transferidos".
       // El join a producto→base YA existía para valorizar (precio_costo,
       // unidad_medida, factor_pack): pedir `nombre` no agrega una consulta, solo

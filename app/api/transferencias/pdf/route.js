@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requirePerm } from "@/lib/authorize";
-import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
+import { valorizarDetalle, origenEsDepositoDe, columnasDeValorizacion } from "@/lib/transferencias/costoTransferencia";
 
 // ESTE PDF LLEVA COSTOS. Con solo pedir sesión, un CAJERO se bajaba el remito
 // entero —productos, cantidades y el costo de cada línea— con solo estar
@@ -162,8 +162,9 @@ export async function GET(req) {
           unidadEnviada: d.unidadEnviada,
           precioCosto:
             d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
+          // La escala con la que se valorizó el precio, guardada en la línea.
+          ...columnasDeValorizacion(d),
         },
-        d.producto?.base,
         {
           cantidadModo: "ENVIADA",
           // El fiambre de pieza fija sale del depósito EN PIEZAS y su costo está

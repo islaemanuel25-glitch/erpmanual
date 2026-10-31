@@ -1529,6 +1529,27 @@ model TransferenciaDetalle {
   /// `confirmar-recepcion` al destino.
   pesoPiezaKg        Decimal?           @db.Decimal(12, 3)
 
+  // ── LA PRESENTACIÓN CON LA QUE SE VALORIZÓ EL PRECIO ──────────────────────
+  //
+  // `precioCosto` es el costo de la ficha del origen en SU escala comercial
+  // —por bulto en un pack, por kilo en el fiambre—, y para llevarlo a la escala
+  // del envío hace falta saber cuál era esa escala. Hasta el 2026-10-31 se leía
+  // de la ficha VIVA, así que editar la presentación después de despachar
+  // releía el precio viejo con el factor nuevo: la #1 (11/05/2026) mostraba
+  // ABSOLUT a $3.083,33 en vez de $18.500 porque el producto pasó a pack de 6.
+  //
+  // Son las seis columnas de `ProductoBase` que lee `resolverCostoTransferencia`,
+  // copiadas al crear la línea por `presentacionParaGuardar`. La valorización
+  // lee SOLO estas: una línea sin ellas lanza (`presentacionValorizadaDe`).
+  // Nulables porque las filas viejas se rellenan en la migración y porque
+  // `factor_pack` y el peso de referencia pueden ser nulos en la ficha.
+  valorizacionUnidadMedida        UnidadMedida?
+  valorizacionFactorPack          Int?
+  valorizacionPesoEsFijo          Boolean?
+  valorizacionPesoReferenciaKg    Decimal?           @db.Decimal(10, 3)
+  valorizacionModoVentaDeposito   ModoVentaDeposito?
+  valorizacionModoCompraProveedor ModoPedido?
+
   // ── LOS CINCO DE ARRIBA PUEDEN VENIR DE DOS LADOS ─────────────────────────
   //
   // Nacieron como "así SALIÓ del origen". Pero una transferencia HISTÓRICA

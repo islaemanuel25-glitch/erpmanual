@@ -196,7 +196,6 @@ export async function GET(req) {
       // incluido el 0 —que vale 0 y no el total enviado—.
       const { costoUnitario: costoNormalizado, subtotal } = valorizarDetalle(
         { ...d, precioCosto },
-        d.producto?.base,
         { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 
@@ -218,7 +217,6 @@ export async function GET(req) {
       // unidad— y el subtotal enviado.
       const remito = valorizarLineaDelRemito(
         { ...d, precioCosto },
-        d.producto?.base,
         { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 

@@ -672,7 +672,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // margen de las filas de `ProductoLocal` sin margen. No toca la recepción.
   // Sube a 99 el 2026-10-30: `20261030235000_promociones_vuelven`, de datos: 12 combos
   // vuelven a su precio de antes. No toca la recepción.
-  assert.equal(migraciones.length, 99,"aparecio una migracion que nadie declaro aca");
+  // Sube a 100 el 2026-10-31: `20261031120000_transferencia_presentacion_valorizada`,
+  // seis columnas nullable en `TransferenciaDetalle` con la presentación con la
+  // que se valorizó cada línea, y su relleno. No cambia cómo se cuenta lo recibido.
+  assert.equal(migraciones.length, 100,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

@@ -16,8 +16,32 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **99 migraciones**, la última
-`20261030235000_promociones_vuelven`.
+Producción está en **99 migraciones**, la última
+`20261030235000_promociones_vuelven`. Falta una:
+
+- `20261031120000_transferencia_presentacion_valorizada` — agrega a
+  `TransferenciaDetalle` seis columnas nullable `valorizacion*` con la
+  presentación con la que se valorizó cada línea, y las rellena: todas con la
+  presentación actual de su ficha (ningún total cambia) salvo las cuatro líneas
+  de la #1, que reciben la de su fecha (factor 1 para ABSOLUT, 6 para los tres
+  9 de Oro) y llevan la #1 de $100.143,64 a $152.112,50. El clasificador la va a
+  marcar **NO ADITIVA** por los `UPDATE`: hace falta
+  `DEPLOY_MIGRACION_AUTORIZADA=1`. **Va antes de levantar la imagen**: el código
+  nuevo lanza con una línea sin esas columnas. El quinto chequeo del backup no
+  aplica (no cambia precios de `ProductoLocal`). Vuelta atrás: volver la imagen
+  alcanza, la versión anterior no lee las columnas.
+  **Una comprobación después de recrear:** una transferencia creada por la
+  versión vieja ENTRE `migrate deploy` y el `up -d` nace sin estas columnas, y
+  la versión nueva la rechaza (PRESENTACION_FALTANTE) en vez de valorizarla con
+  la ficha. Contar las líneas con `"valorizacionUnidadMedida" IS NULL` en un
+  contenedor descartable: tiene que dar 0. Si no da 0, se rellenan con otra
+  migración que repita el primer `UPDATE` de ésta solo para esas filas.
+  **Ejercida contra Postgres: NO** — en el servidor no hay base de desarrollo.
+  Comprobado en solo lectura contra producción el 2026-10-31: los tres tipos
+  existen, las seis columnas de `ProductoBase` tienen el tipo de las nuevas, las
+  cuatro líneas de la #1 cumplen las condiciones de sus `UPDATE`, y ninguna
+  línea queda sin ficha. Y simulado el relleno en JS sobre las 550
+  transferencias: solo la #1 cambia de valor, en +$51.968,86.
 
 La `20261030235000_promociones_vuelven` —de datos: los 12 combos que las dos
 correcciones de precios del día habían subido vuelven al precio, margen y regla

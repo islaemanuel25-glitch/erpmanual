@@ -25,6 +25,7 @@
 // Siembra sus propios datos con una marca única y los borra al terminar.
 
 import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
+import { presentacionDeLaFicha } from "../lib/presentacionDeLaFicha.mjs";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
@@ -113,7 +114,9 @@ async function montar() {
         destinoId,
         estado: "Enviada",
         fechaEnvio: new Date(),
-        detalle: { create: [{ productoId, cantidad, precioCosto, unidadEnviada: "UNIDAD" }] },
+        detalle: {
+          create: [{ productoId, cantidad, precioCosto, unidadEnviada: "UNIDAD", ...(await presentacionDeLaFicha(prisma, productoId)) }],
+        },
       },
     });
     creado.transferenciaIds.push(t.id);

@@ -7,6 +7,7 @@ import { esComboBase } from "@/lib/combos/guards";
 import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 import { ERRORES_RECEPCION, resolverUnidadEnviada } from "@/lib/transferencias/recepcion";
 import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import { presentacionParaGuardar } from "@/lib/transferencias/costoTransferencia";
 import {
   PRESENTACION,
   agrupa,
@@ -342,6 +343,9 @@ export async function POST(req) {
           pesoPiezaKg:
             presentacion.presentacion === PRESENTACION.PIEZA ? presentacion.pesoPiezaKg : null,
           precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
+          // La escala de ese precio: la presentación de la ficha AHORA, para que
+          // editarla después no relea el precio con otro factor.
+          ...presentacionParaGuardar(producto.base, "linea-recepcion"),
           agregadoEnRecepcion: true,
           agregadoEnRecepcionPorId: usuarioId,
           agregadoEnRecepcionAt: new Date(),

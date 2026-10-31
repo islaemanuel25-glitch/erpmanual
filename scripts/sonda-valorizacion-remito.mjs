@@ -15,6 +15,8 @@ import fs from "node:fs";
 import {
   valorizarLineaDelRemito,
   resolverCostoTransferencia,
+  presentacionParaGuardar,
+  presentacionValorizadaDe,
 } from "@/lib/transferencias/costoTransferencia";
 
 const archivo = process.argv[2];
@@ -29,16 +31,11 @@ const money = (n) =>
   n == null ? "—" : `$ ${Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Lo que hacía antes: costo normalizado × `recibido` crudo. */
-function comoEraAntes(fila, base, origenEsDeposito) {
+function comoEraAntes(fila, origenEsDeposito) {
   const costo = resolverCostoTransferencia({
     precioCosto: fila.precioCosto,
     unidadEnviada: fila.unidadEnviada,
-    unidadMedida: base.unidad_medida,
-    factorPack: base.factor_pack,
-    pesoEsFijo: base.pesoEsFijo,
-    pesoReferenciaKg: base.pesoReferenciaKg,
-    modoVentaDeposito: base.modoVentaDeposito,
-    modoCompraProveedor: base.modoCompraProveedor,
+    presentacion: presentacionValorizadaDe(fila),
     origenEsDeposito,
   });
   const cantidad = fila.recibido == null ? fila.cantidad : fila.recibido;
@@ -47,18 +44,23 @@ function comoEraAntes(fila, base, origenEsDeposito) {
 
 console.log("═".repeat(78));
 for (const f of filas) {
-  const base = {
-    unidad_medida: f.unidad_medida,
-    factor_pack: f.factor_pack,
-    modoVentaDeposito: f.modoVentaDeposito,
-    modoCompraProveedor: f.modoCompraProveedor,
-    pesoReferenciaKg: f.pesoReferenciaKg,
-    pesoEsFijo: f.pesoEsFijo,
+  // Las filas del archivo traen la presentación de la ficha con sus nombres de
+  // columna; la línea la guarda con los suyos.
+  const linea = {
+    ...f,
+    ...presentacionParaGuardar({
+      unidad_medida: f.unidad_medida,
+      factor_pack: f.factor_pack,
+      modoVentaDeposito: f.modoVentaDeposito,
+      modoCompraProveedor: f.modoCompraProveedor,
+      pesoReferenciaKg: f.pesoReferenciaKg,
+      pesoEsFijo: f.pesoEsFijo,
+    }),
   };
   const origenEsDeposito = f.origenEsDeposito === true;
 
-  const antes = comoEraAntes(f, base, origenEsDeposito);
-  const ahora = valorizarLineaDelRemito(f, base, { origenEsDeposito });
+  const antes = comoEraAntes(linea, origenEsDeposito);
+  const ahora = valorizarLineaDelRemito(linea, { origenEsDeposito });
 
   console.log(`transf ${f.t} · detalle ${f.id} · ${f.nombre}`);
   console.log(

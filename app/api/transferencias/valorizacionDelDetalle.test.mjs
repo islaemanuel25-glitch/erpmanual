@@ -19,7 +19,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { valorizarLineaDelRemito, valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+import {
+  valorizarLineaDelRemito,
+  valorizarDetalle,
+  presentacionParaGuardar,
+} from "@/lib/transferencias/costoTransferencia";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -64,8 +68,12 @@ const PANCHO = Object.freeze({
  */
 function comoLoArmaElEndpoint(detalle, base) {
   const opciones = { origenEsDeposito: true };
-  const remito = valorizarLineaDelRemito(detalle, base, opciones);
-  const recibido = valorizarDetalle(detalle, base, opciones);
+  // La ruta trae la línea con `include`, así que llega con la presentación que
+  // `crearTransferencia` le guardó al crearla: se reproduce eso, no se le pasa la
+  // ficha a la fórmula, que desde el 2026-10-31 no la recibe.
+  const linea = { ...detalle, ...presentacionParaGuardar(base) };
+  const remito = valorizarLineaDelRemito(linea, opciones);
+  const recibido = valorizarDetalle(linea, opciones);
   return {
     // Lo que va al DTO de la card.
     precioCosto: remito.costoPresentacion,

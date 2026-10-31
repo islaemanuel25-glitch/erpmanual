@@ -39,6 +39,7 @@ import FilaTransferenciaLocal from "./FilaTransferenciaLocal.jsx";
 import ChipsDePeriodo from "./ChipsDePeriodo.jsx";
 
 import { bloquesPorLocal, cuentaDelLocal } from "@/lib/transferencias/bloquesPorLocal";
+import { presentacionParaGuardar } from "@/lib/transferencias/costoTransferencia";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
 
@@ -73,6 +74,8 @@ const linea = (recibido) => ({
   factorPresentacion: 8,
   pesoPiezaKg: null,
   producto: { base: BASE },
+  // La presentación con la que se valorizó, guardada al crear la línea.
+  ...presentacionParaGuardar(BASE),
 });
 
 const transferencia = (id, destinoId, nombre, estado, fecha, recibido) => ({

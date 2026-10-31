@@ -27,6 +27,7 @@ import {
   ORDENES_DESTINO,
   MAX_TRANSFERENCIAS,
 } from "@/lib/transferencias/agregadosPeriodo";
+import { SELECT_DE_VALORIZACION } from "@/lib/transferencias/costoTransferencia";
 
 export async function GET(req) {
   try {
@@ -131,6 +132,8 @@ export async function GET(req) {
             factorPresentacion: true,
             sueltasEnviadas: true,
             pesoPiezaKg: true,
+            // La presentación con la que se valorizó el precio de la línea.
+            ...SELECT_DE_VALORIZACION,
             producto: {
               select: {
                 precio_costo: true,

@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requirePerm } from "@/lib/authorize";
 import { MOTIVO_DIFERENCIA } from "@/lib/stock/motivosDeDiferencia";
-import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
+import { valorizarDetalle, origenEsDepositoDe, columnasDeValorizacion } from "@/lib/transferencias/costoTransferencia";
 
 // El remito de recepción lleva los mismos costos que el de envío, más el motivo
 // de cada diferencia. Mismo permiso que su gemelo.
@@ -186,8 +186,9 @@ export async function GET(req) {
           factorPresentacion: d.factorPresentacion,
           sueltasEnviadas: d.sueltasEnviadas,
           pesoPiezaKg: d.pesoPiezaKg,
+          // La escala con la que se valorizó el precio, guardada en la línea.
+          ...columnasDeValorizacion(d),
         },
-        d.producto?.base,
         // Igual que el remito: el fiambre de pieza fija sale del depósito en
         // piezas y su costo está por kilo.
         { origenEsDeposito: origenEsDepositoDe(transferencia, "pdf-recepcion") }
