@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-31 13:51
+**Fecha:** 2026-10-31 14:29
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(productos): descargar la lista de precios del catálogo en PDF, por ubicación, proveedor y tipo
+- fix(productos): la lista de precios se baja solo de la ubicación actual, dice "Categoría" y busca al elegir, feat(productos): descargar la lista de precios del catálogo en PDF, por ubicación, proveedor y tipo
 - Archivos: 2 nuevos, 5 modificados (7 total)
 
 ### transferencias
