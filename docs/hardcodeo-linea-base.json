@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-27 18:53",
-  "commit": "48019ab9510bd52b67fd7dc3cee48708f5589d92",
+  "generada": "2026-10-31 13:51",
+  "commit": "29f92375d65994558ca3ba34243fa70dfd1ce691",
   "total": {
     "color": 273,
-    "medida": 1495,
+    "medida": 1493,
     "modal": 34,
     "crudo": 262,
     "celda": 429,
@@ -295,7 +295,7 @@
     },
     "productos": {
       "color": 38,
-      "medida": 201,
+      "medida": 199,
       "modal": 1,
       "crudo": 31,
       "celda": 91,
@@ -956,7 +956,7 @@
         "text-[13px]": 3,
         "text-[10px]": 2,
         "min-h-[24px]": 1,
-        "text-[11px]": 19,
+        "text-[11px]": 17,
         "text-[12px]": 14
       },
       "celda": {
