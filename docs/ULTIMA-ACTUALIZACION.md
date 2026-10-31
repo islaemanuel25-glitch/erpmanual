@@ -1,28 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-30 16:17
+**Fecha:** 2026-10-31 12:52
 
 ## Módulos modificados recientemente
 
-### productos
-- fix(recepcion): el alta desde el papel viene en Pack con el costo del bulto, y muestra el código del proveedor, feat(recepcion): «Crear producto» desde la hoja cuando el renglón no existe en el catálogo, fix(productos): con Inactivos o Todos, el buscador encuentra también los inactivos y los sin alta
-- Archivos: 4 modificados (4 total)
-
-### pos-ventas
-- fix(productos): el buscador del catálogo busca como la caja
-- Archivos: 1 modificados (1 total)
-
-### stock
-- feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla), feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla), feat(control-stock): filtro "En negativo" en un carrusel de a cuatro (alto de la página 2 SIN VERIFICAR)
-- Archivos: 1 nuevos, 10 modificados (11 total)
-
 ### transferencias
-- feat(control-stock): filtro "Stock alto" con máximos por categoría y ubicación (vista SIN VERIFICAR en pantalla)
-- Archivos: 1 modificados (1 total)
+- fix(transferencias): el valor de una línea ya no cambia al editar la presentación del producto — SIN VERIFICAR contra Postgres
+- Archivos: 9 modificados (9 total)
 
 
-## Archivos nuevos desde última sincronización
-- app/api/stock_locales/control/maximos/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-31] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: fix(transferencias): el valor de una línea ya no cambia al editar la presentación del producto — SIN VERIFICAR contra Postgres
+
+
 ## [2026-10-30] - Actualización: productos, pos-ventas, stock, transferencias
 
 ### Modificado
