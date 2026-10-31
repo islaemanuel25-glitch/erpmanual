@@ -1,16 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-31 18:21
+**Fecha:** 2026-10-31 20:56
 
 ## Módulos modificados recientemente
+
+### proveedores
+- feat: listas — el renglón muestra su presentación, la hoja ordena y busca por tamaño (SIN VERIFICAR EN PANTALLA), fix: "Pueden ser de…" empareja por nombre los vinos de Carozo (tamaños, presentación, abreviaturas), fix: una receta que lee bien se reaplica sin preguntar, tenga títulos o no (SIN VERIFICAR en la ruta)
+- Archivos: 6 modificados (6 total)
 
 ### transferencias
 - docs: declarar la migración 20261031180000_fila_lista_contenido_ml como pendiente, fix(transferencias): el valor de una línea ya no cambia al editar la presentación del producto — SIN VERIFICAR contra Postgres
 - Archivos: 9 modificados (9 total)
-
-### proveedores
-- fix: "Pueden ser de…" empareja por nombre los vinos de Carozo (tamaños, presentación, abreviaturas), fix: una receta que lee bien se reaplica sin preguntar, tenga títulos o no (SIN VERIFICAR en la ruta), fix: la receta sin títulos no se reaplica en silencio, ni la que descarta de más (SIN VERIFICAR en la ruta)
-- Archivos: 3 modificados (3 total)
 
 ### productos
 - fix(productos): la lista de precios se baja solo de la ubicación actual, dice "Categoría" y busca al elegir, feat(productos): descargar la lista de precios del catálogo en PDF, por ubicación, proveedor y tipo
