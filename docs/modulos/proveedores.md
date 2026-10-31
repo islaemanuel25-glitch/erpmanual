@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-24 23:27
+**Última actualización:** 2026-10-31 15:46
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-31: feat: botón "Ver" en el archivo elegido al subir una lista (SIN VERIFICAR en el teléfono)
 - 2026-10-24: feat: listas — "Te quedan precios sin aplicar" muestra cada producto con su «✓ Usar» y aplica esos N — SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas — una lista con todo aplicado se cancela o se termina; solo Terminada y Cancelada cierran — SIN VERIFICAR EN PANTALLA
 - 2026-10-24: feat: listas — cancelar una lista aplicada deshace lo aplicado; terminar la deja como está — SIN VERIFICAR EN PANTALLA
