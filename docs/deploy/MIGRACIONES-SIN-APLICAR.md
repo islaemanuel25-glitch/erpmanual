@@ -16,14 +16,18 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **100 migraciones**, la última
-`20261031120000_transferencia_presentacion_valorizada`. Falta aplicar:
+Ninguna. Producción está en **101 migraciones**, la última
+`20261031180000_fila_lista_contenido_ml`.
 
-- `20261031180000_fila_lista_contenido_ml` — aditiva: la columna nula
-  `ImportacionListaFila.contenidoMl` (el tamaño de la presentación del renglón,
-  "6X750" → 750), solo para comparar nombres en "Pueden ser de…". Sin relleno:
-  las filas que ya existen quedan en null. Aplicada y comprobada contra un
-  Postgres local (`erpazul_al`) con `migrate dev`, sin diferencias con el schema.
+La `20261031180000_fila_lista_contenido_ml` —aditiva: la columna nula
+`ImportacionListaFila.contenidoMl`, el tamaño de la presentación del renglón,
+solo para comparar nombres en "Pueden ser de…"— se aplicó con el despliegue de
+`beab6227` (2026-10-31), antes de levantar la imagen. El clasificador la marcó
+aditiva y salió con 0: no hizo falta autorización manual. El contenedor informó
+las **101** del árbol y `migrate status` cerró con "Database schema is up to
+date!". Comprobada contra la base, en solo lectura: la columna existe, entera y
+nullable, y las 17.017 filas que ya había quedaron en null, como estaba
+previsto (sin relleno).
 
 La `20261031120000_transferencia_presentacion_valorizada` —seis columnas
 nullable `valorizacion*` en `TransferenciaDetalle` con la presentación con la
