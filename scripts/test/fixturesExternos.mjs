@@ -115,6 +115,32 @@ export function rutaFixture(clave, carpeta = CARPETA_FIXTURES) {
   return inspeccionarFixtures(carpeta).elegidos[clave] ?? null;
 }
 
+/**
+ * Un archivo de la carpeta hermana elegido por una MARCA del nombre normalizado,
+ * para los fixtures que no son las dos planillas de Arcor —la lista de vinos de
+ * Carozo en PDF, por ejemplo—. Misma regla que arriba: ni cero ni dos se eligen.
+ *
+ * @returns {{ ruta: string|null, motivo: string|null }}
+ */
+export function fixturePorMarca({ marca, extension, carpeta = CARPETA_FIXTURES }) {
+  const existe = fs.existsSync(carpeta) && fs.statSync(carpeta).isDirectory();
+  if (!existe) {
+    return { ruta: null, motivo: `sin la carpeta ${path.basename(carpeta)} al lado del repo: los archivos reales no están en el repositorio` };
+  }
+  const ext = String(extension).toLowerCase();
+  const archivos = fs
+    .readdirSync(carpeta, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(ext))
+    .map((e) => e.name)
+    .sort();
+  const candidatos = archivos.filter((a) => normalizar(a).includes(normalizar(marca)));
+  if (candidatos.length === 1) return { ruta: path.join(carpeta, candidatos[0]), motivo: null };
+  if (candidatos.length > 1) {
+    return { ruta: null, motivo: `hay ${candidatos.length} archivos que podrían ser "${marca}" (${candidatos.join(", ")}): no se elige por orden alfabético` };
+  }
+  return { ruta: null, motivo: `no hay ningún "${marca}" ${ext} en ${path.basename(carpeta)}` };
+}
+
 /** Por qué no se pudo elegir, en una frase que sirva en la salida de la suite. */
 export function motivoFaltante(clave, carpeta = CARPETA_FIXTURES) {
   const r = inspeccionarFixtures(carpeta);
