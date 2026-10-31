@@ -59,7 +59,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { filtrosBaseDelCatalogo } from "@/lib/productos/whereCatalogo";
+import { filtrosBaseDelCatalogo, filtroDeEstado } from "@/lib/productos/whereCatalogo";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
@@ -113,13 +113,8 @@ export async function GET(req) {
         // parte del universo, es qué se pregunta sobre él.
         //
         // Y un combo lleva su estado en el ProductoLocal, no en la ficha — la
-        // misma rama que usa el listado.
-        {
-          OR: [
-            { es_combo: false, activo: true },
-            { es_combo: true, locales: { some: { localId, activo: true } } },
-          ],
-        },
+        // misma rama que usa el listado, que vive en `filtroDeEstado`.
+        filtroDeEstado({ localId, activo: true }),
       ],
     };
 

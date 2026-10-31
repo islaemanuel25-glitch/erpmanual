@@ -93,6 +93,10 @@ import {
   normalizarConfiguracion,
 } from "@/lib/productos/camposTarjeta";
 import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
+import { precioQueCobraElPos } from "@/lib/precios/ubicacionVendeAlCosto";
+import { descargar } from "@/lib/compartir/compartirArchivo";
+import CamposDeExportacion from "@/components/productos/CamposDeExportacion";
+import PanelListaDePrecios from "@/components/productos/PanelListaDePrecios";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import { contenedorDeScrollDe } from "@/lib/productos/contenedorDeScroll";
 import {
@@ -896,6 +900,7 @@ export default function ProductosPage() {
   const [expProveedorId, setExpProveedorId] = useState("");
   const [expCategoriaId, setExpCategoriaId] = useState("");
   const [expLoading, setExpLoading] = useState(false);
+  const [panelListaDePrecios, setPanelListaDePrecios] = useState(false);
 
   // Import
   const [impModo, setImpModo] = useState("crear_actualizar");
@@ -2268,13 +2273,8 @@ export default function ProductosPage() {
       }
 
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const hoy = new Date().toISOString().split("T")[0];
-      a.href = url;
-      a.download = `productos_${hoy}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      descargar(blob, `productos_${hoy}.xlsx`);
     } catch (err) {
       console.error("Error exportando:", err);
       alert("Error al exportar productos");
@@ -2845,6 +2845,11 @@ export default function ProductosPage() {
                   <SunmiButton color="cyan" onClick={abrirActualizacionPrecios}>
                     Actualización de precios
                   </SunmiButton>
+                  {puedeExportar && (
+                    <SunmiButton color="cyan" onClick={() => setPanelListaDePrecios(true)}>
+                      Descargar lista de precios
+                    </SunmiButton>
+                  )}
                 </div>
 
                 <ColumnManager
@@ -2945,10 +2950,13 @@ export default function ProductosPage() {
                   // vez y los consume todo lo que muestre ese precio. La rama
                   // desaparece: con `vendeConListaAlCosto` en false esto da
                   // exactamente lo que daba antes.
-                  const precioBaseDelPos = vendeConListaAlCosto ? p.precioCosto : p.precioVenta;
-                  const redondeoDelPos = vendeConListaAlCosto
-                    ? listaAlCostoRedondea100
-                    : p.redondeo100;
+                  //
+                  // La elección la hace `precioQueCobraElPos` desde el
+                  // 2026-10-31: la lista de precios en PDF tiene que dar el mismo
+                  // número, y copiar el ternario allá eran dos lugares decidiendo
+                  // lo mismo.
+                  const { precio: precioBaseDelPos, redondeo100: redondeoDelPos } =
+                    precioQueCobraElPos(p, { vendeConListaAlCosto, listaAlCostoRedondea100 });
 
                   // ── LAS DOS CARAS, DE UNA SOLA PASADA POR FILA ──────────
                   //
@@ -3183,31 +3191,13 @@ export default function ProductosPage() {
               <SunmiSeparator label="Exportar productos" className="my-1" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
-                <div>
-                  <label className="text-[11px] sunmi-text-muted mb-1 block">Proveedor</label>
-                  <SunmiSelectAdv
-                    value={expProveedorId}
-                    onChange={(val) => setExpProveedorId(val)}
-                  >
-                    <option value="">Todos</option>
-                    {catalogos.PROVEEDORES.map((p) => (
-                      <option key={p.id} value={p.id}>{p.nombre}</option>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
-
-                <div>
-                  <label className="text-[11px] sunmi-text-muted mb-1 block">Categoría</label>
-                  <SunmiSelectAdv
-                    value={expCategoriaId}
-                    onChange={(val) => setExpCategoriaId(val)}
-                  >
-                    <option value="">Todas</option>
-                    {catalogos.CATEGORIAS.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
+                <CamposDeExportacion
+                  catalogos={catalogos}
+                  proveedorId={expProveedorId}
+                  onProveedor={setExpProveedorId}
+                  categoriaId={expCategoriaId}
+                  onCategoria={setExpCategoriaId}
+                />
               </div>
 
               <div className="flex px-1 mt-2">
@@ -3526,9 +3516,22 @@ export default function ProductosPage() {
         onNuevoCombo={abrirNuevoCombo}
         onActualizacionPrecios={abrirActualizacionPrecios}
         onImportExport={() => setActiveTab("importexport")}
+        onListaDePrecios={() => setPanelListaDePrecios(true)}
         onPersonalizarCard={() => setHojaPersonalizar(true)}
         puedeExportar={puedeExportar}
       />
+
+      {/* LA LISTA DE PRECIOS EN PDF. Se abre desde la hoja "Más" del celular y
+          desde la fila de acciones de escritorio, con el mismo permiso que el
+          Excel: lleva el costo. */}
+      {puedeExportar && (
+        <PanelListaDePrecios
+          open={panelListaDePrecios}
+          onClose={() => setPanelListaDePrecios(false)}
+          localId={localId}
+          catalogos={catalogos}
+        />
+      )}
 
       <HojaPersonalizarTarjeta
         open={hojaPersonalizar}

@@ -2,9 +2,31 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { getContextoActivo } from "@/lib/contexto";
+import { resolveScope } from "@/lib/grupos";
+import { datosDeLaListaDePrecios } from "@/lib/productos/listaDePreciosServer";
+import { armarListaDePreciosPdf } from "@/lib/pdf/listaDePreciosPdf";
 import * as XLSX from "xlsx";
+
+// LA EXPORTACIÓN DEL CATÁLOGO, EN DOS FORMATOS.
+//
+//   · `formato: "pdf"` — la LISTA DE PRECIOS: los productos activos de una
+//     ubicación con su costo y su venta, agrupados por categoría. Es lo que se
+//     baja desde el botón "Descargar lista de precios" del catálogo.
+//   · sin formato —o cualquier otro— — el EXCEL de siempre, el que se vuelve a
+//     subir desde Import / Export. No cambió de columnas.
+//
+// Son la misma exportación a propósito: el mismo permiso, la misma ubicación y
+// los mismos filtros de proveedor y categoría. La lista en PDF entró el
+// 2026-10-31 y se sumó acá en vez de escribirse una ruta al lado.
+//
+// ── LA UBICACIÓN SALE DE `resolveScope`, DESDE ESE DÍA ────────────────────
+//
+// Antes se tomaba el `localId` del cuerpo tal cual: un usuario de un local con
+// `costos.ver` podía pedir el catálogo con costos de OTRO local. Ahora es la
+// misma regla que el listado del catálogo: quien no es administrador exporta
+// solo su local, y un `localId` ajeno contesta 403; el administrador elige
+// cualquiera, o usa su contexto activo. Con eso siempre hay una ubicación, y la
+// rama que armaba "una fila por cada local" quedó sin camino y se borró.
 
 export async function POST(req) {
   try {
@@ -25,40 +47,38 @@ export async function POST(req) {
     // costo— y contado contra los roles de producción lo tienen Admin y
     // DUEÑO_LOCAL, que son 4 usuarios activos. No lo tienen Mini ni CAJERO.
     //
-    // Ver el catálogo y llevárselo con los costos son dos cosas distintas.
+    // Ver el catálogo y llevárselo con los costos son dos cosas distintas. La
+    // lista de precios en PDF también lleva el costo, así que pide lo mismo.
     const perm = checkPerm(session, "costos.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();
 
-    // Resolver localId: body → session → contexto cookie
-    let localId = Number(body.localId) || 0;
-    if (!localId && session.localId) localId = Number(session.localId);
-    if (!localId && session.esAdmin) {
-      const ctx = getContextoActivo(req, session);
-      if (ctx.localId) localId = Number(ctx.localId);
-    }
-
-    // Resolver grupoId: session → derivar de localId
-    let grupoId = Number(session.grupoId) || 0;
-    if (!grupoId && localId) {
-      grupoId = await getGrupoIdDeLocal(localId);
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[productos/export] CTX:", { sessionGrupoId: session.grupoId, localId, grupoIdResolved: grupoId });
-    }
-
-    if (!grupoId) {
+    const scope = await resolveScope(req, { explicitLocalId: Number(body.localId) || null });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "Selecciona un grupo activo" },
-        { status: 400 }
+        { ok: false, error: scope.error, ...(scope.needsContexto ? { needsContexto: true } : {}) },
+        { status: scope.status }
       );
     }
+    const { localId, grupoId } = scope;
 
-    localId = localId || null;
     const proveedorId = body.proveedorId ? Number(body.proveedorId) : null;
     const categoriaId = body.categoriaId ? Number(body.categoriaId) : null;
+
+    const hoy = new Date().toISOString().split("T")[0];
+
+    if (body.formato === "pdf") {
+      const datos = await datosDeLaListaDePrecios(prisma, { grupoId, localId, proveedorId, categoriaId });
+      const bytes = await armarListaDePreciosPdf(datos);
+      return new NextResponse(bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="lista-de-precios_${hoy}.pdf"`,
+        },
+      });
+    }
 
     // Filtro base
     const where = { grupoId };
@@ -73,21 +93,14 @@ export async function POST(req) {
         categoria: { select: { nombre: true } },
         proveedor: { select: { nombre: true } },
         area_fisica: { select: { nombre: true } },
-        locales: localId
-          ? {
-              where: { localId },
-              take: 1,
-              include: {
-                local: { select: { nombre: true } },
-                stock: { select: { cantidad: true, stockMin: true, stockMax: true } },
-              },
-            }
-          : {
-              include: {
-                local: { select: { nombre: true } },
-                stock: { select: { cantidad: true, stockMin: true, stockMax: true } },
-              },
-            },
+        locales: {
+          where: { localId },
+          take: 1,
+          include: {
+            local: { select: { nombre: true } },
+            stock: { select: { cantidad: true, stockMin: true, stockMax: true } },
+          },
+        },
       },
     });
 
@@ -95,7 +108,7 @@ export async function POST(req) {
     const filas = [];
 
     for (const p of productos) {
-      if (localId && p.locales.length > 0) {
+      if (p.locales.length > 0) {
         // Una fila por el local filtrado
         const loc = p.locales[0];
         filas.push({
@@ -119,28 +132,6 @@ export async function POST(req) {
           activo: (loc.activo ?? p.activo) ? "SI" : "NO",
           local_nombre: loc.local?.nombre || "",
         });
-      } else if (!localId && p.locales.length > 0) {
-        // Sin filtro de local: una fila por cada local
-        for (const loc of p.locales) {
-          filas.push({
-            id: p.id,
-            codigo_barra: p.codigo_barra || "",
-            nombre: loc.nombre || p.nombre,
-            categoria: p.categoria?.nombre || "",
-            proveedor: p.proveedor?.nombre || "",
-            area_fisica: p.area_fisica?.nombre || "",
-            unidad_medida: p.unidad_medida || "",
-            factor_pack: p.factor_pack != null ? Number(p.factor_pack) : "",
-            precio_costo: Number(loc.precio_costo ?? p.precio_costo ?? 0),
-            precio_venta: Number(loc.precio_venta ?? p.precio_venta ?? 0),
-            margen: Number(loc.margen ?? p.margen ?? 0),
-            stock_actual: loc.stock?.[0] ? Number(loc.stock[0].cantidad) : 0,
-            stock_min: loc.stock?.[0]?.stockMin != null ? Number(loc.stock[0].stockMin) : "",
-            stock_max: loc.stock?.[0]?.stockMax != null ? Number(loc.stock[0].stockMax) : "",
-            activo: (loc.activo ?? p.activo) ? "SI" : "NO",
-            local_nombre: loc.local?.nombre || "",
-          });
-        }
       } else {
         // Producto sin locales asignados (solo base)
         filas.push({
@@ -196,8 +187,6 @@ export async function POST(req) {
     ];
 
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-
-    const hoy = new Date().toISOString().split("T")[0];
 
     return new NextResponse(buf, {
       status: 200,

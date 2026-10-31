@@ -833,6 +833,13 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Que la acción sea grave no entra en la cuenta: lo grave lo sostiene el
     // botón "Sí, cancelar", que hay que ir a buscar.
     "components/proveedores/listas/ModalCancelarImportacion.jsx": false,
+    // ── DESCARGAR LA LISTA DE PRECIOS: `false` ─────────────────────────────
+    //
+    // Adentro hay tres elecciones —ubicación, proveedor y tipo— y ninguna se
+    // tipea: son tres toques. Si el velo la cierra sin querer, lo que se pierde
+    // es volver a tocarlas, que es el mismo caso que leer con otra columna. Y no
+    // escribe nada: baja un PDF.
+    "components/productos/PanelListaDePrecios.jsx": false,
     // ── REGISTRAR UN PAGO A UN PROVEEDOR ─────────────────────────────────
     //
     // Carga: adentro hay un importe escrito, un medio, la ubicación de la que

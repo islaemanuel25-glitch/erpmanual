@@ -18,7 +18,7 @@
 // ésta se queda atrás.
 
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import { Layers, TrendingUp, FileSpreadsheet, LayoutGrid } from "lucide-react";
+import { Layers, TrendingUp, FileSpreadsheet, FileText, LayoutGrid } from "lucide-react";
 
 /**
  * UNA OPCIÓN DE LA HOJA.
@@ -51,13 +51,14 @@ function Opcion({ icono: Icono, etiqueta, descripcion, onClick }) {
 /**
  * @param {bool} open
  * @param {func} onClose
- * @param {object} acciones  los cuatro manejadores; los trae la pantalla porque
+ * @param {object} acciones  los manejadores de cada opción; los trae la pantalla porque
  *                           son suyos —navegan, abren modales— y esta hoja no
  *                           tiene por qué saber a dónde van.
  * @param {bool} puedeExportar  el permiso de `costos.ver`, ya resuelto por la
- *                              pantalla. Sin él, Import / Export no se ofrece:
- *                              un botón que contesta 403 al tocarlo es la clase
- *                              de cosa que después se reporta como "anda mal".
+ *                              pantalla. Sin él, ni Import / Export ni la lista
+ *                              de precios se ofrecen: un botón que contesta 403
+ *                              al tocarlo es la clase de cosa que después se
+ *                              reporta como "anda mal".
  */
 export default function HojaMasAcciones({
   open,
@@ -65,6 +66,7 @@ export default function HojaMasAcciones({
   onNuevoCombo,
   onActualizacionPrecios,
   onImportExport,
+  onListaDePrecios,
   onPersonalizarCard,
   puedeExportar = true,
 }) {
@@ -100,6 +102,14 @@ export default function HojaMasAcciones({
         descripcion="Aumentos por proveedor, planilla o reglas"
         onClick={elegir(onActualizacionPrecios)}
       />
+      {puedeExportar && (
+        <Opcion
+          icono={FileText}
+          etiqueta="Descargar lista de precios"
+          descripcion="PDF con el costo y la venta, por proveedor o tipo"
+          onClick={elegir(onListaDePrecios)}
+        />
+      )}
       {puedeExportar && (
         <Opcion
           icono={FileSpreadsheet}

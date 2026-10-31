@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { filtrosBaseDelCatalogo } from "@/lib/productos/whereCatalogo";
+import { filtrosBaseDelCatalogo, filtroDeEstado } from "@/lib/productos/whereCatalogo";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
@@ -152,15 +152,8 @@ export async function GET(req) {
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
       // Estado (activos/inactivos): un PRODUCTO normal lo lleva en ProductoBase.activo;
       // un COMBO lo lleva SOLO en su ProductoLocal.activo (la base del combo no cambia).
-      // Por eso el filtro se ramifica por tipo para que "Estado" funcione con combos.
-      activoFilter !== undefined
-        ? {
-            OR: [
-              { es_combo: false, activo: activoFilter },
-              { es_combo: true, locales: { some: { localId, activo: activoFilter } } },
-            ],
-          }
-        : {},
+      // La rama vive en `filtroDeEstado`, compartida con el contador y la lista de precios.
+      filtroDeEstado({ localId, activo: activoFilter }),
       ...(incompletos
         ? [{
             OR: [
