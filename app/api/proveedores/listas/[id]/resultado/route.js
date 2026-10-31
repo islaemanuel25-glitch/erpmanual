@@ -823,12 +823,29 @@ async function sugerenciasParaLosSinVincular({ importacionId, productos, noViene
       descripcionProveedor: true,
       unidadProveedor: true,
       unidadesPorBulto: true,
+      contenidoMl: true,
       precioConIva: true,
       productoBaseId: true,
     },
     orderBy: { filaExcel: "asc" },
   });
-  return sugerenciasDeRenglones({ filas: libres, productos: sinRenglon });
+  const todas = sugerenciasDeRenglones({ filas: libres, productos: sinRenglon });
+  // ── UN RENGLÓN QUE "PUEDEN SER DE…" LE DIO A OTRO, NO SE PREGUNTA ACÁ ────
+  //
+  // `calcularPuedenSer` deja que un producto del resto del catálogo se lleve un
+  // renglón reservado para un "¿Es …?" si se le parece más (Carozo, #23). Si
+  // esa propuesta sigue por confirmar, ganó ella: preguntar también acá pondría
+  // dos tarjetas a pelear por el mismo renglón.
+  const propuestos = new Set(
+    (
+      await prisma.productoQuePuedeSerDeLaLista.findMany({
+        where: { importacionId, fila: { productoBaseId: null, aplicada: false } },
+        select: { filaId: true },
+      })
+    ).map((p) => p.filaId)
+  );
+  for (const [productoBaseId, s] of todas) if (!propuestos.has(s.id)) sugerencias.set(productoBaseId, s);
+  return sugerencias;
 }
 
 /**

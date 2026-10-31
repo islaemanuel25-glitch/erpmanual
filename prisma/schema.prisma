@@ -4973,6 +4973,9 @@ model ImportacionListaFila {
 
   unidadProveedor  String
   unidadesPorBulto Int?
+  /// El contenido de cada unidad en ml, leído de la presentación ("6X750" → 750).
+  /// Solo para comparar nombres ("Pueden ser de…"): no entra en ningún costo.
+  contenidoMl      Int?
   /// Precio TAL COMO LO INFORMÓ el proveedor. Seis decimales: el archivo real
   /// trae valores como 1404.602001 y truncarlos falsearía la propuesta.
   precioConIva     Decimal  @db.Decimal(18, 6)

@@ -11,7 +11,10 @@
 //
 // Lo que estos candados sostienen:
 //   · un producto de otro proveedor con nombre casi igual se propone;
-//   · un solo candidato claro: con empate, o si gana dos renglones, nada;
+//   · un solo candidato claro por renglón: con empate, nada;
+//   · un producto que gana varios renglones se queda con el de mayor parecido,
+//     con el tamaño de desempate; empatados del todo, nada;
+//   · un renglón reservado para un «¿Es …?» se lo lleva solo quien se parece más;
 //   · por debajo del umbral de «¿Es …?», nada;
 //   · «No» no lo vuelve a proponer, tampoco en las próximas listas;
 //   · «✓ Sí» le suma el proveedor en un lugar libre, sin quitar el que tenía;
@@ -40,6 +43,7 @@ import {
   claveDeRechazo,
   lugarParaSumarProveedor,
   posiblesDelProveedor,
+  renglonQueGana,
   textoDeProveedoresDeHoy,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { parecidoNombre } from "@/lib/proveedores/listas/conciliarLista";
@@ -148,9 +152,62 @@ test("DOS CANDIDATOS EMPATADOS NO PROPONEN NADA", () => {
   assert.equal(posiblesDelProveedor({ filas, productos: [empatados[0]] }).length, 1);
 });
 
-test("UN PRODUCTO QUE GANA DOS RENGLONES NO SE PROPONE: NO HAY UN CANDIDATO CLARO", () => {
+// ── UN PRODUCTO QUE GANA VARIOS RENGLONES (contrato reescrito el 2026-10-31) ──
+//
+// Antes: "si gana dos, ninguno". Con Carozo (#23) eso dejaba sin ofrecer el par
+// bueno de "VINO ESTANCIA MENDOZA MALBEC 750ML", que gana "ESTANCIA MENDOZA
+// MALBEC" y, más flojo, "MERLOT-MALBEC". Ahora: el de mayor parecido; si
+// empatan, el tamaño; si siguen empatados, ninguno.
+test("UN PRODUCTO QUE GANA DOS RENGLONES EMPATADOS Y SIN TAMAÑO NO SE PROPONE", () => {
   const filas = [renglon(41, "4148", "GRANIX BOCADITOS FRUTILLA 2KG"), renglon(43, "4149", "GRANIX BOCADITO FRUTILLA 2 KG")];
   assert.deepEqual(posiblesDelProveedor({ filas, productos: [producto(500, "GRANIX BOCADITO FRUTILLA 2KG")] }), []);
+});
+
+test("UN PRODUCTO QUE GANA DOS RENGLONES SE QUEDA CON EL DE MAYOR PARECIDO", () => {
+  const filas = [
+    renglon(51, "86288", "ESTANCIA MENDOZA MALBEC", 2332.4),
+    renglon(52, "86341", "ESTANCIA MENDOZA MERLOT-MALBEC", 2332.4),
+  ];
+  const posibles = posiblesDelProveedor({ filas, productos: [producto(700, "VINO ESTANCIA MENDOZA MALBEC 750ML")] });
+  assert.equal(posibles.length, 1);
+  assert.equal(posibles[0].renglon.id, 51, "tiene que ser ESTANCIA MENDOZA MALBEC, no MERLOT-MALBEC");
+});
+
+test("SI EMPATAN EN PARECIDO, DESEMPATA EL TAMAÑO; SI SIGUEN EMPATADOS, NINGUNO", () => {
+  // Los dos "CANCILLER BLEND TINTO" de Carozo solo difieren en la presentación.
+  const conTamano = (id, codigo, contenidoMl) => ({ ...renglon(id, codigo, "CANCILLER BLEND TINTO", 1875), contenidoMl });
+  const sinTamano = [producto(800, "CANCILLER BLEND TINTO")];
+  // El producto sin tamaño empata los dos: no se ofrece ninguno.
+  assert.deepEqual(posiblesDelProveedor({ filas: [conTamano(61, "87347", 750), conTamano(62, "87349", 1125)], productos: sinTamano }), []);
+  // Con tamaño, el otro renglón da cero y queda el suyo.
+  const p = posiblesDelProveedor({ filas: [conTamano(61, "87347", 750), conTamano(62, "87349", 1125)], productos: [producto(801, "CANCILLER BLEND TINTO 1.125ML")] });
+  assert.equal(p.length, 1);
+  assert.equal(p[0].renglon.id, 62);
+  // `renglonQueGana`, el desempate solo: empatados en parecido, el del tamaño del producto.
+  const lista = [{ puntaje: 0.75, tamano: "750ml", id: 1 }, { puntaje: 0.75, tamano: "1125ml", id: 2 }];
+  assert.equal(renglonQueGana(lista, "1125ml").id, 2);
+  assert.equal(renglonQueGana(lista, null), null);
+  assert.equal(renglonQueGana([...lista, { puntaje: 0.75, tamano: "1125ml", id: 3 }], "1125ml"), null);
+});
+
+test("EL CÁLCULO PASA LOS RESERVADOS CON SU PARECIDO, Y EL «¿ES …?» CEDE EL RENGLÓN QUE QUEDÓ PROPUESTO", () => {
+  const calculo = codigoDe(CALCULO);
+  assert.match(calculo, /reservados = new Map\(\s*\[\.\.\.sugerenciasDeRenglones\([^)]*\)\.values\(\)\]\.map\(\(s\) => \[s\.id, s\.puntaje\]\)/);
+  assert.match(calculo, /posiblesDelProveedor\(\{[\s\S]*?\breservados,?\s*\}\)/);
+  assert.doesNotMatch(calculo, /sugeridos\.has/, "volvió a sacar los reservados sin compararlos");
+  const resultado = codigoDe("app/api/proveedores/listas/[id]/resultado/route.js");
+  const funcion = resultado.slice(resultado.indexOf("async function sugerenciasParaLosSinVincular"));
+  assert.match(funcion, /productoQuePuedeSerDeLaLista\.findMany/);
+  assert.match(funcion, /if \(!propuestos\.has\(s\.id\)\) sugerencias\.set/);
+});
+
+test("UN RENGLÓN RESERVADO PARA UN «¿ES …?» SE LO LLEVA SOLO QUIEN SE PARECE MÁS", () => {
+  const filas = [renglon(71, "86288", "ESTANCIA MENDOZA MALBEC", 2332.4)];
+  const productos = [producto(900, "VINO ESTANCIA MENDOZA MALBEC 750ML")]; // parecido 1
+  // Reservado con 0,6 para un producto del paquete 1: gana el de 1.
+  assert.equal(posiblesDelProveedor({ filas, productos, reservados: new Map([[71, 0.6]]) }).length, 1);
+  // Reservado con el mismo parecido o más: se queda donde estaba.
+  assert.deepEqual(posiblesDelProveedor({ filas, productos, reservados: new Map([[71, 1]]) }), []);
 });
 
 test("POR DEBAJO DEL UMBRAL DE «¿ES …?» NO SE PROPONE", () => {
