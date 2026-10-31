@@ -66,13 +66,26 @@ test("el consumidor pide sus fixtures al resolutor, no a una variable de entorno
   );
 });
 
-test("si la carpeta de fixtures está, los dos formatos se resuelven", () => {
+test("si la carpeta de fixtures tiene planillas, los dos formatos se resuelven", () => {
   const r = inspeccionarFixtures();
 
   if (!r.existe) {
     // Sin carpeta no hay nada que exigir. El salteo es legítimo y está declarado.
     return;
   }
+
+  // ── UNA CARPETA SIN NINGUNA PLANILLA TAMPOCO EXIGE NADA ──────────────────
+  //
+  // Hasta el 2026-10-31 la carpeta tenía solo los Excel de Arcor, y "existe"
+  // quería decir "tiene las planillas". Desde ese día guarda también la lista de
+  // vinos de Carozo en PDF (`listaVinosCarozo.test.mjs`), y en una sesión de nube
+  // la carpeta se arma para el fixture que haga falta: con el PDF solo, este
+  // candado daba rojo sin que ningún candado de Arcor se estuviera salteando por
+  // error —no hay planilla que no llegue—.
+  //
+  // Lo que SIGUE siendo rojo, que es lo que el candado defiende: una carpeta con
+  // planillas de las que no se puede elegir alguno de los dos formatos.
+  if (r.archivos.length === 0) return;
 
   for (const clave of ["A", "B"]) {
     assert.ok(
