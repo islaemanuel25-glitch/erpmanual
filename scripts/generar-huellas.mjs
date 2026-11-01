@@ -105,10 +105,9 @@ const PANTALLAS = [
   { nombre: "11-proveedores", url: "/modulos/proveedores" },
   { nombre: "12-reportes-stock", url: "/modulos/reportes-stock" },
   { nombre: "14-roles", url: "/modulos/roles" },
-  // Turnos arranca filtrado por "hoy" y "abiertas", así que su huella depende del
-  // día en que se corre. Para poder compararla contra una línea de base tomada
-  // otro día, se reponen las fechas de esa corrida y se vuelve a buscar.
-  { nombre: "16-turnos", url: "/modulos/turnos", fecha: arg("fecha-turnos", "2026-08-06") },
+  // 16-turnos se fue el 2026-11-01 con la lista de turnos vieja: la pantalla se
+  // borró y su URL da 404. Era la única que reponía fechas, y ese mecanismo
+  // (`fecha`, `--fecha-turnos`) se fue con ella.
   { nombre: "18-usuarios", url: "/modulos/usuarios" },
   { nombre: "19-productos-fila-seleccionada", url: "/modulos/productos", clicPrimeraFila: true },
   // 20-edicion-rapida se fue con el módulo: la pantalla se borró al implementar
@@ -564,48 +563,8 @@ try {
   for (const p of seleccion) {
     await navegar(BASE + p.url);
 
-    // La pantalla tiene que estar asentada ANTES de tocarle nada. Escribirle la
-    // fecha mientras todavía carga hacía que el botón "Buscar" no existiera
-    // todavía: la reposición fallaba, la pantalla quedaba con el filtro de hoy y
-    // la huella salía vacía. Es lo que dejaba a `16-turnos` sin tabla.
-    if (p.fecha || p.clicPrimeraFila) await esperarTablaEstable();
-
-    if (p.fecha) {
-      // El formulario se monta después del readyState, y el botón puede tardar
-      // más que los campos: se esperan los TRES, que son los que hacen falta.
-      let montado = false;
-      for (let i = 0; i < 40 && !montado; i++) {
-        await sleep(250);
-        montado = await evaluar(`(() => {
-          const campos = !!document.getElementById("f-desde") && !!document.getElementById("f-hasta");
-          const boton = [...document.querySelectorAll("button")]
-            .some((x) => (x.innerText || "").trim().toLowerCase() === "buscar");
-          return campos && boton;
-        })()`);
-      }
-      if (!montado) log(`  ${p.nombre}: el filtro de fechas nunca se montó`);
-
-      // React ignora una asignación directa a .value: hay que usar el setter
-      // nativo y disparar el evento para que el estado del componente se entere.
-      const ok = await evaluar(`(() => {
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-        const poner = (id) => {
-          const el = document.getElementById(id);
-          if (!el) return false;
-          setter.call(el, ${JSON.stringify(p.fecha)});
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-          return true;
-        };
-        const a = poner("f-desde"), b = poner("f-hasta");
-        const boton = [...document.querySelectorAll("button")]
-          .find((x) => (x.innerText || "").trim().toLowerCase() === "buscar");
-        if (boton) boton.click();
-        return a && b && !!boton;
-      })()`);
-      if (!ok) log(`  ${p.nombre}: no se pudieron reponer los filtros de fecha`);
-      await sleep(1200);
-    }
+    // La pantalla tiene que estar asentada ANTES de tocarle nada.
+    if (p.clicPrimeraFila) await esperarTablaEstable();
 
     if (p.buscar) {
       // La tabla tiene que estar cargada ANTES de escribir: si se escribe
@@ -745,7 +704,6 @@ try {
         identificadores: {
           pedido: arg("pedido", "216"),
           importacion: arg("importacion", "3"),
-          fechaTurnos: arg("fecha-turnos", "2026-08-06"),
           buscarStock: arg("buscar-stock", "Mogul"),
         },
         pantallasGuardadas: Object.keys(huellas).length,

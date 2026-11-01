@@ -31,7 +31,9 @@ import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 
 import CuentaFinancieraDeUnLocal from "@/components/finanzas/CuentaFinancieraDeUnLocal";
 import { useFinanzasDelLocal } from "@/components/finanzas/useFinanzasDelLocal";
-import { RUTA_FINANZAS, urlDelTurno } from "@/lib/finanzas/contextoFinanzas";
+import { RUTA_FINANZAS } from "@/lib/finanzas/contextoFinanzas";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
+import { urlDeCaja } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 export default function LocalDeFinanzasPage() {
   return (
@@ -80,7 +82,10 @@ function CuentaDelLocal() {
 
       <CuentaFinancieraDeUnLocal
         {...cuenta}
-        onAbrirTurno={(turnoId) => router.push(urlDelTurno(localId, turnoId, cuenta.contexto))}
+        // El turno se abre en su caja de "Turnos y cierres" (el id de la caja ES
+        // el del turno), solo para quien puede verla: dueño y admin. La ficha
+        // del turno propia de Finanzas se borró el 2026-11-01.
+        onAbrirTurno={puedeVerTurnosYCierres(perfil) ? (turnoId) => router.push(urlDeCaja(turnoId)) : undefined}
       />
     </div>
   );

@@ -12,7 +12,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const rutaTablero = await import("../../app/api/finanzas/tablero/route.js");
-const rutaTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
+const { calcularEsperadoDeTurno } = await import("../../lib/caja/arqueoServer.js");
 const rutaCuentas = await import("../../app/api/finanzas/pagos-proveedores/route.js");
 const rutaCuenta = await import("../../app/api/finanzas/pagos-proveedores/[cuentaId]/route.js");
 const rutaPagos = await import("../../app/api/finanzas/pagos-proveedores/[cuentaId]/pagos/route.js");
@@ -64,7 +64,6 @@ const leer = async (respuesta) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 
-const paramsTurno = (turnoId) => ({ params: Promise.resolve({ turnoId: String(turnoId) }) });
 const paramsCuenta = (cuentaId) => ({ params: Promise.resolve({ cuentaId: String(cuentaId) }) });
 
 const conCuerpo = (url, sesion, metodo, cuerpo) =>
@@ -407,30 +406,8 @@ async function correr(f) {
   ok("la lista 'Todos' del mismo período suma exactamente lo mismo", sumaLista === Math.round(resumen.gastos * 100),
     JSON.stringify({ lista: sumaLista, resumen: Math.round(resumen.gastos * 100) }));
 
-  console.log("\n── Turno: abierto por el local");
-  const detalleLocal = await leer(
-    rutaTurno.GET(
-      pedido(`http://ci/api/finanzas/turno/${f.turno.id}`, sesionLocal),
-      paramsTurno(f.turno.id)
-    )
-  );
-  ok("el detalle del turno responde 200", detalleLocal.status === 200 && detalleLocal.ok === true, detalleLocal.error);
-  ok("devuelve el turno correcto", detalleLocal.turno?.id === f.turno.id);
-  ok("ejerció movimientos de caja", Array.isArray(detalleLocal.movimientos) && detalleLocal.movimientos.length === 1);
-  ok("calculó efectivo esperado", detalleLocal.esperado?.efectivoEsperado !== undefined);
-
-  console.log("\n── Turno: abierto por el depósito");
-  const detalleDeposito = await leer(
-    rutaTurno.GET(
-      pedido(`http://ci/api/finanzas/turno/${f.turno.id}`, sesionDeposito),
-      paramsTurno(f.turno.id)
-    )
-  );
-  ok(
-    "el depósito puede abrir el turno del local de su grupo",
-    detalleDeposito.status === 200 && detalleDeposito.ok === true,
-    detalleDeposito.error
-  );
+  // "Turno: abierto por el local / por el depósito" ejercía la ficha del turno
+  // en Finanzas, que se borró el 2026-11-01 con las pantallas viejas de turnos.
 }
 
 // ── LA SEMANA DE FINANZAS ES LA SEMANA OPERATIVA DE LA UBICACIÓN ──────────
@@ -554,17 +531,16 @@ async function abrir(cuentaId, sesion) {
 
 const movimientosDe = (turnoId) => prisma.cajaMovimiento.count({ where: { turnoId } });
 
-async function esperadoDelTurno(turnoId, sesion) {
-  const r = await leer(
-    rutaTurno.GET(pedido(`http://ci/api/finanzas/turno/${turnoId}`, sesion), paramsTurno(turnoId))
-  );
-  return r.esperado?.efectivoEsperado;
+// El esperado sale de la fórmula única, la misma que usan el cierre y el
+// retiro. Antes se leía de la ficha del turno en Finanzas, que se borró el
+// 2026-11-01 con las pantallas viejas de turnos.
+async function esperadoDelTurno(turnoId) {
+  const turno = await prisma.turno.findUnique({ where: { id: turnoId } });
+  return (await calcularEsperadoDeTurno(turno, prisma)).efectivoEsperado;
 }
 
-// El detalle entero del turno y el resumen del tablero del local: los dos
-// lugares donde `clasificarMovimientos` decide si un retiro es manual.
-const detalleDelTurno = (turnoId, sesion) =>
-  leer(rutaTurno.GET(pedido(`http://ci/api/finanzas/turno/${turnoId}`, sesion), paramsTurno(turnoId)));
+// El resumen del tablero del local: donde `clasificarMovimientos` decide si un
+// retiro es manual.
 const tableroDelLocal = (sesion) =>
   leer(rutaTablero.GET(pedido("http://ci/api/finanzas/tablero?entrada=1", sesion)));
 
@@ -687,8 +663,7 @@ async function correrPagos(f) {
   ok("efectivo desde el turno de otra ubicación → 403", turnoAjeno.status === 403, `${turnoAjeno.status} ${turnoAjeno.error}`);
   ok("y cero retiro en ese turno", (await movimientosDe(f.turnoOtro.id)) === movsOtroAntesCruce);
 
-  const esperadoAntes = await esperadoDelTurno(f.turno.id, localEscribe);
-  const detalleAntesEf = await detalleDelTurno(f.turno.id, localEscribe);
+  const esperadoAntes = await esperadoDelTurno(f.turno.id);
   const tableroAntesEf = await tableroDelLocal(localEscribe);
   const movsAntesEf = await movimientosDe(f.turno.id);
   const p2 = await pagar(cuentaA.id, localEscribe, {
@@ -704,7 +679,7 @@ async function correrPagos(f) {
     : null;
   ok("el movimiento es un RETIRO por el mismo importe", mov?.tipo === "RETIRO" && Number(mov?.monto) === 100000);
   ok("pago y movimiento quedan vinculados por id", mov?.turnoId === f.turno.id && p2.pago?.turnoId === f.turno.id);
-  const esperadoDespues = await esperadoDelTurno(f.turno.id, localEscribe);
+  const esperadoDespues = await esperadoDelTurno(f.turno.id);
   ok(
     "el efectivo esperado baja exactamente una vez",
     Math.round((esperadoAntes - esperadoDespues) * 100) === 10000000,
@@ -713,27 +688,11 @@ async function correrPagos(f) {
 
   // ── EL RETIRO DEL PAGO ES UN PAGO, NO UN RETIRO MANUAL ──────────────────
   //
-  // Las dos rutas preguntan por `PagoProveedor.cajaMovimientoId` con la forma
-  // exacta que usan en producción. El motivo no interviene: lo que se afirma es
-  // la clase que sale del vínculo.
-  const detalleDespuesEf = await detalleDelTurno(f.turno.id, localEscribe);
+  // El tablero pregunta por `PagoProveedor.cajaMovimientoId` con la forma
+  // exacta que usa en producción. El motivo no interviene: lo que se afirma es
+  // la clase que sale del vínculo. (La ficha del turno en Finanzas, que era la
+  // segunda ruta, se borró el 2026-11-01.)
   const tableroDespuesEf = await tableroDelLocal(localEscribe);
-  const movEnDetalle = (detalleDespuesEf.movimientos || []).find((m) => m.id === mov?.id);
-  ok(
-    "el detalle del turno lo clasifica PAGO_PROVEEDOR",
-    movEnDetalle?.clase === "PAGO_PROVEEDOR",
-    `clase ${movEnDetalle?.clase}`
-  );
-  ok(
-    "el turno no lo suma a los retiros manuales",
-    Math.round(detalleDespuesEf.caja?.retiros * 100) === Math.round(detalleAntesEf.caja?.retiros * 100),
-    `${detalleAntesEf.caja?.retiros} → ${detalleDespuesEf.caja?.retiros}`
-  );
-  ok(
-    "pero el esperado del turno lo resta una sola vez",
-    Math.round((detalleDespuesEf.esperado?.retiros - detalleAntesEf.esperado?.retiros) * 100) === 10000000,
-    `${detalleAntesEf.esperado?.retiros} → ${detalleDespuesEf.esperado?.retiros}`
-  );
   ok(
     "el resumen del tablero no lo suma a los retiros manuales",
     tableroDespuesEf.status === 200 &&

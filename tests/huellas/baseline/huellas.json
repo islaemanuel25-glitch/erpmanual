@@ -640,67 +640,6 @@
   ],
   "textoTabla": "Rol\tPermisos\tAcciones\nAdmin\t*\t\n\nCAJERO\tpos.usar, clientes.crear, clientes.puntos.ver, clientes.puntos.canjear, clientes.cc.ver, clientes.cc.pagar\t\n\nMini\tproductos.ver, pos_transferencias.enviar, pos.usar, transferencias.ver, transferencias.recibir, transferencias.cancelar, compras.crear, compras.ver, compras.recibir, pos_transferencias.ver\t"
  },
- "16-turnos": {
-  "url": "/modulos/turnos",
-  "tablas": [
-   {
-    "indice": 0,
-    "columnas": [
-     "Estado",
-     "Vendedor",
-     "Apertura",
-     "Cierre",
-     "M. Inicial",
-     "Esperado",
-     "Real",
-     "Diferencia",
-     "Se retiró",
-     "Cambio dejado",
-     "Ventas",
-     "Efectivo",
-     "Digital",
-     ""
-    ],
-    "thAlign": [
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left",
-     "left"
-    ],
-    "thPad": "5.25px 7px",
-    "thFondo": "rgba(15, 23, 42, 0.8)",
-    "filas": 1,
-    "muestra": [
-     {
-      "alto": 50,
-      "fondo": "rgba(0, 0, 0, 0)",
-      "opacidad": "1",
-      "tdPad": "7px 10.5px",
-      "tdFuente": "12.25px",
-      "tdAlign": "start"
-     }
-    ],
-    "anchoTabla": 1216,
-    "contenedor": {
-     "overflowX": "auto",
-     "overflowY": "auto",
-     "maxHeight": "none",
-     "id": null
-    }
-   }
-  ],
-  "textoTabla": "Estado\tVendedor\tApertura\tCierre\tM. Inicial\tEsperado\tReal\tDiferencia\tSe retiró\tCambio dejado\tVentas\tEfectivo\tDigital\t\n● Abierta\tAdministrador\t17/08/2026, 12:24 p. m.\t-\t10.000,00\t-\t-\t-\t—\t—\t-\t-\t-\tVer"
- },
  "18-usuarios": {
   "url": "/modulos/usuarios",
   "tablas": [

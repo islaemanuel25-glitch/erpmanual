@@ -38,7 +38,6 @@ const rutaCorregir = await import("../../app/api/pos-ventas/venta/[id]/corregir/
 const rutaSinConteo = await import("../../app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js");
 const rutaPendientes = await import("../../app/api/pos-ventas/cierres/pendientes/route.js");
 const rutaResumen = await import("../../app/api/pos-ventas/turnos/resumen/route.js");
-const rutaFinanzasTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
 const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
 const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
 const rutaAbrirSinCambio = await import("../../app/api/pos-ventas/turnos/abrir-sin-cambio/route.js");
@@ -47,7 +46,6 @@ const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[toke
 
 const { ESTADO_TURNO, ESTADO_CIERRE, estadoDelTurno, PERMISO_CERRAR_SIN_CONTEO, ACCION_CERRAR_SIN_CONTEO } =
   await import("../../lib/caja/cierreRelevo.js");
-const { CAJA_SIN_CONTEO } = await import("../../lib/caja/vistaTurno.js");
 const { COD_TURNO_CERRADO, COD_TURNO_EN_CIERRE } = await import(
   "../../lib/pos-ventas/correccionCompletaServer.js"
 );
@@ -730,15 +728,8 @@ async function correr(f) {
     ok("D19 el resumen responde", rRes.ok === true, rRes.error);
     igual("D19 el resumen trae el corte resuelto sin conteo", rRes.relevo?.corte?.estado, ESTADO_CIERRE.CERRADO_SIN_CONTEO);
 
-    const rFin = await leer(
-      await rutaFinanzasTurno.GET(
-        pedidoGet(`http://ci/api/finanzas/turno/${tid}`, sesionSinConteo),
-        { params: Promise.resolve({ turnoId: String(tid) }) }
-      )
-    );
-    ok("D19 Finanzas responde", rFin.ok === true, `${rFin.status} ${rFin.error ?? ""}`);
-    igual("D19 Finanzas dice 'cerrado sin conteo', no 'turno abierto'", rFin.resultado?.estado, CAJA_SIN_CONTEO);
-    igual("D19 sin diferencia inventada", rFin.resultado?.monto, null);
+    // La ficha del turno en Finanzas, que también se leía acá, se borró el
+    // 2026-11-01 con las pantallas viejas de turnos.
 
     const rPend = await leer(await rutaPendientes.GET(pedidoGet(`${BASE}/cierres/pendientes`, sesion)));
     ok("D19 el resuelto ya no aparece entre los pendientes",

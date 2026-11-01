@@ -582,15 +582,8 @@ const CASOS = [
     ],
     esperadas: ["D19 el resumen trae el corte resuelto sin conteo"],
   },
-  {
-    n: "CC-12",
-    defecto: "Finanzas vuelve a leer un cerrado sin contado como 'turno abierto'",
-    archivo: "app/api/finanzas/turno/[turnoId]/route.js",
-    suite: "scripts/pruebas-db/cierreCaja.mjs",
-    minimo: 20,
-    inyecciones: [{ de: "        cerrado: estadoDelTurno(turno) === ESTADO_TURNO.CERRADO,\n", a: "" }],
-    esperadas: ["D19 Finanzas dice 'cerrado sin conteo', no 'turno abierto'", "D19 sin diferencia inventada"],
-  },
+  // CC-12 se fue el 2026-11-01 con la ficha del turno en Finanzas
+  // (`app/api/finanzas/turno/[turnoId]`), que era lo que contraprobaba.
   // ── El error ×1000: la cantidad de billetes escrita como monto ────────────
   // Una por cada camino donde ya ocurrió en producción, más la confirmación.
   {

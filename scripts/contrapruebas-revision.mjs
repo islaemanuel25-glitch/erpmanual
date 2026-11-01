@@ -909,17 +909,8 @@ const CASOS = [
     candado: "el resultado de un cerrado sin contado NO es 'turno abierto' ni un cero",
     suite: "lib/caja/cierreSinConteo.test.mjs",
   },
-  {
-    // Sin el retiro final, sumar los otros dos y mostrarlo como el total de lo
-    // que salió del local es presentar un número menor como cierto.
-    n: "SC-circuito",
-    defecto: "'dinero que salió del local' vuelve a sumar sin el retiro final desconocido",
-    archivo: "lib/caja/circuitoDinero.js",
-    de: "  const salioDelLocal = sinConteo\n    ? null\n    : retirosManuales",
-    a: "  const salioDelLocal = false\n    ? null\n    : retirosManuales",
-    candado: "el circuito no presenta como cierto lo que salió del local si no se contó",
-    suite: "lib/caja/cierreSinConteo.test.mjs",
-  },
+  // SC-circuito se fue el 2026-11-01 con `lib/caja/circuitoDinero.js`, que solo
+  // usaba la ficha del turno viejo.
   // ── El error ×1000: la cantidad de billetes escrita como monto ────────────
   // Los candados de texto de `desgloseDesproporcionado.test.mjs`. Lo que las
   // rutas escriben se contraprueba contra Postgres en CC-13 a CC-18. Los dos

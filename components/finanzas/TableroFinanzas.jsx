@@ -27,7 +27,10 @@ import { useRouter } from "next/navigation";
 
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import EntradaDeLocales from "@/components/transferencias/EntradaDeLocales";
-import { urlDelLocal, urlDelTurno } from "@/lib/finanzas/contextoFinanzas";
+import { useUser } from "@/app/context/UserContext";
+import { urlDelLocal } from "@/lib/finanzas/contextoFinanzas";
+import { puedeVerTurnosYCierres } from "@/lib/turnosYCierres/alcance";
+import { urlDeCaja } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 import CuentaFinancieraDeUnLocal from "./CuentaFinancieraDeUnLocal";
 import { useFinanzasDelLocal } from "./useFinanzasDelLocal";
@@ -47,6 +50,10 @@ export function insigniaDelLocal(local) {
 
 export default function TableroFinanzas() {
   const router = useRouter();
+  const { perfil } = useUser();
+  // La caja se mira en "Turnos y cierres", que es solo de dueño y admin. Sin
+  // ese permiso la fila no se ofrece: llevaría a "Sin permisos".
+  const puedeAbrirCaja = puedeVerTurnosYCierres(perfil);
 
   // UNA SOLA LLAMADA DECIDE LAS DOS VISTAS. `entrada=1` contesta la lista SI
   // quien pregunta es el depósito; si es un local, el servidor ignora el pedido
@@ -106,13 +113,10 @@ export default function TableroFinanzas() {
       {!esEntrada && cuenta.datos?.vista === "UN_LOCAL" && (
         <CuentaFinancieraDeUnLocal
           {...cuenta}
-          // EL CONTEXTO VIAJA CON EL LINK. Sin esto, volver del turno cae en el
-          // período de hoy: la pantalla se remonta y el estado arranca en su
-          // valor por defecto. Es un `push` —el turno SÍ es otro lugar— y las
-          // flechas usan `replace`, que es lo que deja una sola entrada.
-          onAbrirTurno={(turnoId) =>
-            router.push(urlDelTurno(cuenta.datos.local.id, turnoId, cuenta.contexto))
-          }
+          // El turno se abre en su caja de "Turnos y cierres" (el id de la caja
+          // ES el del turno). La ficha del turno propia de Finanzas se borró el
+          // 2026-11-01. Es un `push`: la caja SÍ es otro lugar.
+          onAbrirTurno={puedeAbrirCaja ? (turnoId) => router.push(urlDeCaja(turnoId)) : undefined}
         />
       )}
     </div>

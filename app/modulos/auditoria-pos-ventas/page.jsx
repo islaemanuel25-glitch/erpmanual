@@ -5,7 +5,6 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import {
-  Landmark,
   TrendingUp,
   Package,
   Wrench,
@@ -13,16 +12,9 @@ import {
 import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
 import { PERMISO_CORREGIR_HISTORICO } from "@/lib/caja/correcciones/permisos";
 
+// Cajas y Turnos salieron del hub el 2026-11-01: turnos, cajas, arqueos y
+// cierres viven solo en /modulos/turnos-y-cierres.
 const SECCIONES = [
-  {
-    key: "turnos",
-    label: "Cajas",
-    descripcion: "Retiros, turnos y efectivo",
-    href: "/modulos/auditoria-pos-ventas/turnos",
-    icon: Landmark,
-    iconColor: "#60a5fa",
-    glowColor: "rgba(96,165,250,0.12)",
-  },
   {
     key: "balances",
     label: "Balances",

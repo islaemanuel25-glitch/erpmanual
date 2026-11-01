@@ -46,7 +46,6 @@ const rutaGasto = await import("../../app/api/finanzas/gastos/[gastoId]/route.js
 const rutaPagos = await import("../../app/api/finanzas/gastos/[gastoId]/pagos/route.js");
 const rutaCategorias = await import("../../app/api/finanzas/gastos/categorias/route.js");
 const rutaTurnosOperativos = await import("../../app/api/finanzas/pagos-proveedores/turnos-operativos/route.js");
-const rutaTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
 const { CATEGORIAS_INICIALES, ERROR_CATEGORIA_FILTRO, ERROR_GASTO_PAGADO, ERROR_MONTO_MAYOR_AL_SALDO_GASTO, ERROR_RANGO_INVERTIDO, PERMISO_REGISTRAR_GASTOS } =
   await import("../../lib/finanzas/gastos.js");
 const { ERROR_CATEGORIA_INVALIDA, ERROR_GASTO_NO_ENCONTRADO, ERROR_OPERAR_EN_LA_UBICACION_DEL_GASTO, ERROR_ORIGEN_DE_OTRA_UBICACION_GASTO } =
@@ -54,7 +53,8 @@ const { ERROR_CATEGORIA_INVALIDA, ERROR_GASTO_NO_ENCONTRADO, ERROR_OPERAR_EN_LA_
 const { ERROR_FALTA_TURNO, ERROR_TURNO_DE_OTRA_UBICACION, ERROR_TURNO_NO_OPERATIVO } = await import("../../lib/finanzas/salidaDelPago.js");
 const { ERROR_FECHA_FUTURA, ERROR_FECHA_INVALIDA, ERROR_MEDIO_INVALIDO } = await import("../../lib/finanzas/pagosProveedores.js");
 const { ERROR_DESTINO_INVALIDO, ERROR_FUERA_DE_ALCANCE } = await import("../../lib/finanzas/alcanceFinanciero.js");
-const { CLASE_MOVIMIENTO } = await import("../../lib/finanzas/movimientosDeCaja.js");
+const { CLASE_MOVIMIENTO, clasificarMovimientos } = await import("../../lib/finanzas/movimientosDeCaja.js");
+const { vinculosDeMovimientos } = await import("../../lib/finanzas/movimientosDeCajaServer.js");
 const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
 const { sumarDias } = await import("../../lib/transferencias/periodoDePago.js");
 
@@ -385,8 +385,10 @@ try {
   // ══════════════════════════════════════════════════════════════════════
   seccion("La caja: el pago de un gasto no es un retiro manual");
   // ══════════════════════════════════════════════════════════════════════
-  const resTurno = await leer(rutaTurno.GET(pedir(`/api/finanzas/turno/${turnoCasiano.id}`, casianoVe), { params: Promise.resolve({ turnoId: String(turnoCasiano.id) }) }));
-  const movs = resTurno?.movimientos ?? resTurno?.turno?.movimientos ?? [];
+  // La clasificación del tablero, por sus mismas piezas y contra Postgres. Antes
+  // se leía de la ficha del turno en Finanzas, borrada el 2026-11-01.
+  const movsDelTurno = await c.cajaMovimiento.findMany({ where: { turnoId: turnoCasiano.id }, select: { id: true, tipo: true, monto: true, motivo: true } });
+  const movs = clasificarMovimientos(movsDelTurno, await vinculosDeMovimientos(c, movsDelTurno.map((m) => m.id)));
   const claseDe = (id) => movs.find((m) => m.id === id)?.clase;
   ok("el retiro de un pago de gasto hecho por la ruta es PAGO_GASTO", claseDe(mov3.id) === CLASE_MOVIMIENTO.PAGO_GASTO && claseDe(g2.pago.cajaMovimientoId) === CLASE_MOVIMIENTO.PAGO_GASTO,
     JSON.stringify(movs.map((m) => [m.id, m.clase])));

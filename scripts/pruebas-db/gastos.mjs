@@ -107,9 +107,9 @@ const { ERROR_GASTO_PAGADO, ERROR_MONTO_MAYOR_AL_SALDO_GASTO, CATEGORIAS_INICIAL
 const { ERROR_MONTO_INVALIDO } = await import("../../lib/finanzas/pagosProveedores.js");
 const { registrarPagoProveedor } = await import("../../lib/finanzas/pagosProveedoresServer.js");
 const { Prisma } = await import("@prisma/client");
-const { CLASE_MOVIMIENTO } = await import("../../lib/finanzas/movimientosDeCaja.js");
+const { CLASE_MOVIMIENTO, clasificarMovimientos } = await import("../../lib/finanzas/movimientosDeCaja.js");
+const { vinculosDeMovimientos } = await import("../../lib/finanzas/movimientosDeCajaServer.js");
 const rutaTablero = await import("../../app/api/finanzas/tablero/route.js");
-const rutaTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
 
 let pasadas = 0;
 const fallas = [];
@@ -383,14 +383,12 @@ try {
   // vínculo, tiene que seguir siendo manual.
   const impostor = await c.cajaMovimiento.create({ data: { turnoId: turnoCasiano.id, usuarioId: uCasiano.id, tipo: "RETIRO", monto: 777, motivo: movP.motivo } });
   const token = jwt.sign({ id: uCasiano.id, nombre: "CI", email: "gastos@ci.local", localId: casiano.id, permisos: ["finanzas.ver"] }, process.env.AUTH_SECRET, { expiresIn: "1h" });
-  const resTurno = await rutaTurno.GET(
-    new Request(`http://ci/api/finanzas/turno/${turnoCasiano.id}`, { headers: { cookie: `erpazul_sesion=${token}` } }),
-    { params: Promise.resolve({ turnoId: String(turnoCasiano.id) }) }
-  );
-  const cuerpoTurno = await resTurno.json();
-  const movimientos = cuerpoTurno?.movimientos ?? cuerpoTurno?.turno?.movimientos ?? [];
+  // La clasificación del tablero, por sus mismas piezas y contra Postgres. Antes
+  // se leía de la ficha del turno en Finanzas, borrada el 2026-11-01.
+  const movsDelTurno = await c.cajaMovimiento.findMany({ where: { turnoId: turnoCasiano.id }, select: { id: true, tipo: true, monto: true, motivo: true } });
+  const movimientos = clasificarMovimientos(movsDelTurno, await vinculosDeMovimientos(c, movsDelTurno.map((m) => m.id)));
   const claseDe = (id) => movimientos.find((m) => m.id === id)?.clase;
-  ok("la ruta del turno contesta 200", resTurno.status === 200, JSON.stringify(cuerpoTurno).slice(0, 300));
+  ok("el turno tiene sus movimientos", movimientos.length > 0, JSON.stringify(movimientos).slice(0, 300));
   ok("el retiro de un PagoGasto es PAGO_GASTO", claseDe(movP.id) === CLASE_MOVIMIENTO.PAGO_GASTO && claseDe(mov.id) === CLASE_MOVIMIENTO.PAGO_GASTO, JSON.stringify(movimientos.map((m) => [m.id, m.clase])));
   ok("el retiro con el mismo texto pero sin vínculo sigue MANUAL", claseDe(impostor.id) === CLASE_MOVIMIENTO.MANUAL);
 

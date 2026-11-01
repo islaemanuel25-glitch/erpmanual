@@ -42,7 +42,6 @@ const sinComentarios = (ruta) =>
 
 const RUTAS = [
   "app/api/finanzas/tablero/route.js",
-  "app/api/finanzas/turno/[turnoId]/route.js",
 ];
 
 // ── LAS TRES FILAS, CON LA FORMA QUE TIENE LA TABLA ──────────────────────

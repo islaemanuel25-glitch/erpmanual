@@ -58,7 +58,6 @@ const rutaCierreIniciar = await import("../../app/api/pos-ventas/cierres/iniciar
 const rutaCierreConfirmar = await import("../../app/api/pos-ventas/cierres/[token]/confirmar/route.js");
 const rutaCierresPendientes = await import("../../app/api/pos-ventas/cierres/pendientes/route.js");
 const rutaAuditoriaOperadores = await import("../../app/api/auditoria-pos-ventas/operadores/route.js");
-const rutaAuditoriaCajas = await import("../../app/api/auditoria-pos-ventas/cajas/route.js");
 
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -533,13 +532,6 @@ async function correr() {
   igual("el agregado del local separa faltantes y sobrantes",
     [rOps.agregadoEstadistico?.faltante, rOps.agregadoEstadistico?.sobrante, rOps.agregadoEstadistico?.cierresConDiferencia],
     [5000, 5000, 2]);
-
-  const rCajas = await leer(await rutaAuditoriaCajas.GET(
-    pedidoGet(`${AUDITORIA}/cajas?fechaDesde=${hoy}&fechaHasta=${hoy}`, f.auditor)
-  ));
-  const difPorTurno = new Map((rCajas.items || []).map((c) => [c.turnoId, c.diferencia]));
-  igual("el reporte de cajas conserva −5.000 y +5.000 por turno",
-    [difPorTurno.get(turnoA.id), difPorTurno.get(turnoB.id)], [-5000, 5000]);
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("10. Offline no es una excepción de propiedad ni de vigencia");

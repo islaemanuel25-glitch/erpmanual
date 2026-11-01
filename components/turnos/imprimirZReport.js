@@ -5,7 +5,8 @@
 // Vivía adentro de `app/modulos/turnos/[id]/page.jsx` y se mudó acá TAL CUAL,
 // sin cambiar una línea del papel, cuando "Turnos y cierres" necesitó
 // reimprimirlo: dos copias del comprobante se desincronizan el día que una
-// cambia un renglón. Las dos pantallas lo importan de acá.
+// cambia un renglón. Aquella ficha se borró el 2026-11-01; hoy lo importa el Z
+// de la caja de "Turnos y cierres".
 //
 // Recibe la forma que ya recibía: el turno (con su local y su cajero), el
 // resumen de `/api/pos-ventas/turnos/resumen` —cantidad, efectivo, digital y el
