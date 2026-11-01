@@ -1,5 +1,11 @@
 # Módulo: Turnos / Cajas
 
+> **BORRADO el 2026-11-01.** Las pantallas de `/modulos/turnos` (lista, ficha y
+> cambios pendientes) se borraron con lo que solo ellas usaban. Turnos, cajas,
+> arqueos y cierres viven en `/modulos/turnos-y-cierres`: ver
+> `docs/modulos/turnos-y-cierres.md`, que lista qué se borró y qué se quedó. Lo
+> de abajo es histórico.
+
 **Archivos principales:** `app/modulos/turnos/*`, `app/api/pos-ventas/turnos/*`,
 `components/turnos/*`
 

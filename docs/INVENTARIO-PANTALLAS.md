@@ -6,6 +6,15 @@
 **Son 80 pantallas** que una persona puede abrir y ver. Hay 92 archivos de página en
 el repo; los 12 que faltan no son pantallas y están listados al final, con el motivo.
 
+> **2026-11-01:** se borraron seis de esta lista —11, 12, 13, 54, 56 y 57: los
+> turnos viejos y Cajas y Turnos de Auditoría POS— y la ficha del turno de
+> Finanzas, que es posterior al relevamiento. Las entradas quedan marcadas como
+> borradas y no se renumeró nada, para no correr las marcas. Los conteos de este
+> encabezado son los del relevamiento original: hoy
+> `git ls-files --cached --others --exclude-standard "app/**/page.jsx"` da 135
+> archivos de página, porque desde entonces entraron pantallas que esta lista no
+> tiene.
+
 ## Cómo se enumeraron
 
 Con `git ls-files --cached --others --exclude-standard "app/**/page.jsx"`, que
@@ -112,20 +121,12 @@ La pantalla del PIN: quién está atendiendo la caja.
 **Huella:** no · **Tandas:** ninguna anotada
 `[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
 
-### 11. Turnos y cierres — `/modulos/turnos`
-El listado de turnos con lo que se vendió y lo que se cerró en cada uno.
-**Huella:** SÍ, en la línea de base · **Tandas:** ninguna anotada
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
-
-### 12. Detalle de un turno — `/modulos/turnos/[id]`
-Todo lo que pasó en un turno: ventas, movimientos de caja y diferencias.
-**Huella:** no puede tener (no dibuja tabla) · **Tandas:** ninguna anotada
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
-
-### 13. Cambios pendientes — `/modulos/turnos/cambios-pendientes`
-Consulta de los sobres de cambio que quedaron dando vueltas entre turnos.
-**Huella:** no · **Tandas:** ninguna anotada
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
+### 11, 12 y 13. BORRADAS el 2026-11-01
+La lista de turnos (`/modulos/turnos`), el detalle de un turno
+(`/modulos/turnos/[id]`) y los cambios pendientes
+(`/modulos/turnos/cambios-pendientes`). Turnos, cajas, arqueos y cierres viven
+solo en `/modulos/turnos-y-cierres`. La huella de la lista salió de la línea de
+base. Sin redirecciones: las URL dan 404.
 
 ### 14. POS Transferencias — `/modulos/pos-transferencias`
 Mandar mercadería de un local a otro desde el punto de venta.
@@ -347,7 +348,8 @@ Cuánta plata hay parada en mercadería. Es la tabla más larga: 1.790 filas.
 `[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
 
 ### 52. Auditoría POS — `/modulos/auditoria-pos-ventas`
-La portada de auditoría, con los accesos a las cuatro vistas de abajo.
+La portada de auditoría. Desde el 2026-11-01 da acceso a Balances, Productos y
+Correcciones; Cajas y Turnos salieron del hub con sus pantallas.
 **Huella:** no · **Tandas:** ninguna anotada
 `[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
 
@@ -357,30 +359,18 @@ Comparar un período contra otro.
 los temas claros queda ilegible. Medido y decidido, sin implementar.
 `[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
 
-### 54. Auditoría · Cajas — `/modulos/auditoria-pos-ventas/cajas`
-Cómo cerró cada caja y qué diferencias hubo.
-**Huella:** no · **Tandas:** un borde que hoy sale del color de la letra en vez del
-color del tema. Se ve, pero está del color equivocado.
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
+### 54. Auditoría · Cajas — BORRADA el 2026-11-01
+Era `/modulos/auditoria-pos-ventas/cajas`. Las cajas viven en
+`/modulos/turnos-y-cierres`.
 
 ### 55. Auditoría · Productos — `/modulos/auditoria-pos-ventas/productos`
 Qué se vendió más y qué se movió raro.
 **Huella:** no · **Tandas:** `--accent` — tres botones seleccionados y un subrayado
 `[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
 
-### 56. Auditoría · Turnos — `/modulos/auditoria-pos-ventas/turnos`
-Los turnos con lupa. Tercera pantalla más grande (864 líneas).
-**Huella:** no · **Tandas:** ninguna anotada
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
-
-### 57. Auditoría · Detalle de turno — `/modulos/auditoria-pos-ventas/turnos/[id]`
-Las ventas de un turno, una por una. Es la pantalla donde se destapó lo de los
-rótulos de 10px.
-**Huella:** no · **Tandas:** los rótulos de 10px no se leen — falla en los catorce
-temas. **El color ya se arregló** (commit `67e2a56`); lo que queda pendiente es el
-tamaño. Además un color de texto que hoy zafa de casualidad y no está medido en los
-temas claros.
-`[ ] cambia entera    [ ] cambia en parte    [ ] queda igual`
+### 56 y 57. Auditoría · Turnos y Detalle de turno — BORRADAS el 2026-11-01
+Eran `/modulos/auditoria-pos-ventas/turnos` y `/modulos/auditoria-pos-ventas/turnos/[id]`.
+Los turnos y sus ventas se miran en `/modulos/turnos-y-cierres`.
 
 ### 58. Bitácora — `/modulos/auditoria`
 Quién cambió qué y cuándo, en todo el sistema.
