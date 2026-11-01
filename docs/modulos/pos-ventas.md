@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-29 12:00
+**Última actualización:** 2026-11-01 02:23
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-01: refactor: borrar los turnos y cierres viejos; /modulos/turnos-y-cierres queda como el único lugar
 - 2026-10-29: fix(productos): el buscador del catálogo busca como la caja
 - 2026-10-28: fix(pos-ventas): consumo del personal en dos renglones y con kilo decimal (descuento SIN VERIFICAR en Postgres)
 - 2026-10-26: fix(transferencias): cada línea del ticket sale como Posventa imprime esa venta —bultos en bultos, sueltas aparte, sin prefijo—

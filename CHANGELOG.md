@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-01] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: refactor: borrar los turnos y cierres viejos; /modulos/turnos-y-cierres queda como el único lugar
+
+
 ## [2026-10-31] - Actualización: transferencias
 
 ### Modificado
