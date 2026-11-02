@@ -43,6 +43,7 @@ import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
@@ -724,9 +725,10 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
               ))}
             </SunmiModalLayout>
 
-            {/* ── MÁS ACCIONES: HOY, CANCELAR EL PEDIDO ──────────────────────
+            {/* ── MÁS ACCIONES: DESCARGAR EL PDF Y CANCELAR EL PEDIDO ────────
                 La misma hoja que la de la recepción. Cancelar no es una acción
-                del flujo de preparar: queda a un toque, pero afuera. */}
+                del flujo de preparar: queda a un toque, pero afuera. El PDF
+                tampoco, y va acá para no mover nada de la pantalla. */}
             <SunmiModalLayout
               open={masAcciones}
               title={TITULO_MAS_ACCIONES}
@@ -736,6 +738,7 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
               forma="hoja"
               espacioCuerpo="gap-2"
             >
+              <BotonDescargarPdfPedido posId={posId} className="w-full justify-center" onBajado={() => setMasAcciones(false)} />
               <SunmiButton
                 color="red"
                 className="w-full justify-center"

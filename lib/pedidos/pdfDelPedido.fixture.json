@@ -1,0 +1,110 @@
+{
+  "local": {
+    "status": 200,
+    "contentType": "application/pdf",
+    "disposicion": "attachment; filename=\"pedido-2-mini-centro-a-1793641747600.pdf\"",
+    "empiezaConPdf": true,
+    "textos": [
+      "Pedido #2",
+      "Local:",
+      "Mini Centro A 1793641747600",
+      "Depósito:",
+      "Depósito A 1793641747600",
+      "Enviado:",
+      "02/11/2026 14:49",
+      "Estado:",
+      "Enviado",
+      "Código",
+      "Producto",
+      "Pedido",
+      "ALMACÉN 1793641747600",
+      "7717936417476",
+      "Yerba 1kg",
+      "4 UNIDAD",
+      "BEBIDAS 1793641747600",
+      "7717936417476",
+      "Agua x10",
+      "2 PACK x10",
+      "7717936417476",
+      "Coca 2L",
+      "3 UNIDAD",
+      "3 renglones",
+      "Página 1 de 1"
+    ]
+  },
+  "deposito": {
+    "status": 200,
+    "contentType": "application/pdf",
+    "disposicion": "attachment; filename=\"pedido-2-mini-centro-a-1793641747600.pdf\"",
+    "empiezaConPdf": true,
+    "textos": [
+      "Pedido #2",
+      "Local:",
+      "Mini Centro A 1793641747600",
+      "Depósito:",
+      "Depósito A 1793641747600",
+      "Enviado:",
+      "02/11/2026 14:49",
+      "Estado:",
+      "Preparando",
+      "Código",
+      "Producto",
+      "Pedido",
+      "Preparado",
+      "ALMACÉN 1793641747600",
+      "7717936417476",
+      "Yerba 1kg",
+      "4 UNIDAD",
+      "",
+      "BEBIDAS 1793641747600",
+      "7717936417476",
+      "Agua x10",
+      "2 PACK x10",
+      "2 PACK x10",
+      "7717936417476",
+      "Coca 2L",
+      "3 UNIDAD",
+      "No hay",
+      "3 renglones",
+      "Página 1 de 1"
+    ]
+  },
+  "otroGrupo": {
+    "status": 404,
+    "contentType": "application/json",
+    "disposicion": null,
+    "cuerpo": {
+      "ok": false,
+      "error": "No se encontró ese pedido."
+    }
+  },
+  "cajero": {
+    "status": 403,
+    "contentType": "application/json",
+    "disposicion": null,
+    "cuerpo": {
+      "ok": false,
+      "error": "Sin permiso para ver pedidos"
+    }
+  },
+  "sinSesion": {
+    "status": 401,
+    "contentType": "application/json",
+    "disposicion": null,
+    "cuerpo": {
+      "ok": false,
+      "error": "No autenticado"
+    }
+  },
+  "siembra": {
+    "posId": 2,
+    "local": "Mini Centro A 1793641747600",
+    "deposito": "Depósito A 1793641747600",
+    "categorias": [
+      "Bebidas 1793641747600",
+      "Almacén 1793641747600"
+    ],
+    "costo": "4321",
+    "venta": "8765"
+  }
+}

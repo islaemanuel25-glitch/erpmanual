@@ -27,6 +27,7 @@ import { juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedi
 import PedidosEscritorio from "@/components/pedidos/PedidosEscritorio";
 import TarjetaPedido from "@/components/pedidos/TarjetaPedido";
 import FilaDePedidoAnterior from "@/components/pedidos/FilaDePedidoAnterior";
+import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
 import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
 import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
 import { ESTADO_LOCAL, COLOR_DEL_ESTADO, estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
@@ -966,7 +967,10 @@ function PedidosCatalogoPage() {
                 <span className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</span>
                 {soloMirar || viendoPedido ? null : <SunmiLinkButton onClick={() => abrirCarrito("catalogo")}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
-              {soloMirar ? null : (
+              {/* Solo para mirar, en el lugar de "Cancelar pedido": bajarlo en PDF. */}
+              {soloMirar ? (
+                <BotonDescargarPdfPedido posId={pendiente.posId} className="w-full min-h-toque" />
+              ) : (
                 <SunmiButton
                   color="red"
                   className="w-full min-h-toque"

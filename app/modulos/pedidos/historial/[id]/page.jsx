@@ -11,7 +11,7 @@
 //     se vino (la entrada o el historial);
 //   · arriba, una tarjeta: "Pedido #N" con el estado, las fechas que existan
 //     (enviado, recibido, cancelado), cuántos productos y, si salió, el enlace
-//     a su transferencia;
+//     a su transferencia, y "Descargar PDF" (`BotonDescargarPdfPedido`);
 //   · debajo, los productos con la tarjeta de solo lectura de Pedidos
 //     (`TarjetaPedido` con `soloLectura`), con las fotos si "Ver fotos" está
 //     prendido en Pedidos.
@@ -36,6 +36,7 @@ import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import TarjetaPedido from "@/components/pedidos/TarjetaPedido";
+import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 import { COLOR_DEL_ESTADO, SE_MANEJA_EN_LA_ENTRADA, estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
@@ -144,6 +145,9 @@ export default function DetalleDePedido() {
                 </>
               ) : null}
             </p>
+            <div className="pt-2 space-y-1">
+              <BotonDescargarPdfPedido posId={pedido.posId} className="w-full min-h-toque" />
+            </div>
           </SunmiCard>
 
           <SunmiListaProductoCards mismoAlto={false}>

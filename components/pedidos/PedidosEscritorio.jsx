@@ -94,6 +94,7 @@ import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos
 import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
 import { crearGuardiaDeLecturas } from "@/lib/pedidos/guardiaDeLecturas";
 import { useRefrescoDelPedido } from "@/lib/pedidos/useRefrescoDelPedido";
+import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
 import {
   COLOR_DEL_ESTADO,
   FILTRO_HISTORIAL,
@@ -684,6 +685,8 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
     setPreguntando(null);
     const estado = estadoParaElLocal({ estado: pendiente.estado, depositoEmpezo: empezado });
     setMirando({
+      // Para "Descargar PDF".
+      posId: pendiente.posId,
       titulo: "Pedido al depósito",
       estado,
       linea: pendiente.solicitadoAt ? `Enviado ${cuandoSeEnvio(pendiente.solicitadoAt)}` : "",
@@ -699,7 +702,7 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
   /** Un pedido anterior, de solo mirar: el detalle de la ruta. Nunca el historial viejo. */
   const mirarAnterior = async (posIdAnterior) => {
     const volverA = vista;
-    setMirando({ titulo: `Pedido #${posIdAnterior}`, estado: null, linea: "", items: [], cargando: true, volverA });
+    setMirando({ posId: posIdAnterior, titulo: `Pedido #${posIdAnterior}`, estado: null, linea: "", items: [], cargando: true, volverA });
     setVista(VISTA.MIRAR);
     try {
       const res = await fetch(`/api/pedidos/historial/${encodeURIComponent(posIdAnterior)}`, { cache: "no-store" });
@@ -1025,6 +1028,10 @@ export default function PedidosEscritorio({ vistaInicial = VISTA.ENTRADA }) {
               {estadoMirado ? <SunmiPill color={COLOR_DEL_ESTADO[estadoMirado] ?? "slate"}>{estadoMirado}</SunmiPill> : null}
             </div>
             {mirando.linea ? <p className="text-sm3 sunmi-text-muted">{mirando.linea}</p> : null}
+          </div>
+          {/* A la derecha, sin correr lo de la izquierda. */}
+          <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+            <BotonDescargarPdfPedido posId={mirando.posId} />
           </div>
         </div>
         {mirando.error ? <SunmiAviso tono="danger">{mirando.error}</SunmiAviso> : null}

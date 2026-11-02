@@ -44,6 +44,7 @@ import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -718,6 +719,7 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
         forma="centrado"
         espacioCuerpo="gap-2"
       >
+        <BotonDescargarPdfPedido posId={posId} className="w-full justify-center" onBajado={() => setMasAcciones(false)} />
         <SunmiButton
           color="red"
           className="w-full justify-center"

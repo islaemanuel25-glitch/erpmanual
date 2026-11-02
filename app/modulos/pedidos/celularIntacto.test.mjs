@@ -28,6 +28,11 @@
 // se mira pasaron a ser de SOLO LECTURA (`components/pedidos/TarjetaPedido`),
 // sin − ni + ni recuadro ni ✕, por pedido de Emanuel. Los otros seis siguen
 // siendo los de aff3a9c: las tarjetas editables no cambiaron un nodo.
+//
+// Y otra vez el 2026-11-02, por pedido de Emanuel: "Descargar PDF" en el pie,
+// en el lugar donde el pedido sin empezar tiene "Cancelar pedido". Medida la
+// diferencia antes de reescribirla: el único cambio es ese `<button>`, nada
+// quitado ni movido.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";

@@ -89,11 +89,15 @@ test("con Ver fotos prendido en Pedidos, las tarjetas llevan la foto o la inicia
   for (const t of tarjetas()) assert.ok(t.foto || t.inicial, `${t.nombre}: sin foto ni inicial`);
 });
 
-test("sin barra de abajo, sin buscador y sin filtro: lo único que se toca es el enlace", async () => {
+// Desde el 2026-11-02 se toca una cosa más, y dentro de la tarjeta de arriba:
+// "Descargar PDF" (pedido de Emanuel). Sigue sin campos, sin filtro y sin nada
+// que cambie el pedido.
+test("sin barra de abajo, sin buscador y sin filtro: lo único que se toca es el enlace y Descargar PDF", async () => {
   await montarDetalle(ids.pRecibido, real.detalleRecibido);
   assert.equal(contenido().querySelectorAll("input, select, textarea").length, 0, "hay un campo");
   assert.ok(!contenido().querySelector('[role="group"]'), "hay un filtro");
-  assert.deepEqual(botones(contenido()).map((b) => b.textContent.trim()), [`Transferencia #${ids.tRecibido}`]);
+  assert.deepEqual(botones(contenido()).map((b) => b.textContent.trim()), [`Transferencia #${ids.tRecibido}`, "Descargar PDF"]);
+  assert.ok(cabecera().contains(boton("Descargar PDF", contenido())), "Descargar PDF no está en la tarjeta de arriba");
 });
 
 test("cancelado: su estado, la fecha en que se canceló, y sin transferencia", async () => {

@@ -75,10 +75,15 @@ const enter = async (campo) => {
 // `git hash-object` del archivo el día que se hizo esta pantalla. Si el
 // celular cambia a propósito, en otra tanda, la huella se actualiza en ESE
 // commit diciendo por qué; si cambió para servir a esta pantalla, está mal.
+//
+// Cambió a propósito el 2026-11-02: Emanuel pidió "Descargar PDF" en preparar,
+// celular y computadora. En el celular va adentro de la hoja "Más acciones",
+// arriba de "Cancelar pedido" (un import, el botón y el comentario de la
+// hoja); la pantalla en sí no cambió.
 test("la pantalla del celular está igual, byte por byte", () => {
   const contenido = readFileSync("components/pos-transferencias/PrepararPedidoCelular.jsx");
   const huella = createHash("sha1").update(`blob ${contenido.length}\0`).update(contenido).digest("hex");
-  assert.equal(huella, "001f32faa9a38528753f617ca28b804bb138ebae", "se tocó PrepararPedidoCelular.jsx");
+  assert.equal(huella, "03fc8ecd0fbd8f16f34af722ca46104d61b36bc0", "se tocó PrepararPedidoCelular.jsx");
 });
 
 test("la barra fija: Volver, buscador, categoría, Falta revisar, Enviar; filtros, el pedido, Agregar y ⋯; el avance", async () => {
