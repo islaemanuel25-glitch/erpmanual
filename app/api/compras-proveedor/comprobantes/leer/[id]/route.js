@@ -72,6 +72,7 @@ import {
   ESTADO_TURNO,
   TEXTO_TURNO,
 } from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
+import { proponerRecetaConLoDelPie } from "@/lib/compras-proveedor/comprobante/percepcionEnLaReceta";
 
 export async function POST(req, { params }) {
   // ── QUIÉN PIDIÓ ESTA LECTURA ─────────────────────────────────────────
@@ -731,6 +732,23 @@ export async function POST(req, { params }) {
           });
         } catch (e) {
           console.error("No se pudo dejar la receta propuesta para confirmar:", e?.message);
+        }
+      } else if (puerta.cierra && resultado.lectura?.repartidoDelPie) {
+        // ── EL SISTEMA REPARTIÓ ALGO DEL PIE QUE EL LECTOR NO REPARTIÓ ──────
+        //
+        // OLIMAR 2026-11-02: la percepción se sumó sola y el papel cerró sin
+        // el modelo grande, que era quien proponía receta. Si la confirmada
+        // de este tipo de papel no la nombra, queda propuesta con una frase
+        // más (`percepcionEnLaReceta.js`). Best-effort, como la de arriba.
+        try {
+          await proponerRecetaConLoDelPie(prisma, {
+            papel: { ...comprobante, grupoId, modeloLectura: resultado.lectura.modelo ?? null },
+            tipo: recetaDeLaLectura?.tipoComprobante ?? null,
+            conceptos: resultado.lectura.repartidoDelPie.conceptos,
+            lectura: resultado.lectura,
+          });
+        } catch (e) {
+          console.error("No se pudo dejar la receta propuesta con lo del pie:", e?.message);
         }
       }
 

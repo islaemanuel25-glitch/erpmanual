@@ -1,0 +1,25 @@
+{
+  "_origen": "Remito «Pre-Venta(P)» de OLIMAR, reparto SL8, fecha 2026-11-02, nueve renglones: el caso de producción que la recepción del depósito marcaba «no cierra por $34.839,56». Lo que SÍ es del papel, tal como lo informó Emanuel: los nueve renglones, el total de los productos tal como quedó leído (648.552,06), el renglón «(Percepciones = 34839.57)» del pie y «TOTAL Remito: 683391.62». Lo que NO es del papel: cómo se reparten los 648.552,06 entre los nueve renglones y sus descripciones. El papel no está en el repo ni en el entorno de desarrollo y los datos de producción no se traen, así que el importe de cada renglón es un reparto cualquiera que suma exactamente lo leído. Si el reparto real aparece, se reemplaza: los candados no dependen de él, dependen de la suma y del pie. La forma es la que devuelve el lector (`esquemaInterpretado`), antes de `normalizarLectura`.",
+  "papel": {
+    "identidad": { "fecha": "2026-11-02" },
+    "lineasEnElPapel": 9,
+    "hayTotalImpreso": true,
+    "discriminaImpuestos": true,
+    "explicacion": "Remito de preventa de Olimar: cada renglón trae cantidad, precio e importe. Al pie, una línea entre paréntesis con las percepciones y después el total del remito.",
+    "lineas": [
+      { "descripcion": "RENGLÓN 1", "cantidad": 10, "precioImpreso": 12000, "importeImpreso": 120000, "costoFinal": 120000, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 2", "cantidad": 10, "precioImpreso": 9543.05, "importeImpreso": 95430.5, "costoFinal": 95430.5, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 3", "cantidad": 20, "precioImpreso": 4410.5, "importeImpreso": 88210, "costoFinal": 88210, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 4", "cantidad": 5, "precioImpreso": 15300.05, "importeImpreso": 76500.25, "costoFinal": 76500.25, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 5", "cantidad": 10, "precioImpreso": 7000, "importeImpreso": 70000, "costoFinal": 70000, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 6", "cantidad": 1, "precioImpreso": 64980.31, "importeImpreso": 64980.31, "costoFinal": 64980.31, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 7", "cantidad": 8, "precioImpreso": 6500, "importeImpreso": 52000, "costoFinal": 52000, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 8", "cantidad": 1, "precioImpreso": 45431, "importeImpreso": 45431, "costoFinal": 45431, "tipo": "MERCADERIA" },
+      { "descripcion": "RENGLÓN 9", "cantidad": 12, "precioImpreso": 3000, "importeImpreso": 36000, "costoFinal": 36000, "tipo": "MERCADERIA" }
+    ],
+    "pie": {
+      "total": 683391.62,
+      "conceptos": [{ "nombre": "Percepciones", "importe": 34839.57 }]
+    }
+  }
+}
