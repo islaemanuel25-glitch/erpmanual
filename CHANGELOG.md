@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-02] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: fix: la percepción del pie que el lector copió y no repartió va al costo (remito de OLIMAR que no cerraba por $34.839,56); lo ya subido se reprocesa al abrir el pedido y la receta sin percepción queda propuesta
+
+
 ## [2026-11-01] - Actualización: pos-ventas
 
 ### Modificado
