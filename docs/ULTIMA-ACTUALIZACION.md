@@ -1,11 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-03 23:01
+**Fecha:** 2026-11-03 23:23
 
 ## Módulos modificados recientemente
 
+### transferencias
+- feat: columnas del tercer nivel de empaque, vacías y sin lectores, fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto, feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
+- Archivos: 4 modificados (4 total)
+
 ### productos
-- refactor: embudo de la escala para el tercer nivel de empaque
+- feat: columnas del tercer nivel de empaque, vacías y sin lectores, refactor: embudo de la escala para el tercer nivel de empaque
 - Archivos: 2 modificados (2 total)
 
 ### pos-ventas
@@ -15,10 +19,6 @@
 ### proveedores
 - fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
 - Archivos: 1 modificados (1 total)
-
-### transferencias
-- fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto, feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido, fix: las correcciones de precios del 30/10 vuelven a su regla
-- Archivos: 4 modificados (4 total)
 
 ### pos-transferencias
 - feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
