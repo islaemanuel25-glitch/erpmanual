@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-03] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: fix: las correcciones de precios del 30/10 vuelven a su regla
+
+
 ## [2026-11-02] - Actualización: compras-proveedor
 
 ### Modificado

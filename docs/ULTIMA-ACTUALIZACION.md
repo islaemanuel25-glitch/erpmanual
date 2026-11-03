@@ -1,16 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-02 17:59
+**Fecha:** 2026-11-03 11:47
 
 ## Módulos modificados recientemente
 
-### pos-transferencias
-- feat: descargar en PDF un pedido del local al depósito
-- Archivos: 3 modificados (3 total)
-
-### pos-ventas
-- refactor: borrar los turnos y cierres viejos; /modulos/turnos-y-cierres queda como el único lugar
-- Archivos: 15 modificados (15 total)
+### transferencias
+- fix: las correcciones de precios del 30/10 vuelven a su regla
+- Archivos: 1 modificados (1 total)
 
 
 
