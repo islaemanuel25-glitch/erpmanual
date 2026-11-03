@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-31 20:56
+**Última actualización:** 2026-11-03 21:56
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-03: fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
 - 2026-10-31: feat: listas — el renglón muestra su presentación, la hoja ordena y busca por tamaño (SIN VERIFICAR EN PANTALLA)
 - 2026-10-31: fix: "Pueden ser de…" empareja por nombre los vinos de Carozo (tamaños, presentación, abreviaturas)
 - 2026-10-31: fix: una receta que lee bien se reaplica sin preguntar, tenga títulos o no (SIN VERIFICAR en la ruta)

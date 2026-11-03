@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-11-03 14:44
+**Última actualización:** 2026-11-03 21:56
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-11-03: fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
 - 2026-11-03: feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
 - 2026-11-03: fix: las correcciones de precios del 30/10 vuelven a su regla
 - 2026-10-31: docs: declarar la migración 20261031180000_fila_lista_contenido_ml como pendiente
