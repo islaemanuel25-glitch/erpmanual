@@ -29,9 +29,15 @@ dejó la corrección no se toca. Nunca baja un precio: si la regla propia da men
 que el precio previo, la fila vuelve a su valor previo y se lista como "no se
 bajó".
 
-**FRENADA en `TANDAS-BLOQUEADAS.md`**: falta la decisión 2 de Emanuel (las filas
-recalculadas solas con el 30 % inventado), que con la bitácora no se puede
-distinguir como se pidió.
+Una fila de `precios_sin_regla` se saltea SOLO si `AuditoriaBitacora` tiene,
+después de que esa migración terminó (`_prisma_migrations.finished_at`), una
+edición manual de precio, margen o regla de ese producto; se saltea en todas
+sus ubicaciones y se lista con la fecha para revisar. Recibir una compra (la
+fila de bitácora trae el pedido) y aplicar una lista (se ata a
+`ImportacionListaFila.aplicadaEn`, mismo usuario, 10 minutos) son automáticas:
+esas filas, incluidas las que se recalcularon solas con el 30 %, se corrigen
+sobre el costo de hoy. Sin `_prisma_migrations` y con filas reales, la migración
+se frena.
 
 El clasificador la marca **NO ADITIVA** —`UPDATE` de datos, `DROP TABLE` de dos
 tablas temporales propias y un bloque `DO` que solo imprime el informe—, así que

@@ -24,6 +24,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
+// Los rótulos con los que la bitácora escribe cada campo: se piden a la misma
+// función que los escribe, no se copian.
+import { labelDe } from "../../lib/auditoria/formato.js";
 
 const RAIZ = path.resolve(import.meta.dirname, "../..");
 const MIGRACIONES = path.join(RAIZ, "prisma/migrations");
@@ -35,6 +38,24 @@ export const MIGRACION_NUEVA = "20261103120000_precios_del_30_10_vuelven_a_su_re
 
 /** El proveedor cuyos productos tienen precio y % fijados por la empresa. */
 export const PROVEEDOR_COCA_COLA = 19;
+
+/**
+ * Los campos cuya edición cuenta como "editar el precio" de un producto, con el
+ * rótulo que les pone la bitácora (`lib/auditoria/formato.js`).
+ */
+export const ROTULOS_DE_PRECIO = ["precio_venta", "margen", "reglaPrecio", "recargoFijoUnidad"].map(labelDe);
+
+/**
+ * Cuánto después de `aplicadaEn` puede quedar escrita en la bitácora una
+ * aplicación de lista: la transacción de aplicar tiene un tope de 300 s
+ * (`TX_APLICAR` en app/api/proveedores/listas/[id]/aplicar/route.js) y la
+ * bitácora se escribe al terminar el request.
+ */
+export const VENTANA_LISTA_MINUTOS = 10;
+
+/** El motivo de una fila salteada por edición manual, con la fecha en hora argentina. */
+const EDITADA_A_MANO =
+  `'editada a mano el ' || to_char((e.editada_en AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI')`;
 
 const UPDATE = /^UPDATE "(ProductoLocal|ProductoBase)" SET (.*?), "updatedAt" = CURRENT_TIMESTAMP\n WHERE "id" = (\d+)/gm;
 
@@ -131,9 +152,15 @@ const cabecera = (r) => `-- LAS DOS CORRECCIONES DE PRECIOS DEL 30/10 SE CORRIGE
 --
 -- ── SEGURIDAD ─────────────────────────────────────────────────────────────
 --
--- Una fila se toca solo si HOY tiene exactamente el precio, el margen, la regla
--- y el monto fijo que dejó la corrección. Si alguien —o un recálculo por costo—
--- la cambió después, no se toca y se lista como salteada.
+-- Primera corrección: una fila se toca solo si HOY tiene exactamente el precio,
+-- el margen, la regla y el monto fijo que dejó la corrección.
+--
+-- Segunda corrección (Emanuel, 2026-11-03): se saltea SOLO si la bitácora tiene
+-- una edición manual de precio, margen o regla de ese PRODUCTO posterior a ella
+-- —en todas sus ubicaciones—, y se lista con la fecha para revisarla. Recibir
+-- una compra y aplicar una lista son automáticas y no cuentan: una fila que se
+-- recalculó sola con el 30 % inventado se corrige como las demás, sobre el costo
+-- de hoy.
 --
 -- ── IDEMPOTENTE ──────────────────────────────────────────────────────────
 --
@@ -191,6 +218,8 @@ CREATE TABLE IF NOT EXISTS respaldo.reversion_20261030_resultado (
   regla_final  text,
   recargo_final numeric(12,2),
   precio_previo numeric(12,2),
+  estaba_intacta boolean,
+  editada_en   timestamp(3),
   aplicada     boolean NOT NULL DEFAULT false,
   decidida_en  timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (tabla, id)
@@ -272,12 +301,73 @@ UPDATE _rev_estado SET intacta = hay
    AND antes_regla   IS NOT DISTINCT FROM (CASE WHEN pone_regla THEN 'MARGEN_PORCENTUAL' ELSE previo_regla END)
    AND antes_recargo IS NOT DISTINCT FROM previo_recargo;
 
+-- ── EDITADA A MANO, O RECALCULADA SOLA (Emanuel, 2026-11-03) ────────────────
+--
+-- Una fila de la segunda corrección se saltea SOLO si la bitácora tiene, después
+-- de que esa corrección terminó, una edición de precio, margen o regla de ese
+-- PRODUCTO que no sea automática. Mira el producto y no la ubicación: la
+-- bitácora no guarda la ubicación, y es el lado seguro.
+--
+-- Automáticas, y por eso no cuentan:
+--   · recibir una compra: escribe el producto Y el pedido en el mismo request,
+--     así que su fila trae una entrada "Pedido" (o "Comprobante");
+--   · aplicar una lista: la fila de la lista guarda producto, quién y cuándo
+--     (aplicadaEn), y la bitácora se escribe al terminar ese request.
+-- La acción ("producto.editar") NO sirve para separarlas: sale de la primera
+-- escritura del request, y la recepción escribe el producto antes que el pedido.
+--
+-- Una fila sin edición manual entra aunque hoy no tenga lo que dejó la
+-- corrección: es la que se recalculó sola con el 30 % inventado.
+--
+-- El corte es cuándo terminó la segunda corrección, según _prisma_migrations.
+-- Se lee con SQL dinámico porque "prisma migrate dev" aplica todo primero en una
+-- base sombra que NO tiene esa tabla: nombrarla directo rompía migrate dev en
+-- cualquier máquina. Falla cerrada: sin corte y con filas reales en juego, no
+-- sigue.
+CREATE TEMP TABLE _rev_corte (corte timestamp(3));
+DO $$
+BEGIN
+  IF to_regclass('"_prisma_migrations"') IS NOT NULL THEN
+    EXECUTE 'INSERT INTO _rev_corte SELECT MAX(finished_at) AT TIME ZONE ''UTC'' FROM "_prisma_migrations" WHERE migration_name = ''${MIGRACION_B}''';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM _rev_corte WHERE corte IS NOT NULL)
+     AND EXISTS (SELECT 1 FROM _rev_estado WHERE migracion = 'sin_regla' AND hay) THEN
+    RAISE EXCEPTION 'No se sabe cuándo terminó ${MIGRACION_B}: sin eso no se puede separar una edición posterior.';
+  END IF;
+END $$;
+
+CREATE TEMP TABLE _rev_editados AS
+SELECT (c->>'id')::int AS base_id, MAX(a."createdAt") AS editada_en
+  FROM "AuditoriaBitacora" a
+  CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(a."cambios"::jsonb) = 'array' THEN a."cambios"::jsonb ELSE '[]'::jsonb END) c
+ WHERE a."createdAt" > (SELECT MAX(corte) FROM _rev_corte)
+   AND c->>'entidad' = 'Producto'
+   AND (c->>'id') ~ '^[0-9]+$'
+   AND EXISTS (
+     SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(c->'campos') = 'array' THEN c->'campos' ELSE '[]'::jsonb END) k
+      WHERE k->>'label' IN (${ROTULOS_DE_PRECIO.map((r) => `'${r}'`).join(", ")}))
+   AND NOT EXISTS (
+     SELECT 1 FROM jsonb_array_elements(a."cambios"::jsonb) p WHERE p->>'entidad' IN ('Pedido', 'Comprobante'))
+   AND NOT EXISTS (
+     SELECT 1 FROM "ImportacionListaFila" f
+      WHERE f."productoBaseId" = (c->>'id')::int AND f."aplicada" AND f."aplicadaEn" IS NOT NULL
+        AND f."aplicadaPorUsuarioId" IS NOT DISTINCT FROM a."usuarioId"
+        AND a."createdAt" >= f."aplicadaEn"
+        AND a."createdAt" <= f."aplicadaEn" + interval '${VENTANA_LISTA_MINUTOS} minutes')
+ GROUP BY 1;
+
+ALTER TABLE _rev_estado ADD COLUMN editada_en timestamp(3);
+ALTER TABLE _rev_estado ADD COLUMN corregible boolean;
+UPDATE _rev_estado e SET editada_en = d.editada_en
+  FROM _rev_editados d WHERE e.migracion = 'sin_regla' AND d.base_id = e.base_id;
+UPDATE _rev_estado SET corregible = CASE WHEN migracion = 'sin_regla' THEN hay AND editada_en IS NULL ELSE intacta END;
+
 -- La regla que decidió una persona, para cada fila por ubicación de los
 -- productos en juego.
 CREATE TEMP TABLE _rev_fuente AS
 SELECT p."id", p."baseId", p."localId", x.tipo, x.valor
   FROM "ProductoLocal" p
-  LEFT JOIN _rev_estado e ON e.tabla = 'ProductoLocal' AND e.id = p."id" AND e.intacta
+  LEFT JOIN _rev_estado e ON e.tabla = 'ProductoLocal' AND e.id = p."id" AND e.corregible
   CROSS JOIN LATERAL (
     SELECT CASE WHEN e.id IS NOT NULL THEN e.previo_margen  ELSE p."margen" END AS margen,
            CASE WHEN e.id IS NOT NULL THEN e.previo_regla   ELSE p."reglaPrecio"::text END AS regla,
@@ -296,7 +386,7 @@ SELECT p."id", p."baseId", p."localId", x.tipo, x.valor
 INSERT INTO respaldo.reversion_20261030_resultado
   (tabla, id, migracion, resultado, motivo, producto, ubicacion,
    precio_antes, margen_antes, regla_antes, recargo_antes,
-   precio_final, margen_final, regla_final, recargo_final, precio_previo)
+   precio_final, margen_final, regla_final, recargo_final, precio_previo, estaba_intacta, editada_en)
 SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
        COALESCE(NULLIF(TRIM(pl."nombre"), ''), b."nombre"), l."nombre",
        e.antes_precio, e.antes_margen, e.antes_regla, e.antes_recargo,
@@ -307,7 +397,7 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
                         WHEN 'REVERTIDA' THEN e.previo_regla WHEN 'SIN_REGLA' THEN e.previo_regla WHEN 'NO_SE_BAJO' THEN e.previo_regla ELSE e.antes_regla END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN r.tipo = 'RECARGO' THEN r.valor ELSE e.previo_recargo END)
                         WHEN 'REVERTIDA' THEN e.previo_recargo WHEN 'SIN_REGLA' THEN e.previo_recargo WHEN 'NO_SE_BAJO' THEN e.previo_recargo ELSE e.antes_recargo END,
-       e.previo_precio
+       e.previo_precio, e.intacta, e.editada_en
   FROM _rev_estado e
   LEFT JOIN "ProductoLocal" pl ON pl."id" = e.id
   LEFT JOIN "ProductoBase" b ON b."id" = pl."baseId"
@@ -329,7 +419,7 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
       SELECT 2, 'PORCENTAJE', fm.margen, 'la de la ficha', 0, 0
         FROM (SELECT CASE WHEN eb.id IS NOT NULL THEN eb.previo_margen ELSE b."margen" END AS margen
                 FROM (SELECT 1) uno
-                LEFT JOIN _rev_estado eb ON eb.tabla = 'ProductoBase' AND eb.id = b."id" AND eb.intacta) fm
+                LEFT JOIN _rev_estado eb ON eb.tabla = 'ProductoBase' AND eb.id = b."id" AND eb.corregible) fm
        WHERE fm.margen > 0
       UNION ALL
       SELECT 3, f.tipo, f.valor, 'la de otra ubicación', COUNT(*), MIN(f."localId")
@@ -351,7 +441,8 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
     SELECT CASE
       WHEN e.combo_ya_devuelto THEN 'INTACTA'
       WHEN NOT e.hay THEN 'SALTEADA'
-      WHEN NOT e.intacta THEN 'SALTEADA'
+      WHEN e.editada_en IS NOT NULL THEN 'SALTEADA'
+      WHEN NOT e.corregible THEN 'SALTEADA'
       WHEN e.migracion = 'bajo_su_regla' THEN 'REVERTIDA'
       WHEN k.coca OR k.combo OR k.promo THEN 'REVERTIDA'
       WHEN r.tipo IS NULL OR k.costo IS NULL OR k.costo <= 0 THEN 'SIN_REGLA'
@@ -363,7 +454,8 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
     CASE
       WHEN e.combo_ya_devuelto THEN 'combo ya devuelto por ${MIGRACION_C}'
       WHEN NOT e.hay THEN 'sin fila o sin respaldo'
-      WHEN NOT e.intacta THEN 'editada después de la corrección'
+      WHEN e.editada_en IS NOT NULL THEN ${EDITADA_A_MANO}
+      WHEN NOT e.corregible THEN 'editada después de la corrección'
       WHEN k.coca THEN 'Coca-Cola: precio y % fijados por la empresa'
       WHEN e.migracion = 'bajo_su_regla' THEN 'ya tenía %'
       WHEN k.combo THEN 'combo'
@@ -384,25 +476,26 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
 -- volvió, vuelve; si la fila no se tocó, la ficha tampoco.
 INSERT INTO respaldo.reversion_20261030_resultado
   (tabla, id, migracion, resultado, motivo, producto, ubicacion,
-   precio_antes, margen_antes, precio_final, margen_final, precio_previo)
+   precio_antes, margen_antes, precio_final, margen_final, precio_previo, estaba_intacta, editada_en)
 SELECT 'ProductoBase', e.id, e.migracion, d.resultado, d.motivo, b."nombre", 'ficha del depósito',
        e.antes_precio, e.antes_margen,
        CASE d.resultado WHEN 'RECALCULADA' THEN fd.precio_final WHEN 'REVERTIDA' THEN e.previo_precio WHEN 'SIN_REGLA' THEN e.previo_precio WHEN 'NO_SE_BAJO' THEN e.previo_precio ELSE e.antes_precio END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN fd.regla_final = 'MARGEN_PORCENTUAL' THEN fd.margen_final ELSE e.previo_margen END)
                         WHEN 'REVERTIDA' THEN e.previo_margen WHEN 'SIN_REGLA' THEN e.previo_margen WHEN 'NO_SE_BAJO' THEN e.previo_margen ELSE e.antes_margen END,
-       e.previo_precio
+       e.previo_precio, e.intacta, e.editada_en
   FROM _rev_estado e
   LEFT JOIN "ProductoBase" b ON b."id" = e.id
   LEFT JOIN respaldo.reversion_20261030_resultado fd ON fd.tabla = 'ProductoLocal' AND fd.id = e.fila_deposito
   CROSS JOIN LATERAL (
     SELECT CASE
-      WHEN NOT e.hay OR NOT e.intacta THEN 'SALTEADA'
+      WHEN NOT e.hay OR e.editada_en IS NOT NULL OR NOT e.corregible THEN 'SALTEADA'
       WHEN e.migracion = 'bajo_su_regla' THEN 'REVERTIDA'
       WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO') THEN fd.resultado
       ELSE 'SALTEADA' END AS resultado,
     CASE
       WHEN NOT e.hay THEN 'sin ficha o sin respaldo'
-      WHEN NOT e.intacta THEN 'editada después de la corrección'
+      WHEN e.editada_en IS NOT NULL THEN ${EDITADA_A_MANO}
+      WHEN NOT e.corregible THEN 'editada después de la corrección'
       WHEN e.migracion = 'bajo_su_regla' THEN 'ya tenía %'
       WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO') THEN 'sigue a su fila del depósito: ' || fd.motivo
       ELSE 'su fila del depósito no se tocó' END AS motivo
@@ -444,6 +537,8 @@ UPDATE respaldo.reversion_20261030_resultado r SET aplicada = true
 
 DROP TABLE _rev_fuente;
 DROP TABLE _rev_estado;
+DROP TABLE _rev_editados;
+DROP TABLE _rev_corte;
 
 -- ── EL INFORME ──────────────────────────────────────────────────────────────
 DO $$
@@ -477,9 +572,25 @@ BEGIN
   LOOP
     RAISE NOTICE '  % · % · % (%)', f.ubicacion, f.producto, f.precio_final, f.motivo;
   END LOOP;
-  RAISE NOTICE 'Salteadas por edición posterior:';
+  SELECT COUNT(*) FILTER (WHERE r.aplicada) AS corregidas,
+         COUNT(*) FILTER (WHERE r.aplicada AND NOT r.estaba_intacta) AS solas,
+         COUNT(*) FILTER (WHERE r.editada_en IS NOT NULL) AS a_mano,
+         COUNT(*) AS total
+    INTO f
+    FROM respaldo.reversion_20261030_resultado r
+    JOIN respaldo.reversion_20261030_objetivo o ON o.tabla = r.tabla AND o.id = r.id
+   WHERE r.tabla = 'ProductoLocal' AND r.migracion = 'sin_regla' AND o.pone_margen;
+  RAISE NOTICE 'Las % filas a las que la segunda corrección les puso margen: % corregidas (% se habían recalculado solas), % salteadas por edición manual',
+    f.total, f.corregidas, f.solas, f.a_mano;
+  RAISE NOTICE 'Salteadas por edición manual del producto (para revisar):';
   FOR f IN SELECT * FROM respaldo.reversion_20261030_resultado
-            WHERE resultado = 'SALTEADA' ORDER BY tabla DESC, ubicacion, producto
+            WHERE resultado = 'SALTEADA' AND editada_en IS NOT NULL ORDER BY producto, tabla DESC, ubicacion
+  LOOP
+    RAISE NOTICE '  % · % · hoy % (%)', f.producto, f.ubicacion, f.precio_antes, f.motivo;
+  END LOOP;
+  RAISE NOTICE 'Salteadas por edición posterior (primera corrección):';
+  FOR f IN SELECT * FROM respaldo.reversion_20261030_resultado
+            WHERE resultado = 'SALTEADA' AND editada_en IS NULL ORDER BY tabla DESC, ubicacion, producto
   LOOP
     RAISE NOTICE '  % · % · hoy % (%)', f.ubicacion, f.producto, f.precio_antes, f.motivo;
   END LOOP;
@@ -520,9 +631,24 @@ SELECT ubicacion, producto, precio_final, motivo FROM respaldo.reversion_2026103
 SELECT ubicacion, producto, precio_final, motivo FROM respaldo.reversion_20261030_resultado
  WHERE tabla = 'ProductoLocal' AND resultado = 'SIN_REGLA' ORDER BY ubicacion, producto;
 
-\\echo 'Salteadas por edición posterior (precio de hoy, que no se tocó)'
+\\echo 'Las filas a las que la segunda corrección les puso margen (las 1.360)'
+SELECT COUNT(*) AS filas,
+       COUNT(*) FILTER (WHERE r.aplicada) AS corregidas,
+       COUNT(*) FILTER (WHERE r.aplicada AND NOT r.estaba_intacta) AS se_habian_recalculado_solas,
+       COUNT(*) FILTER (WHERE r.editada_en IS NOT NULL) AS salteadas_por_edicion_manual
+  FROM respaldo.reversion_20261030_resultado r
+  JOIN respaldo.reversion_20261030_objetivo o ON o.tabla = r.tabla AND o.id = r.id
+ WHERE r.tabla = 'ProductoLocal' AND r.migracion = 'sin_regla' AND o.pone_margen;
+
+\\echo 'Salteadas por edición manual del producto (para revisar; precio de hoy, que no se tocó)'
+SELECT producto, ubicacion, precio_antes AS precio_hoy,
+       to_char((editada_en AT TIME ZONE 'UTC') AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI') AS editada_el
+  FROM respaldo.reversion_20261030_resultado
+ WHERE resultado = 'SALTEADA' AND editada_en IS NOT NULL ORDER BY producto, tabla DESC, ubicacion;
+
+\\echo 'Salteadas por edición posterior en la primera corrección (precio de hoy, que no se tocó)'
 SELECT tabla, ubicacion, producto, precio_antes AS precio_hoy, motivo FROM respaldo.reversion_20261030_resultado
- WHERE resultado = 'SALTEADA' ORDER BY tabla DESC, ubicacion, producto;
+ WHERE resultado = 'SALTEADA' AND editada_en IS NULL ORDER BY tabla DESC, ubicacion, producto;
 
 \\echo 'Coca-Cola'
 SELECT ubicacion, producto, precio_final, margen_final, resultado FROM respaldo.reversion_20261030_resultado
