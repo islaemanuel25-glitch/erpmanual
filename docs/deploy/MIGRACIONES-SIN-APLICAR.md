@@ -16,8 +16,20 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **103 migraciones**, la última
-`20261103142413_pedido_cambiar_por_otro`.
+Producción está en **103 migraciones**, la última
+`20261103142413_pedido_cambiar_por_otro`. Falta una:
+
+- `20261103210000_recargo_fijo_en_cada_unidad` — DE DATOS. Recalcula el precio
+  de venta de las filas con regla "Recargo fijo por unidad" que quedaron con el
+  recargo sumado una sola vez al bulto (Casiano, cartón de 10: $41.000 → $44.000).
+  Las devolvió así `20261103120000`; también entran las que tienen hoy exactamente
+  esa cuenta equivocada. Respaldo en `respaldo.backup_recargo_unidad_20261103`,
+  decisiones en `respaldo.recargo_unidad_20261103_resultado`, informe por NOTICE.
+  El clasificador la marca NO ADITIVA (comprobado con `--desde 057a8ce`): los
+  `DROP TABLE`, `DELETE` y `UPDATE` sobre sus tablas temporales `_rec_*`, los
+  bloques `DO` y los `UPDATE` de precios. Falso positivo para el schema; hace falta
+  `DEPLOY_MIGRACION_AUTORIZADA=1` con la autorización de Emanuel. No toca el
+  schema: la versión vieja de la app sigue funcionando con ella aplicada.
 
 La `20261103142413_pedido_cambiar_por_otro` —aditiva: dos columnas nulas con su
 FK, `PosTransferenciaDetalle.reemplazoProductoId` (el producto que el depósito

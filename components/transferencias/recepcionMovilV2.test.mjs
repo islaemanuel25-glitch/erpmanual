@@ -684,7 +684,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // pedido) y otra en `TransferenciaDetalle` (`reemplazaABaseId`, lo que el local
   // pidió). La recepción solo la LEE para decir "Pediste …, va …"; no cambia cómo
   // se cuenta lo recibido ni el stock que entra.
-  assert.equal(migraciones.length, 103,"aparecio una migracion que nadie declaro aca");
+  // Sube a 104 el 2026-11-03: `20261103210000_recargo_fijo_en_cada_unidad`, de
+  // datos: recalcula precios de venta con recargo fijo por unidad. No toca la recepción.
+  assert.equal(migraciones.length, 104,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

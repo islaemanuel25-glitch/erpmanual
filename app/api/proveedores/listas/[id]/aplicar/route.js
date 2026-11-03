@@ -427,7 +427,12 @@ export async function POST(req, context) {
 
       const overrides = await tx.productoLocal.findMany({
         where: { baseId: { in: baseIds } },
-        select: { id: true, baseId: true, localId: true, precio_costo: true, precio_venta: true, margen: true },
+        select: {
+          id: true, baseId: true, localId: true, precio_costo: true, precio_venta: true, margen: true,
+          // La regla de la ubicación: una fila en recargo fijo por unidad no se
+          // recalcula con el margen viejo que pueda arrastrar.
+          reglaPrecio: true, recargoFijoUnidad: true,
+        },
       });
       const overridesPorBase = new Map();
       for (const o of overrides) {
@@ -498,6 +503,10 @@ export async function POST(req, context) {
               costo: costoNuevo,
               margenConfigurado: margenLocal,
               redondeo100: base.redondeo_100 === true,
+              reglaPrecio: ov.reglaPrecio,
+              recargoFijoUnidad: ov.recargoFijoUnidad,
+              unidadMedida: base.unidad_medida,
+              factorPack: base.factor_pack,
             });
             if (ventaLocal.aplica && debeActualizarVentaOverride(ov.precio_venta, ventaAnteriorMaestra)) {
               dataLocal.precio_venta = ventaLocal.precioFinal;
