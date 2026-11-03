@@ -121,11 +121,35 @@ sus dos bloques `DO`).
   `sueltosPorUnidad` entre versiones se trata como cambio de escala. Hoy no se
   puede observar, porque el embudo devuelve 1 de los dos lados.
 
-### 3 · El costo hacia abajo — sin migración
+### 3 · El costo hacia abajo — sin migración — HECHA
 
-`costoPorUnidadFisica` divide el costo de la unidad por los sueltos también en
-los productos que no son pack. `fronteraCosto` y la valuación del Stock Diario,
-lo mismo. Inerte mientras el dato esté vacío.
+- **Una sola definición:** `costoDelSuelto` en `lib/conversiones/stock.js`, el
+  costo de la unidad dividido los sueltos por unidad. `costoPorUnidadFisica` la
+  usa después de llevar el bulto a la unidad, en pack y en productos por unidad;
+  el kilo y la pieza no se reparten.
+- **El embudo lee los sueltos solo si el que pregunta se los pasa.** El costo se
+  los pasa (desde la ficha, `sueltos_por_unidad`, o desde la versión del libro,
+  `sueltosPorUnidad`). La venta y el stock todavía no: para ellos la unidad sigue
+  valiendo 1 aunque la columna tuviera un número, y así sigue cerrada la puerta
+  de cobrar en una escala y descontar en otra hasta las tandas 4 y 5.
+- **`fronteraCosto` no se tocó porque no convierte escala**
+  **[verificado en código]**: compara dos costos que ya le llegan en la misma.
+- **La valuación del stock no divide por su cuenta**
+  **[verificado en código]**: `costoDeLasVersiones` le pasa la versión a
+  `costoPorUnidadFisica`, que desde la tanda 2 trae `sueltosPorUnidad`.
+- Candados: el costo del cigarrillo × 20 cierra con el atado y × 200 con el
+  cartón; 10 atados y 200 sueltos valen lo mismo, y en la cadena el período abre
+  y cierra con la misma plata, sin revalorización.
+- **Divergencia conocida, para la tanda 9 [verificado ejecutando]:** el costo de
+  un día es el vigente a sus 00:00, así que el DÍA en que se carga el dato cierra
+  con los sueltos valorizados al costo del atado (200 × $1.200 = $240.000 por
+  $12.000 de mercadería). Desde el día siguiente está bien y el período cierra.
+  Lo fija un candado "DIVERGENCIA CONOCIDA" en `valorDelStock.test.mjs`; la tanda
+  9 decide cómo entra el cambio de escala al día en que se carga.
+- **Para la tanda 6 [verificado en código]:** el control de stock valoriza la
+  diferencia de un conteo con `costoPorUnidadFisica`, pero su `SELECT_BASE`
+  (`lib/stock/control/controlStockServer.js`) no trae `sueltos_por_unidad`.
+  Hay que agregarlo cuando el conteo pase a cargarse en sueltos.
 
 ### 4 · La venta en el servidor — sin migración
 
