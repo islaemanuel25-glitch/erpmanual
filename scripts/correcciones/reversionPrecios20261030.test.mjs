@@ -113,7 +113,8 @@ INSERT INTO "ProductoBase" ("id", "nombre", "proveedor_id", "proveedor2_id", "un
   (804928, 'Amoxicilina 500g',            NULL, NULL, 'unidad', NULL, 300,    300,   NULL,  false),
   (801598, 'Aceitunas negras',            NULL, NULL, 'unidad', NULL, 14580,  0,     NULL,  false),
   (801599, 'componente',                  NULL, NULL, 'unidad', NULL, 100,    150,   NULL,  false),
-  (803185, 'COLGATE DENTRIFICO 70G X12',  NULL, NULL, 'unidad', NULL, 22200,  28900, NULL,  false);
+  (803185, 'COLGATE DENTRIFICO 70G X12',  NULL, NULL, 'unidad', NULL, 22200,  28900, NULL,  false),
+  (1203,   'BAGGIO 200 ML MANZANA',       NULL, NULL, 'unidad', NULL, 8380,   10900, NULL,  false);
 INSERT INTO "ProductoLocal" ("id", "localId", "baseId", "precio_costo", "precio_venta", "margen", "reglaPrecio", "recargoFijoUnidad") VALUES
   (13982,  1, 2609,   35400,    46100, 30.23, 'MARGEN_PORCENTUAL', NULL),
   (495,    1, 495,    3261.01,  2900,  NULL,  'MARGEN_PORCENTUAL', NULL),
@@ -127,7 +128,9 @@ INSERT INTO "ProductoLocal" ("id", "localId", "baseId", "precio_costo", "precio_
   (14928,  3, 804928, 300,      300,   0,     'MARGEN_PORCENTUAL', NULL),
   (11598,  3, 801598, 14580,    0,     0,     'MARGEN_PORCENTUAL', NULL),
   (800002, 3, 801599, 100,      150,   NULL,  'MARGEN_PORCENTUAL', NULL),
-  (13185,  3, 803185, 22200,    28900, NULL,  'MARGEN_PORCENTUAL', NULL);
+  (13185,  3, 803185, 22200,    28900, NULL,  'MARGEN_PORCENTUAL', NULL),
+  (1203,   1, 1203,   8380,     10900, NULL,  'MARGEN_PORCENTUAL', NULL),
+  (800003, 2, 1203,   8380,     10100, 20,    'MARGEN_PORCENTUAL', NULL);
 INSERT INTO "ComboComponente" ("comboProductoLocalId", "comboLocalId", "componenteProductoLocalId", "componenteLocalId", "cantidad")
   VALUES (11598, 3, 800002, 3, 1);
 `;
@@ -194,6 +197,15 @@ test("contra Postgres: cada caso termina donde dice la regla, y la segunda corri
     assert.equal(fila(6086), `${conMonto.toFixed(2)}|30.00|RECARGO_FIJO_UNIDAD|200.00`);
     assert.equal(resultado("ProductoLocal", 6086), "RECALCULADA|+$200.00 por unidad, la de la fila");
 
+    //    Nunca baja un precio: con el 20 % de otra ubicación daría menos que los
+    //    $10.900 que tenía; vuelve entera a su valor previo, y la ficha también.
+    const con20 = precioDesdeMargen({ costo: 8380, margenConfigurado: 20, redondeo100: true }).precioFinal;
+    assert.ok(con20 < 10900, "el caso tiene que ser uno donde la regla baja el precio");
+    assert.equal(fila(1203), "10900.00|∅|MARGEN_PORCENTUAL|∅");
+    assert.equal(ficha(1203), "10900.00|∅");
+    assert.equal(resultado("ProductoLocal", 1203), `NO_SE_BAJO|no se bajó: su regla daba ${con20.toFixed(2)}`);
+    assert.match(resultado("ProductoBase", 1203), /^NO_SE_BAJO\|sigue a su fila del depósito/);
+
     // 3. Sin regla en ningún lado: no se inventa, vuelve a su valor previo.
     assert.equal(fila(11265), "4100.00|∅|MARGEN_PORCENTUAL|∅");
     assert.equal(resultado("ProductoLocal", 11265), "SIN_REGLA|sin regla en ningún lado");
@@ -225,6 +237,8 @@ test("contra Postgres: cada caso termina donde dice la regla, y la segunda corri
     assert.match(informe, /Minimarket ayala\s*\|\s*DOWNY 400ML BRISA INTENSO\s*\|\s*4100\.00\s*\|\s*sin regla en ningún lado/);
     assert.match(informe, /Mini unidas\s*\|\s*COCA COLA 2\.25L\s*\|\s*27600\.00\s*\|\s*-3\.16\s*\|\s*REVERTIDA/);
     assert.match(informe, /Amoxicilina 500g\s*\|\s*450\.00\s*\|\s*editada después/);
+    assert.match(informe, /depo\s*\|\s*BAGGIO 200 ML MANZANA\s*\|\s*10900\.00\s*\|\s*no se bajó/);
+    assert.match(primera.stderr, /No se bajó \(.*\): 1\n.*depo · BAGGIO 200 ML MANZANA · 10900\.00/);
 
     // Los respaldos del 30/10 siguen ahí.
     for (const t of ["backup_precios_ubicacion_20261030", "backup_precios_ubicacion_20261030_b", "backup_precios_ubicacion_20261030_e"]) {

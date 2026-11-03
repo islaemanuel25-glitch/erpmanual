@@ -50,7 +50,18 @@ la lista esté vacía.
 
 ## Bloqueos vigentes
 
-Ninguno.
+- **La migración `20261103120000_precios_del_30_10_vuelven_a_su_regla` NO sale**
+  (commits `2baaa31` y siguientes de esa migración, 2026-11-03). Emanuel tomó dos
+  decisiones para aplicarle antes del deploy. La 1 —nunca baja un precio— ya
+  está. La 2 —las filas recalculadas solas con el 30 % inventado entran en la
+  corrección, y se saltean solo las que la bitácora muestra editadas a mano— NO
+  se pudo aplicar: `AuditoriaBitacora` sí registra los recálculos automáticos
+  (recepción de compra por `costoMaestro` → `propagarCostoALocales`, aplicar
+  lista de proveedor), porque corren en un request con el cliente que audita; y
+  no guarda qué ubicación cambió, solo el producto. Con ese criterio, las filas
+  recalculadas solas se seguirían salteando. Se levanta cuando Emanuel elija
+  otro criterio y esté aplicado; hasta entonces, si se despliega, se despliega
+  cortado antes de esa migración.
 
 ---
 

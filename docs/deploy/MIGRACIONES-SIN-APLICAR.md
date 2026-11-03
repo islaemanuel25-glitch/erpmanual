@@ -25,7 +25,13 @@ combos y promociones vuelven a `..._20261030_b`; el resto se recalcula con la
 regla propia del producto (la de la fila, la de la ficha o la que más se repite
 en otras ubicaciones) y, sin regla en ningún lado, vuelve a su valor previo. Los
 12 combos de `promociones_vuelven` no se tocan. Una fila que ya no tiene lo que
-dejó la corrección no se toca.
+dejó la corrección no se toca. Nunca baja un precio: si la regla propia da menos
+que el precio previo, la fila vuelve a su valor previo y se lista como "no se
+bajó".
+
+**FRENADA en `TANDAS-BLOQUEADAS.md`**: falta la decisión 2 de Emanuel (las filas
+recalculadas solas con el 30 % inventado), que con la bitácora no se puede
+distinguir como se pidió.
 
 El clasificador la marca **NO ADITIVA** —`UPDATE` de datos, `DROP TABLE` de dos
 tablas temporales propias y un bloque `DO` que solo imprime el informe—, así que

@@ -123,6 +123,9 @@ const cabecera = (r) => `-- LAS DOS CORRECCIONES DE PRECIOS DEL 30/10 SE CORRIGE
 --     recalcula con la regla PROPIA del producto: la de la fila, la de la ficha o
 --     la de otra ubicación, en ese orden. Sin regla en ningún lado no se inventa:
 --     vuelve a su valor previo y se lista.
+--   · NUNCA BAJA UN PRECIO (Emanuel, 2026-11-03): si la regla propia da menos
+--     que el precio previo a la corrección, la fila vuelve entera a su valor
+--     previo y se lista como "no se bajó".
 --   · Los ${r.combosYaDevueltos} combos que devolvió ${MIGRACION_C} no se tocan.
 --   · La ficha del depósito sigue a su fila del depósito, como se alineó entonces.
 --
@@ -297,13 +300,13 @@ INSERT INTO respaldo.reversion_20261030_resultado
 SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
        COALESCE(NULLIF(TRIM(pl."nombre"), ''), b."nombre"), l."nombre",
        e.antes_precio, e.antes_margen, e.antes_regla, e.antes_recargo,
-       CASE d.resultado WHEN 'RECALCULADA' THEN c.precio WHEN 'REVERTIDA' THEN e.previo_precio WHEN 'SIN_REGLA' THEN e.previo_precio ELSE e.antes_precio END,
+       CASE d.resultado WHEN 'RECALCULADA' THEN c.precio WHEN 'REVERTIDA' THEN e.previo_precio WHEN 'SIN_REGLA' THEN e.previo_precio WHEN 'NO_SE_BAJO' THEN e.previo_precio ELSE e.antes_precio END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN r.tipo = 'PORCENTAJE' THEN r.valor ELSE e.previo_margen END)
-                        WHEN 'REVERTIDA' THEN e.previo_margen WHEN 'SIN_REGLA' THEN e.previo_margen ELSE e.antes_margen END,
+                        WHEN 'REVERTIDA' THEN e.previo_margen WHEN 'SIN_REGLA' THEN e.previo_margen WHEN 'NO_SE_BAJO' THEN e.previo_margen ELSE e.antes_margen END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN r.tipo = 'PORCENTAJE' THEN 'MARGEN_PORCENTUAL' ELSE 'RECARGO_FIJO_UNIDAD' END)
-                        WHEN 'REVERTIDA' THEN e.previo_regla WHEN 'SIN_REGLA' THEN e.previo_regla ELSE e.antes_regla END,
+                        WHEN 'REVERTIDA' THEN e.previo_regla WHEN 'SIN_REGLA' THEN e.previo_regla WHEN 'NO_SE_BAJO' THEN e.previo_regla ELSE e.antes_regla END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN r.tipo = 'RECARGO' THEN r.valor ELSE e.previo_recargo END)
-                        WHEN 'REVERTIDA' THEN e.previo_recargo WHEN 'SIN_REGLA' THEN e.previo_recargo ELSE e.antes_recargo END,
+                        WHEN 'REVERTIDA' THEN e.previo_recargo WHEN 'SIN_REGLA' THEN e.previo_recargo WHEN 'NO_SE_BAJO' THEN e.previo_recargo ELSE e.antes_recargo END,
        e.previo_precio
   FROM _rev_estado e
   LEFT JOIN "ProductoLocal" pl ON pl."id" = e.id
@@ -352,6 +355,10 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
       WHEN e.migracion = 'bajo_su_regla' THEN 'REVERTIDA'
       WHEN k.coca OR k.combo OR k.promo THEN 'REVERTIDA'
       WHEN r.tipo IS NULL OR k.costo IS NULL OR k.costo <= 0 THEN 'SIN_REGLA'
+      -- Nunca baja un precio (Emanuel, 2026-11-03: "nada peor que perder"). Se
+      -- compara contra el precio previo a la corrección; si el recálculo da menos,
+      -- la fila no se recalcula y vuelve entera a su valor previo.
+      WHEN c.precio < COALESCE(e.previo_precio, 0) THEN 'NO_SE_BAJO'
       ELSE 'RECALCULADA' END AS resultado,
     CASE
       WHEN e.combo_ya_devuelto THEN 'combo ya devuelto por ${MIGRACION_C}'
@@ -363,6 +370,7 @@ SELECT 'ProductoLocal', e.id, e.migracion, d.resultado, d.motivo,
       WHEN k.promo THEN 'promoción'
       WHEN r.tipo IS NULL THEN 'sin regla en ningún lado'
       WHEN k.costo IS NULL OR k.costo <= 0 THEN 'sin costo para aplicar su regla'
+      WHEN c.precio < COALESCE(e.previo_precio, 0) THEN 'no se bajó: su regla daba ' || c.precio::text
       ELSE (CASE WHEN r.tipo = 'PORCENTAJE' THEN r.valor::text || ' %' ELSE '+$' || r.valor::text || ' por unidad' END) || ', ' || r.origen
     END AS motivo
   ) d
@@ -379,9 +387,9 @@ INSERT INTO respaldo.reversion_20261030_resultado
    precio_antes, margen_antes, precio_final, margen_final, precio_previo)
 SELECT 'ProductoBase', e.id, e.migracion, d.resultado, d.motivo, b."nombre", 'ficha del depósito',
        e.antes_precio, e.antes_margen,
-       CASE d.resultado WHEN 'RECALCULADA' THEN fd.precio_final WHEN 'REVERTIDA' THEN e.previo_precio WHEN 'SIN_REGLA' THEN e.previo_precio ELSE e.antes_precio END,
+       CASE d.resultado WHEN 'RECALCULADA' THEN fd.precio_final WHEN 'REVERTIDA' THEN e.previo_precio WHEN 'SIN_REGLA' THEN e.previo_precio WHEN 'NO_SE_BAJO' THEN e.previo_precio ELSE e.antes_precio END,
        CASE d.resultado WHEN 'RECALCULADA' THEN (CASE WHEN fd.regla_final = 'MARGEN_PORCENTUAL' THEN fd.margen_final ELSE e.previo_margen END)
-                        WHEN 'REVERTIDA' THEN e.previo_margen WHEN 'SIN_REGLA' THEN e.previo_margen ELSE e.antes_margen END,
+                        WHEN 'REVERTIDA' THEN e.previo_margen WHEN 'SIN_REGLA' THEN e.previo_margen WHEN 'NO_SE_BAJO' THEN e.previo_margen ELSE e.antes_margen END,
        e.previo_precio
   FROM _rev_estado e
   LEFT JOIN "ProductoBase" b ON b."id" = e.id
@@ -390,13 +398,13 @@ SELECT 'ProductoBase', e.id, e.migracion, d.resultado, d.motivo, b."nombre", 'fi
     SELECT CASE
       WHEN NOT e.hay OR NOT e.intacta THEN 'SALTEADA'
       WHEN e.migracion = 'bajo_su_regla' THEN 'REVERTIDA'
-      WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA') THEN fd.resultado
+      WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO') THEN fd.resultado
       ELSE 'SALTEADA' END AS resultado,
     CASE
       WHEN NOT e.hay THEN 'sin ficha o sin respaldo'
       WHEN NOT e.intacta THEN 'editada después de la corrección'
       WHEN e.migracion = 'bajo_su_regla' THEN 'ya tenía %'
-      WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA') THEN 'sigue a su fila del depósito: ' || fd.motivo
+      WHEN fd.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO') THEN 'sigue a su fila del depósito: ' || fd.motivo
       ELSE 'su fila del depósito no se tocó' END AS motivo
   ) d
  WHERE e.tabla = 'ProductoBase'
@@ -411,7 +419,7 @@ WITH escritas AS (
          "updatedAt" = CURRENT_TIMESTAMP
     FROM respaldo.reversion_20261030_resultado r
    WHERE r.tabla = 'ProductoLocal' AND r.id = pl."id" AND NOT r.aplicada
-     AND r.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA')
+     AND r.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO')
      AND pl."precio_venta" IS NOT DISTINCT FROM r.precio_antes
      AND pl."margen" IS NOT DISTINCT FROM r.margen_antes
      AND pl."reglaPrecio"::text IS NOT DISTINCT FROM r.regla_antes
@@ -426,7 +434,7 @@ WITH escritas AS (
      SET "precio_venta" = r.precio_final, "margen" = r.margen_final, "updatedAt" = CURRENT_TIMESTAMP
     FROM respaldo.reversion_20261030_resultado r
    WHERE r.tabla = 'ProductoBase' AND r.id = b."id" AND NOT r.aplicada
-     AND r.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA')
+     AND r.resultado IN ('REVERTIDA', 'RECALCULADA', 'SIN_REGLA', 'NO_SE_BAJO')
      AND b."precio_venta" IS NOT DISTINCT FROM r.precio_antes
      AND b."margen" IS NOT DISTINCT FROM r.margen_antes
   RETURNING b."id"
@@ -456,9 +464,13 @@ BEGIN
   LOOP
     RAISE NOTICE '  fichas del depósito %: %', f.resultado, f.n;
   END LOOP;
-  RAISE NOTICE 'Recalculadas que quedan por debajo de su precio previo: %',
-    (SELECT COUNT(*) FROM respaldo.reversion_20261030_resultado
-      WHERE tabla = 'ProductoLocal' AND resultado = 'RECALCULADA' AND precio_final < precio_previo);
+  RAISE NOTICE 'No se bajó (su regla daba menos que el precio previo; vuelven a su valor previo): %',
+    (SELECT COUNT(*) FROM respaldo.reversion_20261030_resultado WHERE tabla = 'ProductoLocal' AND resultado = 'NO_SE_BAJO');
+  FOR f IN SELECT * FROM respaldo.reversion_20261030_resultado
+            WHERE tabla = 'ProductoLocal' AND resultado = 'NO_SE_BAJO' ORDER BY ubicacion, producto
+  LOOP
+    RAISE NOTICE '  % · % · % (%)', f.ubicacion, f.producto, f.precio_final, f.motivo;
+  END LOOP;
   RAISE NOTICE 'Sin regla, devueltas a su valor previo:';
   FOR f IN SELECT * FROM respaldo.reversion_20261030_resultado
             WHERE tabla = 'ProductoLocal' AND resultado = 'SIN_REGLA' ORDER BY ubicacion, producto
@@ -500,9 +512,9 @@ SELECT migracion, resultado, regexp_replace(motivo, '^-?[0-9.]+ %|^\\+\\$[0-9.]+
   FROM respaldo.reversion_20261030_resultado WHERE tabla = 'ProductoLocal'
  GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
 
-\\echo 'Recalculadas que quedan por debajo de su precio previo'
-SELECT COUNT(*) AS filas FROM respaldo.reversion_20261030_resultado
- WHERE tabla = 'ProductoLocal' AND resultado = 'RECALCULADA' AND precio_final < precio_previo;
+\\echo 'No se bajó: su regla daba menos que el precio previo, vuelven a su valor previo'
+SELECT ubicacion, producto, precio_final, motivo FROM respaldo.reversion_20261030_resultado
+ WHERE tabla = 'ProductoLocal' AND resultado = 'NO_SE_BAJO' ORDER BY ubicacion, producto;
 
 \\echo 'Sin regla, devueltas a su valor previo'
 SELECT ubicacion, producto, precio_final, motivo FROM respaldo.reversion_20261030_resultado
