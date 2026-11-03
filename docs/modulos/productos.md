@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-10-31 14:29
+**Última actualización:** 2026-11-03 23:01
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-03: refactor: embudo de la escala para el tercer nivel de empaque
 - 2026-10-31: fix(productos): la lista de precios se baja solo de la ubicación actual, dice "Categoría" y busca al elegir
 - 2026-10-31: feat(productos): descargar la lista de precios del catálogo en PDF, por ubicación, proveedor y tipo
 - 2026-10-29: fix(recepcion): el alta desde el papel viene en Pack con el costo del bulto, y muestra el código del proveedor

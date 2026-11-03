@@ -1,8 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-03 21:56
+**Fecha:** 2026-11-03 23:01
 
 ## Módulos modificados recientemente
+
+### productos
+- refactor: embudo de la escala para el tercer nivel de empaque
+- Archivos: 2 modificados (2 total)
+
+### pos-ventas
+- refactor: embudo de la escala para el tercer nivel de empaque
+- Archivos: 1 modificados (1 total)
 
 ### proveedores
 - fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
