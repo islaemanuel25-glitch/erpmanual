@@ -140,12 +140,15 @@ sus dos bloques `DO`).
 - Candados: el costo del cigarrillo × 20 cierra con el atado y × 200 con el
   cartón; 10 atados y 200 sueltos valen lo mismo, y en la cadena el período abre
   y cierra con la misma plata, sin revalorización.
-- **Divergencia conocida, para la tanda 9 [verificado ejecutando]:** el costo de
-  un día es el vigente a sus 00:00, así que el DÍA en que se carga el dato cierra
-  con los sueltos valorizados al costo del atado (200 × $1.200 = $240.000 por
-  $12.000 de mercadería). Desde el día siguiente está bien y el período cierra.
-  Lo fija un candado "DIVERGENCIA CONOCIDA" en `valorDelStock.test.mjs`; la tanda
-  9 decide cómo entra el cambio de escala al día en que se carga.
+- **Defecto que la tanda 9 TIENE QUE RESOLVER [verificado ejecutando]:** el
+  costo de un día es el vigente a sus 00:00, así que el DÍA en que se carga el
+  dato cierra con los sueltos valorizados al costo del atado (200 × $1.200 =
+  $240.000 por $12.000 de mercadería). **No es una divergencia aceptada**
+  (corrección de Emanuel, 2026-11-03): al cargar el dato, el costo vigente de ese
+  día tiene que quedar en la escala nueva. El candado de
+  `valorDelStock.test.mjs` exige el valor correcto ($12.000 los dos días) y está
+  marcado `todo` hasta la tanda 9, que lo tiene que poner en verde y sacarle la
+  marca.
 - **Para la tanda 6 [verificado en código]:** el control de stock valoriza la
   diferencia de un conteo con `costoPorUnidadFisica`, pero su `SELECT_BASE`
   (`lib/stock/control/controlStockServer.js`) no trae `sueltos_por_unidad`.
