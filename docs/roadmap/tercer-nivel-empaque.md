@@ -1,0 +1,171 @@
+# El tercer nivel de empaque: diez tandas, en orden
+
+Relevado el 2026-11-01 leyendo el repo, sin datos de producción (sesión de
+nube). El diseño de negocio lo decidió Emanuel; las decisiones técnicas están
+marcadas como tales. Cada afirmación lleva su etiqueta: **[verificado en
+código]**, **[decidido]** o **[inferido]**.
+
+## El problema
+
+Hoy un producto tiene un solo escalón entre el bulto y la unidad: `factor_pack`
+en `ProductoBase` **[verificado en código]**. Hay productos con tres:
+
+- Cigarrillos: cartón (10 atados) → atado (20 cigarrillos) → cigarrillo suelto.
+  El local vende el atado Y el suelto del mismo producto.
+- Café: pack de 10 cajas → caja de 10 unidades → unidad suelta. Si el depósito
+  manda por pack, al local le llega el precio de la caja y no lo puede vender
+  suelto.
+
+Hoy esos productos se arman a mano, y quedan mal (ej. "Camel yellow 20" en Mini
+unidas). Cuántos son no se pudo contar: hace falta la base de producción, y
+"armado a mano" no tiene una firma en los datos. Sale en la tanda 10.
+
+## El diseño **[decidido]**
+
+1. El stock se cuenta por dentro en el escalón más chico. Vender un atado
+   descuenta 20, un suelto 1; un cartón que llega suma 200.
+2. En pantalla nunca se muestra el escalón más chico pelado: "1 cartón" en el
+   depósito, "10 atados" en el local, y si se abrió uno "9 atados y 15 sueltos".
+3. Todos los productos tienen el dato opcional **sueltos por unidad**. Vacío =
+   el producto funciona exactamente como hoy. Solo se completa en los de tres
+   niveles.
+4. **Los rótulos no son genéricos** (corrección de Emanuel al relevamiento):
+   junto a `sueltos_por_unidad`, el producto lleva un **nombre opcional de la
+   unidad** ("atado", "caja"), que se carga en la ficha al completar el dato. El
+   escalón de abajo se rotula siempre **"sueltos"**. Si el nombre está vacío, la
+   unidad se rotula **"unidades"**. El bulto conserva el nombre que ya tiene.
+5. Cada escalón tiene su propio precio de venta por ubicación. El suelto NO es
+   la unidad dividida: se carga aparte.
+6. El costo se reparte hacia abajo solo: el local recibe el costo correcto del
+   atado y del suelto (costo de la unidad ÷ sueltos por unidad).
+7. En el POS del local el cajero elige si vende la unidad o el suelto, y el
+   stock baja lo que corresponde. El depósito sigue vendiendo bulto y unidad
+   **[decisión técnica]**.
+
+## Lo que ya está a favor **[verificado en código]**
+
+`StockLocal.cantidad` ya está siempre en el escalón más chico que existe hoy, la
+unidad —lo dice `lib/pos-ventas/consumoStock.js`—, salvo la pieza de fiambre en
+el depósito. El tercer nivel es el mismo invariante con un escalón más abajo:
+cuando un producto tenga sueltos, la columna pasa a contar sueltos.
+
+## La regla de orden, que es la que impide cobrar en una escala y descontar en otra
+
+**El campo no se puede cargar hasta la tanda 9.** Hasta entonces la unidad vale
+1 suelto en todos los productos, así que cada tanda intermedia es inerte: cambia
+el camino del número, no el número. Ninguna tanda puede dejar la venta cobrando
+en una escala y descontando en otra, porque el escalón nuevo no existe para
+ningún producto hasta que todos los caminos lo conocen.
+
+El candado que lo vigila es la atadura de `lib/precios/escalaDeVenta.test.mjs`:
+exige que, mientras no haya venta suelta, una unidad valga exactamente un
+suelto. La tanda 4 lo reescribe a sabiendas cuando la venta suelta exista.
+
+## Las dos trampas
+
+**1. La cantidad guardada en ventas y transferencias viejas está en la escala de
+entonces.** `VentaDetalle.cantidadStock` y la cantidad de `TransferenciaDetalle`
+se escribieron en unidades. Si después se carga "20 sueltos por unidad", anular
+una venta vieja devolvería 1 donde tiene que devolver 20, y una transferencia en
+tránsito acreditaría la vigésima parte. Por eso ventas y transferencias guardan
+**N congelado**: los sueltos por unidad del momento, igual que hoy se congela el
+factor (`factorPresentacion`, `valorizacionFactorPack`). Anular, corregir,
+editar, revertir, cancelar y recibir leen ese N y no el de la ficha viva.
+
+**2. Al cargar el dato en un producto con stock, el stock existente se
+multiplica.** En la misma transacción en que la ficha guarda
+`sueltos_por_unidad`, cada `StockLocal` del producto multiplica `cantidad`,
+`enTransito`, `stockMin` y `stockMax` por N, y queda la constancia en
+`ReinterpretacionDeStock`. Sin eso, "10 atados" pasarían a leerse como "10
+sueltos". Mientras haya transferencias en tránsito o conteos de control abiertos
+de ese producto, el dato no se deja cambiar.
+
+## Las tandas
+
+### 1 · El embudo — sin migración — HECHA
+
+Una sola función, `unidadesDeStockPorEscalon` en `lib/conversiones/stock.js`,
+contesta cuántas unidades de stock son un bulto, una unidad y un suelto. Pasan
+por ella `cantidadParaStockNormal`, `toUnidades`/`fromUnidades` y
+`costoPorUnidadFisica`. El suelto vale 1 (`SUELTOS_POR_UNIDAD_SIN_DATO`) y el
+resultado es idéntico al de antes. La atadura de las 32 combinaciones se
+extendió con el escalón suelto y tiene contraprueba.
+
+### 2 · Las columnas — LLEVA MIGRACIÓN
+
+- `ProductoBase.sueltos_por_unidad` (entero, nulo, mayor que 1 si está) y
+  `ProductoBase.nombre_unidad` (texto, nulo).
+- `ProductoLocal.precio_venta_suelto` (nulo).
+- N congelado en `VentaDetalle` y en `TransferenciaDetalle`.
+- Las dos columnas de `ProductoBase` entran en la lista de campos de
+  reinterpretación: la del trigger de la migración del libro, la de
+  `lib/stock/libro/libroStock.js` y `CAMPOS_DE_ESCALA_BASE` de
+  `lib/stock/libro/valorDelStock.js`.
+- `prisma generate` y una consulta contra Postgres. El embudo empieza a leer la
+  columna; como nadie la escribe, sigue valiendo 1.
+
+### 3 · El costo hacia abajo — sin migración
+
+`costoPorUnidadFisica` divide el costo de la unidad por los sueltos también en
+los productos que no son pack. `fronteraCosto` y la valuación del Stock Diario,
+lo mismo. Inerte mientras el dato esté vacío.
+
+### 4 · La venta en el servidor — sin migración
+
+- `pos-ventas/crear` acepta el modo de línea SUELTO en un local: cobra
+  `precio_venta_suelto` y descuenta 1. La unidad descuenta N.
+- La línea guarda N congelado; `escalaContradictoria` conoce la escala nueva.
+- Anular, corregir, editar, `reversionVenta`, `motorCorreccion` y
+  `consumoPersonalServer` leen el N congelado.
+- El servidor rechaza SUELTO si el producto no tiene el dato o el precio del
+  suelto.
+- `buscar-producto` devuelve el precio y el costo del suelto, con la lista de
+  precios aplicada.
+- La atadura pasa a cubrir los tres escalones con venta suelta real.
+
+### 5 · Las entradas de mercadería — sin migración
+
+Compras (`compras-proveedor/recibir`), transferencias (`crearTransferencia`,
+`confirmar-recepcion`, `cancelar`, con N congelado), `pos-transferencias/enviar`,
+ventas internas (`mapearVentaATransferencia`, `snapshotDePresentacion`), combos
+(`planConsumoVenta`, `ventaConsumo`) y pedidos.
+
+### 6 · La carga manual — sin migración
+
+Ajuste, importación, control de stock y límites: se cargan como "unidades +
+sueltos" y se guardan en sueltos.
+
+### 7 · Las pantallas — sin migración
+
+`fromUnidades` pasa a tres niveles. Rótulos: el nombre del bulto que ya existe,
+`nombre_unidad` (o "unidades" si está vacío) y "sueltos". "1 cartón" en el
+depósito, "9 atados y 15 sueltos" en el local; el suelto nunca aparece solo.
+Tabla de stock, buscador del POS, `lib/stock/mapItem.js`, Stock Diario y
+transferencias.
+
+### 8 · El POS en pantalla — sin migración
+
+Selector de unidad o suelto en el carrito y en el reducer del POS, sobre el
+servidor de la tanda 4.
+
+### 9 · La activación — migración solo si hace falta
+
+La ficha muestra "se vende más chico: cuántos sueltos trae cada unidad", el
+nombre de la unidad y el precio del suelto por ubicación. Al guardar el dato se
+multiplica el stock existente (trampa 2). No se deja cambiar con transferencias
+en tránsito ni conteos abiertos. Es la primera tanda que cambia algo para el
+usuario. Lleva migración solo si el bloqueo necesita una restricción en la base.
+
+### 10 · Los datos — sin migración, desde la aplicación
+
+Cargar el dato en cigarrillos y café, y dar de baja los productos armados a
+mano, pasando su stock al producto de tres niveles por las rutas de la
+aplicación, no por script. Acá sale el conteo que en el relevamiento no se pudo
+hacer.
+
+## Tamaño del terreno **[verificado en código, 2026-11-01]**
+
+Enumerado con `git grep --untracked` sobre `app`, `lib`, `components` y
+`scripts`, sin tests: 253 archivos nombran el factor, 22 escriben en
+`StockLocal` y 19 leen `cantidadStock`. Cada tanda vuelve a enumerar los suyos
+antes de empezar.

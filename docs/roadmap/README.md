@@ -18,6 +18,10 @@ Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788` — 2026-08-10.
 
 ## PENDIENTE CONFIRMADO
 
+- **El tercer nivel de empaque** (cartón → atado → suelto). Diseño decidido por
+  Emanuel, plan de diez tandas con las dos trampas y la regla de orden en
+  [tercer-nivel-empaque.md](tercer-nivel-empaque.md). La tanda 1, el embudo, está
+  hecha; la 2 lleva migración.
 - **Terminar el rediseño MÓVIL de la pantalla de Transferencias.** El dominio está
   hecho, verificado y empujado —`464b8e16`—; la pantalla no está empezada. Dónde
   quedamos exactamente, qué falta y las siete decisiones ya tomadas están en
