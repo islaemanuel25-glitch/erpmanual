@@ -16,7 +16,29 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **101 migraciones**, la última
+- `20261103120000_precios_del_30_10_vuelven_a_su_regla` — de datos, pedida por
+Emanuel el 2026-11-03. Corrige las dos correcciones de precios del 30/10 con su
+regla: solo cambia lo que NO tenía %. Las 768 filas y 23 fichas de
+`precios_bajo_su_regla` vuelven a `respaldo.backup_precios_ubicacion_20261030`.
+De las 1.479 filas y 370 fichas de `precios_sin_regla`, Coca-Cola (proveedor 19),
+combos y promociones vuelven a `..._20261030_b`; el resto se recalcula con la
+regla propia del producto (la de la fila, la de la ficha o la que más se repite
+en otras ubicaciones) y, sin regla en ningún lado, vuelve a su valor previo. Los
+12 combos de `promociones_vuelven` no se tocan. Una fila que ya no tiene lo que
+dejó la corrección no se toca.
+
+El clasificador la marca **NO ADITIVA** —`UPDATE` de datos, `DROP TABLE` de dos
+tablas temporales propias y un bloque `DO` que solo imprime el informe—, así que
+sale con `DEPLOY_MIGRACION_AUTORIZADA=1`, dada por el pedido de Emanuel. Prisma
+no muestra los NOTICE: el informe se lee después, en solo lectura, con
+`node scripts/correcciones/generarReversionPrecios20261030.mjs --informe | psql "<url>" -X`
+(el generador solo imprime las consultas; no se conecta a nada). Lo que
+se espera ver está en el encabezado de la migración; las 6 filas de Coca-Cola
+tienen que quedar en $27.600 / −3,16 (COCA COLA 2.25L, Mini unidas) y $30.400.
+Candado contra Postgres: `scripts/correcciones/reversionPrecios20261030.test.mjs`
+con `PG_PRUEBA_URL`.
+
+Producción está en **101 migraciones**, la última
 `20261031180000_fila_lista_contenido_ml`.
 
 La `20261031180000_fila_lista_contenido_ml` —aditiva: la columna nula
