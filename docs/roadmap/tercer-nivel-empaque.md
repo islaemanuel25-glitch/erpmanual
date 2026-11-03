@@ -154,18 +154,61 @@ sus dos bloques `DO`).
   (`lib/stock/control/controlStockServer.js`) no trae `sueltos_por_unidad`.
   Hay que agregarlo cuando el conteo pase a cargarse en sueltos.
 
-### 4 · La venta en el servidor — sin migración
+### 4 · La venta en el servidor — sin migración — HECHA
 
-- `pos-ventas/crear` acepta el modo de línea SUELTO en un local: cobra
-  `precio_venta_suelto` y descuenta 1. La unidad descuenta N.
-- La línea guarda N congelado; `escalaContradictoria` conoce la escala nueva.
-- Anular, corregir, editar, `reversionVenta`, `motorCorreccion` y
-  `consumoPersonalServer` leen el N congelado.
-- El servidor rechaza SUELTO si el producto no tiene el dato o el precio del
-  suelto.
-- `buscar-producto` devuelve el precio y el costo del suelto, con la lista de
-  precios aplicada.
-- La atadura pasa a cubrir los tres escalones con venta suelta real.
+- **El descuento:** `cantidadParaStockNormal` le pasa al embudo los sueltos del
+  `baseStock` (que ahora traen los dos mapas de productos). BULTO descuenta
+  factor × N, UNIDAD descuenta N y el modo nuevo `SUELTO` descuenta 1. El kilo
+  no tiene sueltos.
+- **El cobro del suelto lo pone el servidor**, como en los servicios:
+  `lib/pos-ventas/lineaSuelta.js` (`resolverLineaSuelta`) decide quién puede
+  vender suelto y pisa el precio con `precio_venta_suelto` (con la lista del
+  cliente aplicada como en `buscar-producto`) y el costo con el del suelto
+  (`costoPorUnidadFisica` → `costoDelSuelto`). Rechaza con código y mensaje: en
+  el depósito, sin `sueltos_por_unidad`, sin precio de suelto en la ubicación, y
+  en kilo, combo o servicio. Las ofertas no se aplican a una línea suelta (son
+  un precio por unidad): motivo `SUELTO` en el motor.
+- **El N congelado:** `planConsumoVenta` lo devuelve junto a `cantidadStock`, y
+  `crear` y `corregir` lo guardan en `VentaDetalle.sueltosPorUnidadCongelado`.
+- **La vuelta del stock:** `cantidadDeStockEnLaEscalaDeHoy` (en el embudo)
+  convierte del N de la venta al de hoy. La usan `deltaDeDevolucion` (anular y
+  cancelar transferencia) y `reconstruirConsumoOriginal` (corregir, editar,
+  revisar). Ventas viejas sin N congelado = 1.
+- `buscar-producto` del POS devuelve `sueltosPorUnidad`, `precioVentaSuelto` y
+  `precioCostoSuelto`, con la misma pieza que cobra. Null en todo producto hoy.
+- `detectarEscalaContradictoria` conoce el suelto (costo de unidad en línea
+  suelta y al revés). Sigue sin estar enganchada en ningún lado, como antes.
+- La atadura de `escalaDeVenta.test.mjs` recorre las 32 combinaciones con N = 1
+  y con N = 20, en las tres escalas, con cinco contrapruebas.
+
+**Lo que esta tanda deja para otras [verificado en código]:**
+
+- **Tanda 5:** los combos. `VentaDetalleComponente` no tiene N congelado y su
+  consumo vuelve sin convertir; `ComboComponente.cantidad` está en unidades de
+  stock y hay que decidir qué significa con sueltos. También la venta interna
+  (`mapearVentaATransferencia`) y la transferencia que genera: su cantidad ya
+  sale con N, pero `TransferenciaDetalle.sueltosPorUnidadCongelado` todavía no
+  se escribe.
+- **Tanda 7:** la copia de `stock_locales/buscar-producto` no trae el suelto. Y
+  el `stock` que devuelve `buscar-producto` está en la escala de StockLocal
+  (sueltos, cuando haya), así que el carrito tiene que mostrarlo en unidades y
+  sueltos. `lib/reportes-ventas/modoLineaDeposito.js` deduce el modo de una
+  línea del depósito comparando contra el factor sin N.
+- **Tanda 8:** el editor de corrección del depósito (`lineaModoDeposito.js`)
+  calcula su vista previa sin N; el servidor recalcula con N, así que lo que se
+  guarda está bien. Los códigos de rechazo del suelto no están en
+  `CODIGO_RECHAZO_VENTA`: la cola offline los trata como un rechazo genérico.
+- **Consumo del personal:** no admite SUELTO (lo frena con mensaje).
+  `ConsumoPersonalLinea` no tiene N congelado; hoy nada revierte un consumo, pero
+  si algo llega a revertirlo, necesita la columna.
+- **En la corrección, el precio del suelto es el del editor**, como en toda
+  línea corregida: la corrección no resuelve la lista del cliente. El costo sí lo
+  pone el servidor. Es la misma deuda que la Gravedad 1 de
+  `docs/roadmap/el-precio-que-se-cobra.md`.
+- **Deuda de la regla 1, anotada y no tocada:** `cargarMapsProductos`
+  (`correccionCompletaServer.js`) es una copia de `cargarMapasDeProductos` con
+  su propio select; en esta tanda hubo que sumar `sueltos_por_unidad` en los
+  dos.
 
 ### 5 · Las entradas de mercadería — sin migración
 
@@ -185,7 +228,9 @@ sueltos" y se guardan en sueltos.
 `nombre_unidad` (o "unidades" si está vacío) y "sueltos". "1 cartón" en el
 depósito, "9 atados y 15 sueltos" en el local; el suelto nunca aparece solo.
 Tabla de stock, buscador del POS, `lib/stock/mapItem.js`, Stock Diario y
-transferencias.
+transferencias. **Y la copia de `app/api/stock_locales/buscar-producto`**, que
+en la tanda 4 quedó sin el precio y el costo del suelto a propósito: se le
+agrega con la misma pieza (`resolverLineaSuelta`), no con una cuenta propia.
 
 ### 8 · El POS en pantalla — sin migración
 
