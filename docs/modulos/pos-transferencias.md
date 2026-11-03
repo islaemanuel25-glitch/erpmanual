@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-11-02 17:59
+**Última actualización:** 2026-11-03 14:44
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-11-03: feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
 - 2026-11-02: feat: descargar en PDF un pedido del local al depósito
 - 2026-10-28: feat(pedidos): preparar un pedido del depósito en la computadora, desde 768 px
 - 2026-10-28: feat(pedidos): un «solo por bulto» de bulto 1 sale aunque se haya preparado por unidad
