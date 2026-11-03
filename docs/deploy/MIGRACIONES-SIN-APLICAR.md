@@ -16,17 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **102 migraciones**, la última
-`20261103120000_precios_del_30_10_vuelven_a_su_regla`. Falta una:
+Ninguna. Producción está en **103 migraciones**, la última
+`20261103142413_pedido_cambiar_por_otro`.
 
-- `20261103142413_pedido_cambiar_por_otro` — aditiva: dos columnas nulas con su
-  FK, `PosTransferenciaDetalle.reemplazoProductoId` (el producto que el depósito
-  manda en lugar del pedido, "Cambiar" en preparar pedido) y
-  `TransferenciaDetalle.reemplazaABaseId` (lo que el local pidió, para "Pediste
-  …, va …" en la recepción), más un índice. Sin relleno: las filas que ya
-  existen quedan en null, que es la verdad. La versión anterior de la app no las
-  lee ni las escribe. Corrida contra Postgres en la sesión de nube (sección 18
-  de `scripts/pruebas-db/pedidosEnviarCancelar.mjs`).
+La `20261103142413_pedido_cambiar_por_otro` —aditiva: dos columnas nulas con su
+FK, `PosTransferenciaDetalle.reemplazoProductoId` (el producto que el depósito
+manda en lugar del pedido, "Cambiar" en preparar pedido) y
+`TransferenciaDetalle.reemplazaABaseId` (lo que el local pidió, para "Pediste
+…, va …" en la recepción), más un índice— se aplicó con el despliegue de
+`451cb212` (2026-11-03), antes de levantar la imagen. El clasificador la marcó
+aditiva y salió con 0: no hizo falta autorización manual. El contenedor informó
+las **103** del árbol, imprimió "Applying migration" y `migrate status` cerró
+con "Database schema is up to date!". Comprobada contra la base, en solo
+lectura: las dos columnas existen, enteras y nullable, con sus dos FK y el
+índice; las 319 filas de `PosTransferenciaDetalle` y las 18.740 de
+`TransferenciaDetalle` que ya había quedaron en null, como estaba previsto.
 
 La `20261103120000_precios_del_30_10_vuelven_a_su_regla` se aplicó con el
 despliegue de `4f2c09e4` (2026-11-03), antes de levantar la imagen, con
