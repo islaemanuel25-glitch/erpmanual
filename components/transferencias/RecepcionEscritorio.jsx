@@ -77,6 +77,7 @@ import { TEXTO_COINCIDE, TEXTO_CORREGIR } from "./TarjetaRecepcionMovil";
 import { fmtCantidad, fmtFechaHoraAR } from "./detallePresentacion";
 
 import { formatearMoneda } from "@/lib/moneda";
+import { textoPedisteVa } from "@/lib/pedidos/preparacionDelPedido";
 import { FILTRO, RESOLUCION, pasaFiltro, resolverEntrada } from "@/lib/transferencias/controlFisico";
 import {
   MOTIVOS_FALTANTE,
@@ -242,6 +243,12 @@ function CeldaProducto({ d }) {
   return (
     <>
       <span className="block font-semibold sunmi-text-strong break-words">{d.nombre}</span>
+      {/* El depósito mandó esto en lugar de lo pedido (2026-11-03). */}
+      {d.pediste ? (
+        <span data-pediste="" className="block text-sm2 font-semibold sunmi-text-accent break-words">
+          {textoPedisteVa(d.pediste, d.nombre)}
+        </span>
+      ) : null}
       {d.categoria?.nombre ? <span className="block text-sm2 sunmi-text-muted">{d.categoria.nombre}</span> : null}
     </>
   );

@@ -60,6 +60,9 @@ import { showSuccess, showWarning } from "@/components/sunmi/SunmiToast";
 import { CantidadDestacada } from "@/components/revision/PiezasDeRevision";
 import FilaCatalogoRecepcion from "@/components/transferencias/FilaCatalogoRecepcion";
 import { TITULO_MAS_ACCIONES } from "@/components/transferencias/RecepcionMovil";
+import SunmiPill from "@/components/sunmi/SunmiPill";
+import HojaCambiarPorOtro from "@/components/pos-transferencias/HojaCambiarPorOtro";
+import { TEXTO_CAMBIAR, TEXTO_DESHACER_CAMBIO, TEXTO_REEMPLAZO, textoPidioProducto } from "@/lib/pedidos/cambiarPorOtro";
 import {
   PLACEHOLDER_BUSCAR,
   TEXTO_AGREGAR,
@@ -78,12 +81,15 @@ import {
   categoriaDe,
   categoriasDePreparacion,
   conteoDePreparacion,
+  esAgregada,
   lineaPorCodigo,
   lineasVisibles,
   pidioEnUnidades,
   rotuloDeLoPedido,
+  rotuloDeLoQueVa,
   sePesa,
   textoLoPreparoOtro,
+  tieneReemplazo,
 } from "@/lib/pedidos/preparacionDelPedido";
 import { cuerpoDeVa, estadoEnTexto, vaCambio, valorInicialDeVa } from "@/lib/pedidos/preparacionEscritorio";
 import { tamanoDePaginaCatalogo, TAMANOS_DE_PAGINA_CATALOGO } from "@/lib/pedidos/tamanoDePagina";
@@ -100,7 +106,9 @@ const MENSAJE_YA_SE_ENVIO = "Este pedido ya se envió.";
 // Los anchos: cada columna menos PRODUCTO declara el suyo en el encabezado, que
 // manda en todas las filas (`table-fixed`). La de acciones son dos lugares de
 // botón iguales; VA, un lugar del mismo ancho para el − campo + y para los kilos.
-const ANCHO = Object.freeze({ categoria: "w-44", pidio: "w-36", va: "w-40", acciones: "w-80" });
+// "Cambiar" (2026-11-03) va en su propia columna, a la derecha de las acciones:
+// así los dos lugares de siempre no se angostan y no se mueven.
+const ANCHO = Object.freeze({ categoria: "w-44", pidio: "w-36", va: "w-40", acciones: "w-80", cambiar: "w-24" });
 const ANCHO_DEL_CAMPO_VA = "w-32";
 
 /** COPIA de `conEncabezado` de `PedidosEscritorio.jsx`. */
@@ -205,6 +213,7 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
   // Lo escrito en VA y todavía no guardado, por renglón.
   const [borradores, setBorradores] = useState({});
   const [agregando, setAgregando] = useState(false);
+  const [cambiando, setCambiando] = useState(null);
   const [textoCatalogo, setTextoCatalogo] = useState("");
   const [catalogo, setCatalogo] = useState(null);
   const [masAcciones, setMasAcciones] = useState(false);
@@ -471,16 +480,29 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
       titulo: "Producto",
       render: (l) => {
         const loPreparo = textoLoPreparoOtro(l, miDepositoId);
+        // Cambiada por otro (2026-11-03): el que va, con su chip, y lo pedido
+        // colgando debajo, como "Lo preparó …".
+        const cambiada = tieneReemplazo(l) && estaRevisada(l);
+        const debajo = [cambiada ? textoPidioProducto(l.productoNombre) : null, loPreparo].filter(Boolean).join(" · ");
         return (
           <div className="relative min-w-0">
-            <span data-nombre-producto="" className="block break-words sunmi-text-strong">
-              {l.productoNombre}
-            </span>
+            {cambiada ? (
+              <span data-reemplazo="" className="flex items-center gap-2 min-w-0">
+                <span data-nombre-producto="" className="min-w-0 break-words sunmi-text-strong">
+                  {l.reemplazo.productoNombre}
+                </span>
+                <SunmiPill color="amber">{TEXTO_REEMPLAZO}</SunmiPill>
+              </span>
+            ) : (
+              <span data-nombre-producto="" className="block break-words sunmi-text-strong">
+                {l.productoNombre}
+              </span>
+            )}
             {/* Cuelga debajo del nombre sin ocupar lugar: aparecer no le cambia
                 el alto a la fila (COPIA de la marca de `CeldaProducto`). */}
-            {loPreparo ? (
+            {debajo ? (
               <span data-lo-preparo="" className="absolute inset-x-0 top-full truncate text-xs2 leading-none sunmi-text-muted">
-                {loPreparo}
+                {debajo}
               </span>
             ) : null}
           </div>
@@ -504,7 +526,12 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
       clave: "va",
       titulo: "Va",
       thClassName: ANCHO.va,
-      render: (l) => (
+      // Cambiada por otro: lo que va, en la presentación del que va. El campo
+      // escribe en la unidad de lo PEDIDO, así que acá no va: se cambia de nuevo
+      // con "Cambiar".
+      render: (l) => tieneReemplazo(l) && estaRevisada(l) ? (
+        <CantidadDestacada rotulo={null} cantidad={rotuloDeLoQueVa(l)} />
+      ) : (
         <CeldaVa
           l={l}
           valor={valorDeVa(l)}
@@ -553,7 +580,8 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
             )}
             {resuelta ? (
               <SunmiButton color="slate" onClick={() => escribirPreparado(l, { pendiente: true })} disabled={guardando} className="w-full justify-center whitespace-nowrap">
-                {TEXTO_VOLVER_A_PENDIENTE}
+                {/* El mismo `pendiente: true`: deshacer el cambio es volver a la original, pendiente. */}
+                {tieneReemplazo(l) ? TEXTO_DESHACER_CAMBIO : TEXTO_VOLVER_A_PENDIENTE}
               </SunmiButton>
             ) : (
               <SunmiButton color="slate" onClick={() => escribirPreparado(l, NO_HAY)} disabled={guardando} className="w-full justify-center whitespace-nowrap">
@@ -563,6 +591,20 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
           </div>
         );
       },
+    },
+    {
+      // "Cambiar" (2026-11-03): la hoja "Cambiar por otro", centrada. En las
+      // pendientes y en las ya cambiadas; lo que agregó el depósito no tiene
+      // pedido que cambiar, y su lugar queda vacío.
+      clave: "cambiar",
+      titulo: "",
+      thClassName: ANCHO.cambiar,
+      render: (l) =>
+        !esAgregada(l) && (!estaRevisada(l) || tieneReemplazo(l)) ? (
+          <SunmiButton color="slate" onClick={() => setCambiando(l)} disabled={guardando} className="w-full justify-center whitespace-nowrap" data-cambiar="">
+            {TEXTO_CAMBIAR}
+          </SunmiButton>
+        ) : null,
     },
   ]);
 
@@ -708,6 +750,18 @@ export default function PrepararPedidoEscritorio({ posId, PantallaDeSiempre }) {
           <FilaCatalogoRecepcion key={p.productoLocalId} p={p} onElegir={agregarDelCatalogo} agregando={guardando} />
         ))}
       </SunmiModalLayout>
+
+      {/* "Cambiar por otro", la misma hoja que el celular, centrada. */}
+      <HojaCambiarPorOtro
+        linea={cambiando}
+        depositoId={miDepositoId ?? pos?.origenId}
+        forma="centrado"
+        guardando={guardando}
+        onGuardar={async (cuerpo) => {
+          if (await escribirPreparado(cambiando, cuerpo)) setCambiando(null);
+        }}
+        onCerrar={() => setCambiando(null)}
+      />
 
       {/* COPIA de "Más acciones" de `PrepararPedidoCelular.jsx`, centrada. */}
       <SunmiModalLayout

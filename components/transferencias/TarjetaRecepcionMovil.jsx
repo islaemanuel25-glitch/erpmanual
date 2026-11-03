@@ -63,6 +63,7 @@ import {
 import SunmiAccionRapida, { TEXTO_COINCIDE } from "@/components/sunmi/SunmiAccionRapida";
 
 import { formatearMoneda } from "@/lib/moneda";
+import { textoPedisteVa } from "@/lib/pedidos/preparacionDelPedido";
 import {
   chipsDeMotivo,
   correccionDeCantidad,
@@ -287,6 +288,8 @@ export default function TarjetaRecepcionMovil({
           )
         }
         nombre={d.nombre}
+        // El depósito mandó esto en lugar de lo pedido (2026-11-03).
+        bajoElNombre={d.pediste ? <span data-pediste="" className="block truncate text-xs2 sunmi-text-accent">{textoPedisteVa(d.pediste, d.nombre)}</span> : null}
         derecha={derecha}
         tono={tonoTarjeta}
         onTocar={puedeRecibir ? () => onAbrirFicha?.(d) : null}
@@ -384,6 +387,12 @@ export default function TarjetaRecepcionMovil({
   // lugar.
   const debajo = (
     <>
+          {/* El depósito mandó esto en lugar de lo pedido (2026-11-03). */}
+          {d.pediste ? (
+            <p data-pediste="" className="text-sm2 font-semibold sunmi-text-accent break-words">
+              {textoPedisteVa(d.pediste, d.nombre)}
+            </p>
+          ) : null}
           {/* ── QUÉ MANDÓ EL DEPÓSITO, Y QUÉ CONTÉ SI YA CONTÉ ─────────────
               Una línea no declarada no tiene remito, así que dice otra cosa en
               vez de inventar un "Enviado 0".

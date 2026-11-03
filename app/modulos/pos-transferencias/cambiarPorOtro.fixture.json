@@ -1,0 +1,1497 @@
+{
+  "cambioMe": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "user": {
+        "id": 121,
+        "nombre": "Depósito Cambio",
+        "email": "deposito-cambio-1793716714544@ci.local",
+        "rolId": 3,
+        "rolNombre": "ENCARGADO",
+        "permisos": [
+          "pos.usar",
+          "clientes.crear",
+          "clientes.puntos.ver",
+          "clientes.puntos.canjear",
+          "clientes.cc.ver",
+          "clientes.cc.pagar",
+          "compras.revisar",
+          "comprobantes.ver",
+          "pos.anular",
+          "turnos.ver_todos",
+          "clientes.ver",
+          "clientes.editar",
+          "productos.ver",
+          "productos.crear",
+          "productos.editar",
+          "stock.ver",
+          "stock.editar",
+          "transferencias.ver",
+          "transferencias.crear",
+          "transferencias.recibir",
+          "transferencias.cancelar",
+          "pos_transferencias.ver",
+          "pos_transferencias.enviar",
+          "pedidos.ver",
+          "pedidos.editar",
+          "pedidos.solicitar",
+          "compras.ver",
+          "compras.recibir",
+          "reportes.ver",
+          "config_local.operadores",
+          "config_local.alertas",
+          "stock.control.contar"
+        ],
+        "esAdmin": false,
+        "esDuenoLocal": false,
+        "operadorActivo": true,
+        "localId": 139,
+        "esDeposito": true,
+        "exigirOperador": true,
+        "tarjetaPrecioUnitario": null,
+        "tarjetaOcultarEquivalencia": null
+      }
+    }
+  },
+  "cambioOperadorMe": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "operador": {
+        "operadorId": 112,
+        "nombre": "Marta",
+        "localId": 139,
+        "emitidoEn": 1793716734328
+      },
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoxMTIsImxvY2FsSWQiOjEzOSwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkzNzE2NzM0LCJleHAiOjE3OTM3NDU1MzR9.k8L4vi8cuTIccptKBpN5KFtx_xpblFZ8vMKxHfK8rjs"
+    }
+  },
+  "cambioOpciones": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "modo": "deposito",
+      "origen": {
+        "id": 139,
+        "nombre": "Depósito Grupo cambio 1793716714544",
+        "esDeposito": true,
+        "grupoId": 65
+      },
+      "destinos": [
+        {
+          "id": 138,
+          "nombre": "Mini Grupo cambio 1793716714544",
+          "esDeposito": false,
+          "grupoId": 65
+        }
+      ],
+      "error": null
+    }
+  },
+  "cambioSolicitados": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "id": 680,
+          "origenId": 139,
+          "origenNombre": "Depósito Grupo cambio 1793716714544",
+          "destinoId": 138,
+          "destinoNombre": "Mini Grupo cambio 1793716714544",
+          "solicitadoAt": "2026-11-03T14:38:54.415Z",
+          "itemCount": 3,
+          "solicitadoPorNombre": "Cuenta Grupo cambio",
+          "revisados": 0,
+          "depositoEmpezo": false
+        }
+      ]
+    }
+  },
+  "cambioDetalleNuevo": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": {
+        "encabezado": {
+          "id": 680,
+          "posTransferenciaId": 680,
+          "estado": "Solicitado",
+          "origen": {
+            "id": 139,
+            "nombre": "Depósito Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": true,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.270Z",
+            "updatedAt": "2026-11-03T14:38:54.270Z"
+          },
+          "destino": {
+            "id": 138,
+            "nombre": "Mini Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": false,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.268Z",
+            "updatedAt": "2026-11-03T14:38:54.268Z"
+          },
+          "usuario": {
+            "id": 120,
+            "nombre": "Cuenta Grupo cambio",
+            "email": "grupo-cambio-1793716714544@ci.local",
+            "passwordHash": "x",
+            "rolId": 3,
+            "localId": 138,
+            "activo": true,
+            "sesionInvalidadaEn": null,
+            "createdAt": "2026-11-03T14:38:54.281Z",
+            "updatedAt": "2026-11-03T14:38:54.281Z"
+          },
+          "origenId": 139,
+          "destinoId": 138,
+          "createdAt": "2026-11-03T14:38:54.344Z",
+          "updatedAt": "2026-11-03T14:38:54.416Z"
+        },
+        "detalles": [
+          {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1313,
+            "productoLocalId": 875,
+            "baseId": 771,
+            "tipo": "manual",
+            "sugerido": 3,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1314,
+            "productoLocalId": 876,
+            "baseId": 772,
+            "tipo": "manual",
+            "sugerido": 1,
+            "preparado": 0,
+            "unidadSugerida": "BULTO",
+            "unidadPreparada": "BULTO",
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "JABON X3",
+            "codigoBarra": "7917937167003",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "pack",
+            "factorPack": 3,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          }
+        ],
+        "totales": {
+          "totalSugerido": 6,
+          "totalPreparado": 0,
+          "cantidadItems": 3
+        }
+      },
+      "error": null
+    }
+  },
+  "cambioBuscarRosa": {
+    "q": "7917937167001",
+    "respuesta": {
+      "status": 200,
+      "cuerpo": {
+        "ok": true,
+        "items": [
+          {
+            "productoLocalId": 874,
+            "baseId": 770,
+            "nombre": "POETT ROSA",
+            "codigoBarra": "7917937167001",
+            "codigoBarraSecundario": "8817937167145",
+            "codigoBarraPropio": "",
+            "stockActual": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "pesoReferenciaKg": null,
+            "categoriaNombre": null,
+            "areaFisicaNombre": null
+          }
+        ],
+        "total": 1,
+        "error": null
+      }
+    }
+  },
+  "cambioBuscarRosaCaja": {
+    "q": "8817937167145",
+    "respuesta": {
+      "status": 200,
+      "cuerpo": {
+        "ok": true,
+        "items": [
+          {
+            "productoLocalId": 874,
+            "baseId": 770,
+            "nombre": "POETT ROSA",
+            "codigoBarra": "7917937167001",
+            "codigoBarraSecundario": "8817937167145",
+            "codigoBarraPropio": "",
+            "stockActual": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "pesoReferenciaKg": null,
+            "categoriaNombre": null,
+            "areaFisicaNombre": null
+          }
+        ],
+        "total": 1,
+        "error": null
+      }
+    }
+  },
+  "cambioBuscarVerde": {
+    "q": "7917937167000",
+    "respuesta": {
+      "status": 200,
+      "cuerpo": {
+        "ok": true,
+        "items": [
+          {
+            "productoLocalId": 873,
+            "baseId": 769,
+            "nombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "codigoBarraSecundario": "",
+            "codigoBarraPropio": "",
+            "stockActual": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "pesoReferenciaKg": null,
+            "categoriaNombre": null,
+            "areaFisicaNombre": null
+          }
+        ],
+        "total": 1,
+        "error": null
+      }
+    }
+  },
+  "cambioBuscarDesconocido": {
+    "q": "7790000000001",
+    "respuesta": {
+      "status": 200,
+      "cuerpo": {
+        "ok": true,
+        "items": [],
+        "total": 0,
+        "error": null
+      }
+    }
+  },
+  "cambioBuscarTexto": {
+    "q": "POETT",
+    "respuesta": {
+      "status": 200,
+      "cuerpo": {
+        "ok": true,
+        "items": [
+          {
+            "productoLocalId": 873,
+            "baseId": 769,
+            "nombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "codigoBarraSecundario": "",
+            "codigoBarraPropio": "",
+            "stockActual": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "pesoReferenciaKg": null,
+            "categoriaNombre": null,
+            "areaFisicaNombre": null
+          },
+          {
+            "productoLocalId": 874,
+            "baseId": 770,
+            "nombre": "POETT ROSA",
+            "codigoBarra": "7917937167001",
+            "codigoBarraSecundario": "8817937167145",
+            "codigoBarraPropio": "",
+            "stockActual": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "pesoReferenciaKg": null,
+            "categoriaNombre": null,
+            "areaFisicaNombre": null
+          }
+        ],
+        "total": 2,
+        "error": null
+      }
+    }
+  },
+  "cambioDetalleCambiado": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": {
+        "encabezado": {
+          "id": 680,
+          "posTransferenciaId": 680,
+          "estado": "Solicitado",
+          "origen": {
+            "id": 139,
+            "nombre": "Depósito Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": true,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.270Z",
+            "updatedAt": "2026-11-03T14:38:54.270Z"
+          },
+          "destino": {
+            "id": 138,
+            "nombre": "Mini Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": false,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.268Z",
+            "updatedAt": "2026-11-03T14:38:54.268Z"
+          },
+          "usuario": {
+            "id": 120,
+            "nombre": "Cuenta Grupo cambio",
+            "email": "grupo-cambio-1793716714544@ci.local",
+            "passwordHash": "x",
+            "rolId": 3,
+            "localId": 138,
+            "activo": true,
+            "sesionInvalidadaEn": null,
+            "createdAt": "2026-11-03T14:38:54.281Z",
+            "updatedAt": "2026-11-03T14:38:54.281Z"
+          },
+          "origenId": 139,
+          "destinoId": 138,
+          "createdAt": "2026-11-03T14:38:54.344Z",
+          "updatedAt": "2026-11-03T14:38:54.416Z"
+        },
+        "detalles": [
+          {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.614Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": {
+              "productoLocalId": 874,
+              "baseId": 770,
+              "productoNombre": "POETT ROSA",
+              "codigoBarra": "7917937167001",
+              "unidadMedida": "unidad",
+              "factorPack": 1,
+              "esFiambre": false,
+              "modoVentaDeposito": "PESO",
+              "pesoReferenciaKg": null,
+              "seCargaEnKilos": false
+            },
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1313,
+            "productoLocalId": 875,
+            "baseId": 771,
+            "tipo": "manual",
+            "sugerido": 3,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1314,
+            "productoLocalId": 876,
+            "baseId": 772,
+            "tipo": "manual",
+            "sugerido": 1,
+            "preparado": 0,
+            "unidadSugerida": "BULTO",
+            "unidadPreparada": "BULTO",
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "JABON X3",
+            "codigoBarra": "7917937167003",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "pack",
+            "factorPack": 3,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          }
+        ],
+        "totales": {
+          "totalSugerido": 6,
+          "totalPreparado": 2,
+          "cantidadItems": 3
+        }
+      },
+      "error": null
+    }
+  },
+  "cambioDetalleListo": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": {
+        "encabezado": {
+          "id": 680,
+          "posTransferenciaId": 680,
+          "estado": "Solicitado",
+          "origen": {
+            "id": 139,
+            "nombre": "Depósito Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": true,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.270Z",
+            "updatedAt": "2026-11-03T14:38:54.270Z"
+          },
+          "destino": {
+            "id": 138,
+            "nombre": "Mini Grupo cambio 1793716714544",
+            "tipo": "local",
+            "direccion": null,
+            "telefono": null,
+            "email": null,
+            "cuil": null,
+            "ciudad": null,
+            "provincia": null,
+            "codigoPostal": null,
+            "activo": true,
+            "es_deposito": false,
+            "politicaLimiteCredito": "ADVERTIR",
+            "createdAt": "2026-11-03T14:38:54.268Z",
+            "updatedAt": "2026-11-03T14:38:54.268Z"
+          },
+          "usuario": {
+            "id": 120,
+            "nombre": "Cuenta Grupo cambio",
+            "email": "grupo-cambio-1793716714544@ci.local",
+            "passwordHash": "x",
+            "rolId": 3,
+            "localId": 138,
+            "activo": true,
+            "sesionInvalidadaEn": null,
+            "createdAt": "2026-11-03T14:38:54.281Z",
+            "updatedAt": "2026-11-03T14:38:54.281Z"
+          },
+          "origenId": 139,
+          "destinoId": 138,
+          "createdAt": "2026-11-03T14:38:54.344Z",
+          "updatedAt": "2026-11-03T14:38:54.416Z"
+        },
+        "detalles": [
+          {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.712Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": {
+              "productoLocalId": 874,
+              "baseId": 770,
+              "productoNombre": "POETT ROSA",
+              "codigoBarra": "7917937167001",
+              "unidadMedida": "unidad",
+              "factorPack": 1,
+              "esFiambre": false,
+              "modoVentaDeposito": "PESO",
+              "pesoReferenciaKg": null,
+              "seCargaEnKilos": false
+            },
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1313,
+            "productoLocalId": 875,
+            "baseId": 771,
+            "tipo": "manual",
+            "sugerido": 3,
+            "preparado": 3,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.734Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          },
+          {
+            "detalleId": 1314,
+            "productoLocalId": 876,
+            "baseId": 772,
+            "tipo": "manual",
+            "sugerido": 1,
+            "preparado": 0,
+            "unidadSugerida": "BULTO",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.753Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "JABON X3",
+            "codigoBarra": "7917937167003",
+            "stockActual": 1000,
+            "cantidadReal": 0,
+            "precioCosto": 600,
+            "unidadMedida": "pack",
+            "factorPack": 3,
+            "modoEnvio": "MIXTO",
+            "modoStock": "BULTO",
+            "categoriaNombre": null,
+            "areaFisicaNombre": null,
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null,
+            "seCargaEnKilos": false
+          }
+        ],
+        "totales": {
+          "totalSugerido": 6,
+          "totalPreparado": 5,
+          "cantidadItems": 3
+        }
+      },
+      "error": null
+    }
+  },
+  "cambioViaje": {
+    "lineas": [
+      {
+        "nombre": "LAVANDINA",
+        "cantidad": 3,
+        "unidadEnviada": "UNIDAD",
+        "pediste": null
+      },
+      {
+        "nombre": "POETT ROSA",
+        "cantidad": 2,
+        "unidadEnviada": "UNIDAD",
+        "pediste": "POETT VERDE"
+      }
+    ],
+    "bajaDelStock": {
+      "POETT VERDE": 0,
+      "POETT ROSA": 2,
+      "LAVANDINA": 3,
+      "JABON X3": 0
+    }
+  },
+  "cambioRecepcion": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": {
+        "id": 171,
+        "estado": "Enviada",
+        "tieneDiferencias": true,
+        "fechaCreada": "2026-11-03T14:38:54.799Z",
+        "fechaEnvio": "2026-11-03T14:38:54.798Z",
+        "fechaRecepcion": null,
+        "origen": {
+          "id": 139,
+          "nombre": "Depósito Grupo cambio 1793716714544",
+          "esDeposito": true
+        },
+        "destino": {
+          "id": 138,
+          "nombre": "Mini Grupo cambio 1793716714544"
+        },
+        "creadaPor": {
+          "id": 120,
+          "nombre": "Cuenta Grupo cambio"
+        },
+        "confirmadores": [],
+        "cancelacion": null,
+        "resumen": {
+          "itemsEnviados": 5,
+          "itemsRecibidos": 0,
+          "diferenciaTotal": -5,
+          "importeOriginal": 3000,
+          "importeCorregido": null,
+          "diferenciaImporte": null,
+          "importeEnviado": 3000,
+          "costoTotal": 3000,
+          "ajusteOrigenTotal": 0,
+          "devolucionOrigenTotal": 0
+        },
+        "items": [
+          {
+            "id": 221,
+            "nombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "cantidadEnviada": 3,
+            "cantidadRecibida": null,
+            "precioCosto": 600,
+            "subtotal": 1800,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 1800,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "pediste": null,
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": null,
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 3,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          },
+          {
+            "id": 222,
+            "nombre": "POETT ROSA",
+            "codigoBarra": "7917937167001",
+            "cantidadEnviada": 2,
+            "cantidadRecibida": null,
+            "precioCosto": 600,
+            "subtotal": 1200,
+            "costoUnitarioFisico": 600,
+            "subtotalRecibido": 1200,
+            "costoNormalizadoRecibido": 600,
+            "ajusteOrigen": null,
+            "devolucionOrigen": null,
+            "excedenteOrigen": null,
+            "agregadoEnRecepcion": false,
+            "agregadoEnRecepcionPor": null,
+            "agregadoEnRecepcionAt": null,
+            "pediste": "POETT VERDE",
+            "revisadoEnRecepcion": false,
+            "revisadoEnRecepcionPor": null,
+            "revisadoEnRecepcionAt": null,
+            "recibidoUnidadesSueltas": 0,
+            "codigoBarraSecundario": "8817937167145",
+            "codigoBarraPropio": null,
+            "categoria": null,
+            "confirmadoPor": null,
+            "fechaRecepcion": null,
+            "motivoPrincipal": "",
+            "motivoDetalle": "",
+            "unidadEnviada": "UNIDAD",
+            "factorPack": 1,
+            "unidadMedida": "unidad",
+            "esFiambreFijo": false,
+            "pesoReferenciaKg": null,
+            "presentacionEnvio": "UNIDAD",
+            "cantidadPresentada": 2,
+            "sueltasEnviadas": 0,
+            "factorPresentacion": null,
+            "pesoPiezaKg": 0,
+            "modoVentaDeposito": "PESO",
+            "modoCompraProveedor": "BULTO",
+            "pesoEsFijo": false,
+            "presentacionAdoptadaAt": null,
+            "presentacionAdoptadaPor": null,
+            "presentacionActual": {
+              "presentacion": "UNIDAD",
+              "factor": null,
+              "pesoPiezaKg": null
+            }
+          }
+        ]
+      }
+    }
+  },
+  "cambioHistorialDetalle": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "pedido": {
+        "posId": 680,
+        "estado": "Enviado",
+        "solicitadoAt": "2026-11-03T14:38:54.415Z",
+        "createdAt": "2026-11-03T14:38:54.344Z",
+        "canceladoAt": null,
+        "depositoEmpezo": true,
+        "transferencia": {
+          "id": 171,
+          "estado": "Enviada",
+          "fechaEnvio": "2026-11-03T14:38:54.798Z",
+          "fechaRecepcion": null
+        },
+        "items": [
+          {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "nombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "unidadMedida": "unidad",
+            "imagenUrl": null,
+            "categoriaNombre": null,
+            "reemplazoNombre": "POETT ROSA"
+          },
+          {
+            "detalleId": 1313,
+            "productoLocalId": 875,
+            "baseId": 771,
+            "nombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "sugerido": 3,
+            "preparado": 3,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "unidadMedida": "unidad",
+            "imagenUrl": null,
+            "categoriaNombre": null,
+            "reemplazoNombre": null
+          },
+          {
+            "detalleId": 1314,
+            "productoLocalId": 876,
+            "baseId": 772,
+            "nombre": "JABON X3",
+            "codigoBarra": "7917937167003",
+            "sugerido": 1,
+            "preparado": 0,
+            "unidadSugerida": "BULTO",
+            "factorPack": 3,
+            "modoEnvio": "SOLO_BULTO",
+            "unidadMedida": "pack",
+            "imagenUrl": null,
+            "categoriaNombre": null,
+            "reemplazoNombre": null
+          }
+        ]
+      }
+    }
+  },
+  "cambioEscrituras": [
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD",
+        "reemplazoProductoId": 873
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.507Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "pendiente": true
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": null,
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.549Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "pendiente": true
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": null,
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD",
+        "reemplazoProductoId": 850
+      },
+      "respuesta": {
+        "status": 409,
+        "cuerpo": {
+          "ok": false,
+          "error": "Ese producto no está en el catálogo de Depósito Grupo cambio 1793716714544: no puede salir de su stock."
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD",
+        "reemplazoProductoId": 874
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.614Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": {
+              "productoLocalId": 874,
+              "baseId": 770,
+              "productoNombre": "POETT ROSA",
+              "codigoBarra": "7917937167001",
+              "unidadMedida": "unidad",
+              "factorPack": 1,
+              "esFiambre": false,
+              "modoVentaDeposito": "PESO",
+              "pesoReferenciaKg": null,
+              "seCargaEnKilos": false
+            },
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "pendiente": true
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 0,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": null,
+            "revisadoEn": null,
+            "resueltoPorDepositoId": null,
+            "resueltoPorNombre": null,
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD",
+        "reemplazoProductoId": 874
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.668Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": {
+              "productoLocalId": 874,
+              "baseId": 770,
+              "productoNombre": "POETT ROSA",
+              "codigoBarra": "7917937167001",
+              "unidadMedida": "unidad",
+              "factorPack": 1,
+              "esFiambre": false,
+              "modoVentaDeposito": "PESO",
+              "pesoReferenciaKg": null,
+              "seCargaEnKilos": false
+            },
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 1,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 1,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.693Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1312,
+        "preparado": 2,
+        "unidadPreparada": "UNIDAD",
+        "reemplazoProductoId": 874
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1312,
+            "productoLocalId": 873,
+            "baseId": 769,
+            "tipo": "manual",
+            "sugerido": 2,
+            "preparado": 2,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.712Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": {
+              "productoLocalId": 874,
+              "baseId": 770,
+              "productoNombre": "POETT ROSA",
+              "codigoBarra": "7917937167001",
+              "unidadMedida": "unidad",
+              "factorPack": 1,
+              "esFiambre": false,
+              "modoVentaDeposito": "PESO",
+              "pesoReferenciaKg": null,
+              "seCargaEnKilos": false
+            },
+            "productoNombre": "POETT VERDE",
+            "codigoBarra": "7917937167000",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1313,
+        "preparado": 3,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1313,
+            "productoLocalId": 875,
+            "baseId": 771,
+            "tipo": "manual",
+            "sugerido": 3,
+            "preparado": 3,
+            "unidadSugerida": "UNIDAD",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.734Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "LAVANDINA",
+            "codigoBarra": "7917937167002",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "unidad",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    },
+    {
+      "ruta": "/api/pos-transferencias/detalle/editar",
+      "cuerpo": {
+        "detalleId": 1314,
+        "preparado": 0,
+        "unidadPreparada": "UNIDAD"
+      },
+      "respuesta": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "item": {
+            "detalleId": 1314,
+            "productoLocalId": 876,
+            "baseId": 772,
+            "tipo": "manual",
+            "sugerido": 1,
+            "preparado": 0,
+            "unidadSugerida": "BULTO",
+            "unidadPreparada": "UNIDAD",
+            "revisadoEn": "2026-11-03T14:38:54.753Z",
+            "resueltoPorDepositoId": 139,
+            "resueltoPorNombre": "Depósito Grupo cambio 1793716714544",
+            "reemplazo": null,
+            "productoNombre": "JABON X3",
+            "codigoBarra": "7917937167003",
+            "stockActual": 1000,
+            "cantidadReal": 1000,
+            "precioCosto": 600,
+            "unidadMedida": "pack",
+            "factorPack": 3,
+            "modoEnvio": "SOLO_BULTO",
+            "esFiambre": false,
+            "modoVentaDeposito": "PESO",
+            "pesoReferenciaKg": null
+          },
+          "error": null
+        }
+      }
+    }
+  ],
+  "cambioIds": {
+    "posId": 680,
+    "transferenciaId": 171,
+    "deposito": "Depósito Grupo cambio 1793716714544",
+    "local": "Mini Grupo cambio 1793716714544",
+    "rosa": 874,
+    "verde": 873
+  }
+}

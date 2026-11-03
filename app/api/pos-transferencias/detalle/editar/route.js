@@ -5,6 +5,8 @@ import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { DATOS_LINEA_PENDIENTE } from "@/lib/pedidos/revisionDeLinea";
+import { INCLUDE_REEMPLAZO, reemplazoDeLinea } from "@/lib/pedidos/reemplazoDeLinea";
+import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 import { esDepositoDelPedido, mensajeNoEstaEnElCatalogo, productoDelDeposito } from "@/lib/pedidos/depositosDelPedido";
 import {
   bloquearParDelPedido,
@@ -198,6 +200,37 @@ export async function POST(req) {
     // volver a pendiente. Con el pedido enviado cae en los rechazos de siempre.
     if (esDeposito && body.pendiente === true) Object.assign(data, DATOS_LINEA_PENDIENTE);
 
+    // ── CAMBIAR POR OTRO (2026-11-03) ────────────────────────────────────────
+    // `reemplazoProductoId`: el producto que va EN LUGAR del pedido, con
+    // `preparado` y `unidadPreparada` de ESE producto. Tiene que estar en el
+    // catálogo del depósito que la resuelve —sale de su stock (`enviar`)—, y si
+    // es el mismo producto que se pidió no es un cambio: queda como va lo
+    // pedido, igual que "Va completo". Lo pedido (`productoId`) no se toca.
+    //
+    // Escribir lo preparado SIN `reemplazoProductoId` —va completo, corregir,
+    // "No hay"— es decidir sobre lo pedido, así que borra un cambio anterior; y
+    // volver a pendiente ya lo borró arriba (`DATOS_LINEA_PENDIENTE`).
+    const resuelveLinea = isAdminUser ? detalle.pos.origenId : Number(session.localId);
+    let reemplazo = null;
+    if (esDeposito && body.pendiente !== true && body.reemplazoProductoId != null) {
+      if (data.preparado === undefined || !(data.preparado > 0)) {
+        return NextResponse.json(
+          { ok: false, error: "Falta la cantidad que va." },
+          { status: 400 }
+        );
+      }
+      reemplazo = await productoDelCatalogoLocal(prisma, { localId: resuelveLinea, productoLocalId: body.reemplazoProductoId });
+      if (!reemplazo) {
+        const deposito = await prisma.local.findUnique({ where: { id: resuelveLinea }, select: { nombre: true } });
+        return NextResponse.json(
+          { ok: false, error: mensajeNoEstaEnElCatalogo("Ese producto", deposito?.nombre ?? "este depósito") },
+          { status: 409 }
+        );
+      }
+      if (reemplazo.baseId === detalle.producto.baseId) reemplazo = null;
+    }
+    if (esDeposito && body.pendiente !== true && data.preparado !== undefined) data.reemplazoProductoId = reemplazo?.id ?? null;
+
     // ── QUÉ DEPÓSITO LA RESOLVIÓ (2026-10-28) ────────────────────────────────
     // El que la decide —va completo, corregida, pesada o "No hay"— pasa a ser
     // su dueño, aunque la hubiera resuelto el otro; volver a pendiente la deja
@@ -208,8 +241,10 @@ export async function POST(req) {
       if (data.revisadoEn === null) {
         data.resueltoPorDepositoId = null;
       } else {
-        const resuelve = isAdminUser ? detalle.pos.origenId : Number(session.localId);
-        if (resuelve !== detalle.pos.origenId && data.preparado > 0 && !(await productoDelDeposito(prisma, resuelve, detalle.producto.baseId))) {
+        const resuelve = resuelveLinea;
+        // Con un reemplazo, lo que sale de su stock es el reemplazo, que ya se
+        // buscó en su catálogo: lo pedido puede no estar.
+        if (resuelve !== detalle.pos.origenId && data.preparado > 0 && !reemplazo && !(await productoDelDeposito(prisma, resuelve, detalle.producto.baseId))) {
           const deposito = await prisma.local.findUnique({ where: { id: resuelve }, select: { nombre: true } });
           return NextResponse.json(
             { ok: false, error: mensajeNoEstaEnElCatalogo(detalle.producto.nombre || baseProducto?.nombre || "Este producto", deposito?.nombre ?? "este depósito") },
@@ -246,6 +281,7 @@ export async function POST(req) {
           producto: { include: { base: true } },
           pos: { select: { origenId: true } },
           resueltoPorDeposito: { select: { nombre: true } },
+          ...INCLUDE_REEMPLAZO,
         },
       });
     });
@@ -287,6 +323,8 @@ export async function POST(req) {
       revisadoEn: updated.revisadoEn,
       resueltoPorDepositoId: updated.resueltoPorDepositoId,
       resueltoPorNombre: updated.resueltoPorDeposito?.nombre ?? null,
+      // El producto que va en lugar del pedido, o null (2026-11-03).
+      reemplazo: reemplazoDeLinea(updated),
       productoNombre: productoLocal?.nombre || baseItem?.nombre || "",
       codigoBarra: baseItem?.codigo_barra || "",
       stockActual,

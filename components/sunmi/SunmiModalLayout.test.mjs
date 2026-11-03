@@ -698,6 +698,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // corregir —la cantidad se escribe en la fila—, y sus dos modales son la
     // búsqueda de agregar y el menú del "⋯". Nada escrito que perder al cerrar.
     "components/pos-transferencias/PrepararPedidoEscritorio.jsx": false,
+    // "Cambiar por otro" (2026-11-03), la hoja de mandar otro producto en lugar
+    // del pedido, compartida por el celular y la computadora: adentro hay un
+    // producto leído y la cantidad que va escrita. Cerrarla de un toque al
+    // costado obliga a escanear y escribir de nuevo.
+    "components/pos-transferencias/HojaCambiarPorOtro.jsx": true,
     // El "⋯" del Control de stock: la misma hoja de "Más acciones" de recibir
     // una transferencia, con un solo botón —"Ver diferencias"—. Un menú: nada
     // que perder al cerrar.

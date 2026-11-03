@@ -80,10 +80,16 @@ const enter = async (campo) => {
 // celular y computadora. En el celular va adentro de la hoja "Más acciones",
 // arriba de "Cancelar pedido" (un import, el botón y el comentario de la
 // hoja); la pantalla en sí no cambió.
+//
+// Cambió a propósito el 2026-11-03: Emanuel pidió "Cambiar" (mandar otro
+// producto en lugar del pedido) en preparar, celular y computadora, con diseño
+// aprobado en Figma. En el celular: el botón entre "Corregir" y "No hay", el
+// renglón cambiado y la hoja `HojaCambiarPorOtro`, compartida con esta pantalla
+// pero no hecha para ella. Lo afirma `cambiarPorOtro.test.mjs`.
 test("la pantalla del celular está igual, byte por byte", () => {
   const contenido = readFileSync("components/pos-transferencias/PrepararPedidoCelular.jsx");
   const huella = createHash("sha1").update(`blob ${contenido.length}\0`).update(contenido).digest("hex");
-  assert.equal(huella, "03fc8ecd0fbd8f16f34af722ca46104d61b36bc0", "se tocó PrepararPedidoCelular.jsx");
+  assert.equal(huella, "38b13e18c995e22c9bf1e8b2ab3fd0238bc9ad9c", "se tocó PrepararPedidoCelular.jsx");
 });
 
 test("la barra fija: Volver, buscador, categoría, Falta revisar, Enviar; filtros, el pedido, Agregar y ⋯; el avance", async () => {
@@ -110,13 +116,15 @@ test("la barra fija: Volver, buscador, categoría, Falta revisar, Enviar; filtro
   assert.equal(barra().querySelector("[data-avance]")?.getAttribute("data-avance"), "0");
 });
 
-test("las columnas: PRODUCTO · CATEGORÍA · PIDIÓ · VA · acciones, con el ancho en el encabezado y la tabla fija", async () => {
+test("las columnas: PRODUCTO · CATEGORÍA · PIDIÓ · VA · acciones · Cambiar, con el ancho en el encabezado y la tabla fija", async () => {
   await montar();
   const tabla = pantalla().querySelector("[data-lista-preparar] table");
   assert.match(tabla.className, /\btable-fixed\b/);
   const ths = [...tabla.querySelectorAll("thead th")];
-  assert.deepEqual(ths.map((th) => th.textContent.trim()), ["Producto", "Categoría", "Pidió", "Va", ""]);
-  for (const [i, ancho] of [[1, "w-44"], [2, "w-36"], [3, "w-40"], [4, "w-80"]]) assert.match(ths[i].className, new RegExp(`\\b${ancho}\\b`), ths[i].textContent);
+  // "Cambiar" (2026-11-03) en su propia columna, a la derecha de las acciones:
+  // los dos lugares de siempre conservan su ancho.
+  assert.deepEqual(ths.map((th) => th.textContent.trim()), ["Producto", "Categoría", "Pidió", "Va", "", ""]);
+  for (const [i, ancho] of [[1, "w-44"], [2, "w-36"], [3, "w-40"], [4, "w-80"], [5, "w-24"]]) assert.match(ths[i].className, new RegExp(`\\b${ancho}\\b`), ths[i].textContent);
   // PIDIÓ, resaltado con la pieza de siempre (acento y negrita), sin rótulo.
   const pidio = fila("AGUA X6").querySelectorAll("td")[2];
   assert.equal(pidio.textContent.trim(), "2 PACK x6");

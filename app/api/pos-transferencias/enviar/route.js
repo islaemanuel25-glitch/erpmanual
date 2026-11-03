@@ -30,7 +30,8 @@ import {
  * a registrar una adivinada.
  */
 function snapshotDeEnvioManual(item) {
-  const base = item?.detalle?.producto?.base;
+  // La base del producto que VA: la del reemplazo si el depósito lo cambió.
+  const base = item?.baseQueVa;
   if (!base) return null;
 
   const d = presentacionDeProducto({
@@ -86,7 +87,7 @@ class ProductoQueNoSeEnvia extends Error {
 /** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
 function firmaDeLineas(lineas) {
   return (lineas || [])
-    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada, d.revisadoEn ? new Date(d.revisadoEn).getTime() : "", d.resueltoPorDepositoId ?? ""].join(":"))
+    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada, d.revisadoEn ? new Date(d.revisadoEn).getTime() : "", d.resueltoPorDepositoId ?? "", d.reemplazoProductoId ?? ""].join(":"))
     .sort()
     .join("|");
 }
@@ -123,6 +124,10 @@ export async function POST(req) {
         detalles: {
           include: {
             producto: {
+              include: { base: true },
+            },
+            // El producto que va en lugar del pedido (2026-11-03).
+            reemplazo: {
               include: { base: true },
             },
           },
@@ -208,7 +213,13 @@ export async function POST(req) {
 
         if (!cantidadRaw || cantidadRaw <= 0) return null;
 
-        const base = detalle.producto?.base;
+        // ── LO QUE VA, QUE NO SIEMPRE ES LO PEDIDO (2026-11-03) ─────────────
+        // "Cambiar por otro": si el depósito mandó otro producto, la mercadería,
+        // el stock, la unidad y la presentación son de ÉSE —`preparado` está en
+        // sus unidades—, y la línea de la transferencia recuerda lo pedido
+        // (`reemplazaABaseId`) para que el local lo lea al recibir.
+        const productoQueVa = estaRevisada(detalle) && detalle.reemplazo ? detalle.reemplazo : detalle.producto;
+        const base = productoQueVa?.base;
         // Los combos no se transfieren: se transfieren sus componentes.
         if (esComboBase(base)) {
           throw new Error("COMBO_NO_TRANSFERIBLE");
@@ -237,7 +248,7 @@ export async function POST(req) {
         // el rechazo. Ninguna otra combinación cambia.
         const bultoDeUno = modoEnvio === "SOLO_BULTO" && unidadPreparada === "UNIDAD" && factorPack <= 1;
         if (!validacion.ok && !bultoDeUno) {
-          throw new ProductoQueNoSeEnvia(detalle.producto?.nombre || base?.nombre || "Un producto", validacion.error);
+          throw new ProductoQueNoSeEnvia(productoQueVa?.nombre || base?.nombre || "Un producto", validacion.error);
         }
 
         toUnidades({
@@ -250,9 +261,11 @@ export async function POST(req) {
           detalle,
           cantidadRaw,
           unidadEnviada: unidadPreparada,
-          baseId: detalle.producto?.baseId,
-          productoLocalOrigen: detalle.producto,
+          baseId: productoQueVa?.baseId,
+          baseQueVa: base,
+          productoLocalOrigen: productoQueVa,
           factorPack,
+          reemplazaABaseId: productoQueVa === detalle.producto ? null : detalle.producto?.baseId ?? null,
         };
       })
       .filter(Boolean);
@@ -378,7 +391,7 @@ export async function POST(req) {
       }
       const ahora = await tx.posTransferenciaDetalle.findMany({
         where: { posTransferenciaId: pos.id, pos: sinCancelados() },
-        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true, resueltoPorDepositoId: true },
+        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true, resueltoPorDepositoId: true, reemplazoProductoId: true },
       });
       if (firmaDeLineas(ahora) !== firmaDeLineas(pos.detalles)) {
         throw new Error("PEDIDO_CAMBIO");
@@ -429,6 +442,7 @@ export async function POST(req) {
           // tiene BULTO y UNIDAD. El descriptor lo resuelve con los datos del
           // producto, y se congela junto con el factor.
           presentacion: snapshotDeEnvioManual(item),
+          reemplazaABaseId: item.reemplazaABaseId,
         })),
         });
         nuevas.push(nuevaTransferencia);

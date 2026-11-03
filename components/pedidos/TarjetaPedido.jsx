@@ -38,6 +38,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import { salePorBulto } from "@/lib/pedidos/lineasDelPedido";
+import { textoPedisteVa } from "@/lib/pedidos/preparacionDelPedido";
 
 /** "Por BULTO de 6 u" o "UNIDAD": lo que la tarjeta dice de cómo se pide. */
 export function textoDeUnidad(producto) {
@@ -77,6 +78,12 @@ export default function TarjetaPedido({ producto, cantidad, enPedido = false, so
           {foto}
           <div className="flex-1 min-w-0 space-y-1">
             <Nombre nombre={nombre} />
+            {/* El depósito mandó otro en su lugar (2026-11-03). */}
+            {producto.reemplazoNombre ? (
+              <p data-reemplazo-pedido="" className="text-sm2 font-semibold sunmi-text-accent break-words">
+                {textoPedisteVa(nombre, producto.reemplazoNombre)}
+              </p>
+            ) : null}
             <div className="flex items-center justify-between gap-2">
               <Unidad producto={producto} />
               <span data-cantidad-pedido="" className="shrink-0 text-xl2 font-bold tabular-nums sunmi-text-strong">

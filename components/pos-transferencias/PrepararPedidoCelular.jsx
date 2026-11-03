@@ -22,6 +22,10 @@
 //     de un toque (2026-10-28);
 //   · un producto por peso se carga en KILOS (2026-10-28): pedido en unidades
 //     no tiene "va completo" sino "Pesar"; ver `HojaCorregir`;
+//   · "Cambiar", entre "Corregir" y "No hay" (2026-11-03): manda OTRO producto
+//     en lugar del pedido, con la hoja "Cambiar por otro"
+//     (`HojaCambiarPorOtro`). La cambiada muestra el que va con el chip
+//     "Reemplazo", "Pidió: …" y "Va …", con "Deshacer cambio" y "Cambiar";
 //   · "+ Agregar producto que no pidió", que busca en el catálogo del depósito;
 //   · la barra de abajo, fija, con el avance y "Enviar al local", apagado hasta
 //     que no quede nada por revisar.
@@ -68,6 +72,8 @@ import {
 } from "@/components/revision/PiezasDeRevision";
 import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
 import FilaCatalogoRecepcion from "@/components/transferencias/FilaCatalogoRecepcion";
+import HojaCambiarPorOtro from "@/components/pos-transferencias/HojaCambiarPorOtro";
+import { TEXTO_CAMBIAR, TEXTO_DESHACER_CAMBIO, TEXTO_REEMPLAZO, textoPidioProducto } from "@/lib/pedidos/cambiarPorOtro";
 import { cuandoDelPedido } from "@/lib/pedidos/cuandoDelPedido";
 import { NO_HAY, cantidadQueViaja, estaRevisada, loPedido, vaCompleto } from "@/lib/pedidos/revisionDeLinea";
 import {
@@ -87,7 +93,9 @@ import {
   textoLoPreparoOtro,
   textoPidio,
   rotuloDeLoPedido,
+  rotuloDeLoQueVa,
   textoVa,
+  tieneReemplazo,
 } from "@/lib/pedidos/preparacionDelPedido";
 
 export const TEXTO_VA_COMPLETO = "✓ Va completo";
@@ -231,10 +239,46 @@ function HojaCorregir({ linea, guardando, onGuardar, onNoHay, onVolverAPendiente
 }
 
 // ── UNA LÍNEA ─────────────────────────────────────────────────────────────
-function LineaParaPreparar({ l, miDepositoId, guardando, onVaCompleto, onNoHay, onCorregir }) {
+function LineaParaPreparar({ l, miDepositoId, guardando, onVaCompleto, onNoHay, onCorregir, onCambiar, onDeshacerCambio }) {
   // La resolvió el otro depósito: lo dice chico, debajo del nombre.
   const loPreparo = textoLoPreparoOtro(l, miDepositoId);
   const estado = estadoDePreparacion(l);
+
+  // "Cambiar" (2026-11-03): manda otro producto en lugar del pedido, en la hoja
+  // "Cambiar por otro". Lo que agregó el depósito no tiene pedido que cambiar.
+  const cambiar = esAgregada(l) ? null : (
+    <SunmiButton color="slate" onClick={() => onCambiar(l)} disabled={guardando} className="shrink-0">
+      {TEXTO_CAMBIAR}
+    </SunmiButton>
+  );
+
+  // Cambiada por otro: el producto que va, con su chip, lo pedido y lo que va.
+  // "Deshacer cambio" la deja como estaba, pendiente; "Cambiar", de nuevo.
+  if (tieneReemplazo(l) && estaRevisada(l)) {
+    return (
+      <TarjetaDeRevision
+        nombre={l.reemplazo.productoNombre}
+        tono="border-1.5 sunmi-border-accent"
+        debajo={
+          <>
+            {loPreparo ? <p className="text-xs2 sunmi-text-muted">{loPreparo}</p> : null}
+            <p className="text-sm2 sunmi-text-muted">{textoPidioProducto(l.productoNombre)}</p>
+            <CantidadDestacada rotulo="Va" cantidad={rotuloDeLoQueVa(l)} />
+          </>
+        }
+        accionArriba={<SunmiPill color="amber">{TEXTO_REEMPLAZO}</SunmiPill>}
+        accionAbajo={
+          <SunmiButton onClick={() => onDeshacerCambio(l)} disabled={guardando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
+            {TEXTO_DESHACER_CAMBIO}
+          </SunmiButton>
+        }
+        alPie={cambiar}
+        data-linea-preparar={l.productoNombre}
+        data-estado={estado}
+        data-reemplazo={l.reemplazo.productoNombre}
+      />
+    );
+  }
 
   // Va completa: un renglón, tocable entero para corregirla, como la recepción.
   if (estado === ESTADO_PREPARACION.COMPLETO) {
@@ -289,11 +333,15 @@ function LineaParaPreparar({ l, miDepositoId, guardando, onVaCompleto, onNoHay, 
       // "No hay", abajo a la derecha, enfrente de Corregir (2026-10-28): al lado
       // de "Va completo" apretaba el nombre y se tocaba sin querer. Lo pedido no
       // está, de un toque y sin confirmar; se deshace con "Volver a pendiente".
+      // "Cambiar" va entre los dos (2026-11-03).
       alPie={
         estado === ESTADO_PREPARACION.PENDIENTE ? (
-          <SunmiButton color="slate" onClick={() => onNoHay(l)} disabled={guardando} className="shrink-0">
-            {TEXTO_NO_HAY}
-          </SunmiButton>
+          <>
+            {cambiar}
+            <SunmiButton color="slate" onClick={() => onNoHay(l)} disabled={guardando} className="shrink-0">
+              {TEXTO_NO_HAY}
+            </SunmiButton>
+          </>
         ) : null
       }
       data-linea-preparar={l.productoNombre}
@@ -318,6 +366,7 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
   const [categoria, setCategoria] = useState(null);
   const [texto, setTexto] = useState("");
   const [corrigiendo, setCorrigiendo] = useState(null);
+  const [cambiando, setCambiando] = useState(null);
   const [agregando, setAgregando] = useState(false);
   const [textoCatalogo, setTextoCatalogo] = useState("");
   const [catalogo, setCatalogo] = useState(null);
@@ -638,6 +687,8 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                 onVaCompleto={(x) => escribirPreparado(x, vaCompleto(x))}
                 onNoHay={(x) => escribirPreparado(x, NO_HAY)}
                 onCorregir={setCorrigiendo}
+                onCambiar={setCambiando}
+                onDeshacerCambio={(x) => escribirPreparado(x, { pendiente: true })}
               />
             ))}
           </>
@@ -695,6 +746,19 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                 />
               ) : null}
             </SunmiModalLayout>
+
+            {/* "Cambiar por otro" (2026-11-03): busca en el catálogo del depósito
+                que prepara, el mismo que resuelve la línea en `detalle/editar`. */}
+            <HojaCambiarPorOtro
+              linea={cambiando}
+              depositoId={miDepositoId ?? pos?.origenId}
+              forma="hoja"
+              guardando={guardando}
+              onGuardar={async (cuerpo) => {
+                if (await escribirPreparado(cambiando, cuerpo)) setCambiando(null);
+              }}
+              onCerrar={() => setCambiando(null)}
+            />
 
             <SunmiModalLayout
               open={agregando}

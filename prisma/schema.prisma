@@ -684,6 +684,10 @@ model ProductoBase {
 
   filasImportacionLista ImportacionListaFila[]
 
+  /// Las líneas de transferencia que fueron EN LUGAR de este producto, que era
+  /// el pedido (`TransferenciaDetalle.reemplazaABaseId`, 2026-11-03).
+  reemplazadoEnTransferencias TransferenciaDetalle[] @relation("transferencia_detalle_reemplaza_a")
+
   // UNICIDAD DEL CÓDIGO POR CREADOR, NO POR GRUPO.
   //
   // Era `@@unique([grupoId, codigo_barra])` y eso le daba el código al primero
@@ -937,6 +941,9 @@ model ProductoLocal {
   detalles TransferenciaDetalle[]
 
   posDetalles             PosTransferenciaDetalle[]
+  /// Las líneas de pedidos donde este producto va EN LUGAR del pedido
+  /// (`PosTransferenciaDetalle.reemplazoProductoId`, 2026-11-03).
+  posDetallesComoReemplazo PosTransferenciaDetalle[] @relation("pos_detalle_reemplazo")
   pedidoProveedorDetalles PedidoProveedorDetalle[]
 
   // Combos exclusivos por local (E1). Las FK son COMPUESTAS a (id, localId).
@@ -1601,10 +1608,20 @@ model TransferenciaDetalle {
   revisadoEnRecepcionPorId Int?
   revisadoEnRecepcionAt    DateTime?
 
+  // ── LO QUE FUE EN LUGAR DE LO PEDIDO (2026-11-03) ─────────────────────────
+  //
+  // Una línea que sale de un pedido donde el depósito cambió el producto
+  // ("Cambiar por otro"): `productoId` es lo que VA —la mercadería y el stock—
+  // y esto es la base de lo que el local PIDIÓ, para que la recepción diga
+  // "Pediste Poett Verde, va Poett Rosa". Null en todas las demás: va lo que
+  // se pidió, o no hubo pedido. Lo escribe `enviar` vía `crearTransferencia`.
+  reemplazaABaseId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   producto      ProductoLocal @relation(fields: [productoId], references: [id])
+  reemplazaA    ProductoBase? @relation("transferencia_detalle_reemplaza_a", fields: [reemplazaABaseId], references: [id], onDelete: SetNull)
   transferencia Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
   confirmadoPor Usuario?      @relation("TransferenciaDetalleConfirmadoPor", fields: [confirmadoPorId], references: [id])
   /// Quién agregó esta línea durante la recepción. Nombrada porque `Usuario` ya
@@ -1785,15 +1802,28 @@ model PosTransferenciaDetalle {
   /// Null en las de antes: salen del origen del pedido, como siempre.
   resueltoPorDepositoId Int?
 
+  /// "CAMBIAR POR OTRO" (2026-11-03): el producto que va EN LUGAR del pedido.
+  /// El local pidió Poett Verde y el depósito no lo tiene, pero tiene Poett
+  /// Rosa: `productoId` sigue siendo lo PEDIDO —el hecho del local no se
+  /// pisa— y esto es lo que el depósito decidió mandar. Es un ProductoLocal del
+  /// depósito que la resolvió (`resueltoPorDepositoId`), y con él `preparado` y
+  /// `unidadPreparada` son de ESTE producto, no del pedido. Null = va lo pedido.
+  /// Lo escribe `detalle/editar` (`reemplazoProductoId`); "Volver a pendiente"
+  /// —el "Deshacer cambio" de la pantalla— lo vuelve a null. Lo lee `enviar`:
+  /// la mercadería y el stock son de éste.
+  reemplazoProductoId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   pos      PosTransferencia @relation(fields: [posTransferenciaId], references: [id], onDelete: Cascade)
   producto ProductoLocal    @relation(fields: [productoId], references: [id])
   resueltoPorDeposito Local? @relation("pos_detalle_resuelto_por", fields: [resueltoPorDepositoId], references: [id], onDelete: SetNull)
+  reemplazo ProductoLocal? @relation("pos_detalle_reemplazo", fields: [reemplazoProductoId], references: [id], onDelete: SetNull)
 
   @@index([posTransferenciaId])
   @@index([productoId])
+  @@index([reemplazoProductoId])
   @@index([tipo])
 }
 

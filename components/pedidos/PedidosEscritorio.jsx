@@ -92,6 +92,7 @@ import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina"
 import { tamanoDePaginaCatalogo, TAMANOS_DE_PAGINA_CATALOGO } from "@/lib/pedidos/tamanoDePagina";
 import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
+import { textoPedisteVa } from "@/lib/pedidos/preparacionDelPedido";
 import { crearGuardiaDeLecturas } from "@/lib/pedidos/guardiaDeLecturas";
 import { useRefrescoDelPedido } from "@/lib/pedidos/useRefrescoDelPedido";
 import BotonDescargarPdfPedido from "@/components/pedidos/BotonDescargarPdfPedido";
@@ -248,7 +249,9 @@ const columnaUnidad = {
  */
 function TablaDeSoloMirar({ items, verFotos }) {
   const columnas = conEncabezado([
-    { clave: "producto", titulo: "Producto", render: (p) => <CeldaProducto producto={p} verFotos={verFotos} cargado={false} marca={null} /> },
+    // El depósito mandó otro en su lugar (2026-11-03): la marca que cuelga
+    // debajo del nombre lo dice.
+    { clave: "producto", titulo: "Producto", render: (p) => <CeldaProducto producto={p} verFotos={verFotos} cargado={false} marca={p.reemplazoNombre ? textoPedisteVa(p.nombre, p.reemplazoNombre) : null} /> },
     columnaCategoria,
     columnaUnidad,
     {

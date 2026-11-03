@@ -16,6 +16,7 @@ import prisma from "@/lib/prisma";
 import { alcanceDelHistorial, pedidosDelHistorial, ESTADOS_DEL_HISTORIAL } from "@/lib/pedidos/alcanceDelHistorial";
 import { itemDelPedido, BASE_CON_CATEGORIA } from "@/lib/pedidos/itemDelPedido";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
+import { INCLUDE_REEMPLAZO } from "@/lib/pedidos/reemplazoDeLinea";
 
 const NO_ENCONTRADO = { ok: false, error: "No se encontró ese pedido en el historial de este local." };
 
@@ -36,7 +37,8 @@ export async function GET(req, { params }) {
       where: { ...pedidosDelHistorial(alcance), id: posId, estado: { in: ESTADOS_DEL_HISTORIAL } },
       include: {
         detalles: {
-          include: { producto: { include: BASE_CON_CATEGORIA } },
+          // Con el producto que fue en su lugar, si el depósito lo cambió.
+          include: { producto: { include: BASE_CON_CATEGORIA }, ...INCLUDE_REEMPLAZO },
           orderBy: { id: "asc" },
         },
         transferencias: {

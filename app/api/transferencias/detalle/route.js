@@ -91,6 +91,9 @@ export async function GET(req) {
             // Y quién decidió recibir esta histórica en la presentación de hoy.
             // Cuarta autoría de la misma tabla, en la misma consulta.
             presentacionAdoptadaPor: { select: { id: true, nombre: true } },
+            // Lo que el local pidió, si el depósito mandó otro en su lugar
+            // (2026-11-03). Misma consulta.
+            reemplazaA: { select: { nombre: true } },
           },
         },
       },
@@ -332,6 +335,10 @@ export async function GET(req) {
           ? { id: d.agregadoEnRecepcionPor.id, nombre: d.agregadoEnRecepcionPor.nombre }
           : null,
         agregadoEnRecepcionAt: d.agregadoEnRecepcionAt,
+        // "Pediste Poett Verde, va Poett Rosa" (2026-11-03): el nombre de lo
+        // que el local pidió cuando el depósito mandó esta línea en su lugar.
+        // Null si va lo pedido.
+        pediste: d.reemplazaA?.nombre ?? null,
         // ── EL CONTROL FÍSICO ────────────────────────────────────────────
         //
         // "Revisado" no se deduce de `cantidadRecibida != null`: son dos hechos

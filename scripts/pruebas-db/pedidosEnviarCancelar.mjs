@@ -1878,6 +1878,171 @@ try {
     ok("17: el stock baja en cada depósito solo por lo suyo —la gaseosa, 4: bulto de 1 = 1 unidad—; la yerba no baja", json(Object.entries(delta17).filter(([, v]) => v !== 0).sort()) === json([
       ["frio:HELADO", 3], ["merca:ACEITE", 2], ["merca:AZUCAR", 1], ["merca:GASEOSA", 4], ["merca:LECHE", 24], ["merca:QUESO", 1.853], ["merca:YOGURT", 2],
     ]), json(delta17));
+
+    seccion("18. Cambiar por otro: el depósito manda otro producto en lugar del pedido");
+    {
+      // 2026-11-03. El local pide 2 POETT VERDE, 3 LAVANDINA y 1 JABON X3 por
+      // bulto; el depósito no tiene el verde y manda POETT ROSA, buscándolo por
+      // su código de unidad y por el de caja. Se ejerce todo por las rutas: el
+      // mismo producto (no es cambio), uno de otro catálogo (409), deshacer,
+      // cambiar de nuevo, enviar —el stock baja del ROSA y no del VERDE— y lo
+      // que lee el local: la recepción y el detalle del pedido.
+      //
+      // Con ESCRIBIR_FIXTURE_CAMBIO=1 deja las respuestas en
+      // `app/modulos/pos-transferencias/cambiarPorOtro.fixture.json`, que leen
+      // los candados de las pantallas (`cambiarPorOtro.test.mjs`). Archivo
+      // propio para no reescribir los fixtures de las otras secciones.
+      const cambio = {};
+      const guardarCambio = (clave, r) => {
+        cambio[clave] = r;
+      };
+      const historialDetalle = await import("../../app/api/pedidos/historial/[id]/route.js");
+      const X = await armarLocal("Grupo cambio", [
+        "POETT VERDE",
+        { nombre: "POETT ROSA", extra: { codigo_barra_secundario: `88${marca}`.slice(0, 13) } },
+        "LAVANDINA",
+        { nombre: "JABON X3", extra: { unidad_medida: "pack", factor_pack: 3 } },
+      ]);
+      for (const id of Object.values(X.ids)) await c.stockLocal.create({ data: { localId: X.deposito.id, productoId: id, cantidad: 1000 } });
+      const grupoX = (await c.grupoLocal.findFirst({ where: { localId: X.local.id }, select: { grupoId: true } })).grupoId;
+      await c.cliente.create({ data: { grupoId: grupoX, localId: X.deposito.id, nombre: `${X.local.nombre} (interno)`, localVinculadoId: X.local.id } });
+      const cuentaDepoX = await c.usuario.create({
+        data: { nombre: "Depósito Cambio", email: `deposito-cambio-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: X.deposito.id },
+      });
+      const operariaX = await c.operadorLocal.create({ data: { nombre: "Marta", pinHash: "x", localId: X.deposito.id } });
+      const sDepoX = `${sesionDe(cuentaDepoX, X.deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: operariaX.id, nombre: operariaX.nombre, localId: X.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+      const escriturasX = [];
+      const editarX = async (body) => {
+        const r = await pedir(R16.editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepoX, body);
+        escriturasX.push({ ruta: "/api/pos-transferencias/detalle/editar", cuerpo: body, respuesta: r });
+        return r;
+      };
+      const detalleX = (posId) => pedir(R16.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, sDepoX);
+      const buscarX = (q) => pedir(R16.buscar, "GET", `${B}/pos-transferencias/buscarProductos?q=${encodeURIComponent(q)}&origenId=${X.deposito.id}`, sDepoX);
+      const lineaX = (det, nombre) => det.cuerpo.item.detalles.find((d) => d.productoNombre === nombre);
+
+      ok("18: el local pide 2 POETT VERDE", (await X.fijar(X.ids["POETT VERDE"], 2)).cuerpo.ok === true);
+      ok("18: el local pide 3 LAVANDINA", (await X.fijar(X.ids.LAVANDINA, 3)).cuerpo.ok === true);
+      ok("18: el local pide 1 bulto de JABON X3", (await X.fijar(X.ids["JABON X3"], 1, "BULTO")).cuerpo.ok === true);
+      const carritoX = await carrito(X.sPin);
+      const solX = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, X.sPin, { posId: carritoX.cuerpo.posId });
+      ok("18: el local lo envía", solX.cuerpo.ok === true, json(solX));
+      const pX = carritoX.cuerpo.posId;
+
+      // Lo que la pantalla del depósito lee al entrar, con ESTA cuenta.
+      guardarCambio("cambioMe", await pedir(R.me, "GET", `${B}/me`, sDepoX));
+      guardarCambio("cambioOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, sDepoX));
+      guardarCambio("cambioOpciones", await pedir(R16.opciones, "GET", `${B}/pos-transferencias/opciones`, sDepoX));
+      guardarCambio("cambioSolicitados", await pedir(R16.solicitados, "GET", `${B}/pos-transferencias/solicitados`, sDepoX));
+      const detNuevoX = await detalleX(pX);
+      guardarCambio("cambioDetalleNuevo", detNuevoX);
+      const verde = lineaX(detNuevoX, "POETT VERDE");
+      const lavandina = lineaX(detNuevoX, "LAVANDINA");
+      ok("18: el detalle trae las tres líneas, sin reemplazo", detNuevoX.cuerpo.item?.detalles?.length === 3 && detNuevoX.cuerpo.item.detalles.every((d) => d.reemplazo === null), json(detNuevoX.cuerpo.item?.detalles));
+
+      // ── Lo que lee la hoja: por código de unidad, de caja, el mismo, uno que
+      // no existe y un texto ──────────────────────────────────────────────
+      const baseRosa = await c.productoBase.findFirst({ where: { grupoId: grupoX, nombre: "POETT ROSA" } });
+      const baseVerde = await c.productoBase.findFirst({ where: { grupoId: grupoX, nombre: "POETT VERDE" } });
+      const lecturas = {
+        cambioBuscarRosa: baseRosa.codigo_barra,
+        cambioBuscarRosaCaja: baseRosa.codigo_barra_secundario,
+        cambioBuscarVerde: baseVerde.codigo_barra,
+        cambioBuscarDesconocido: "7790000000001",
+        cambioBuscarTexto: "POETT",
+      };
+      for (const [clave, q] of Object.entries(lecturas)) guardarCambio(clave, { q, respuesta: await buscarX(q) });
+      ok("18: el código de unidad del rosa lo encuentra", cambio.cambioBuscarRosa.respuesta.cuerpo.items?.some((p) => p.productoLocalId === X.ids["POETT ROSA"]), json(cambio.cambioBuscarRosa));
+      ok("18: el código de caja del rosa lo encuentra", cambio.cambioBuscarRosaCaja.respuesta.cuerpo.items?.some((p) => p.productoLocalId === X.ids["POETT ROSA"]), json(cambio.cambioBuscarRosaCaja));
+      ok("18: un código que no está cargado no encuentra nada", (cambio.cambioBuscarDesconocido.respuesta.cuerpo.items || []).length === 0, json(cambio.cambioBuscarDesconocido));
+
+      // ── El mismo producto no es un cambio ─────────────────────────────────
+      const mismo = await editarX({ detalleId: verde.detalleId, preparado: 2, unidadPreparada: "UNIDAD", reemplazoProductoId: X.ids["POETT VERDE"] });
+      ok("18: cambiarlo por el mismo deja la línea como va completo, sin reemplazo", mismo.cuerpo.ok === true && mismo.cuerpo.item.reemplazo === null && mismo.cuerpo.item.preparado === 2, json(mismo));
+      ok("18: y vuelve a pendiente", (await editarX({ detalleId: verde.detalleId, pendiente: true })).cuerpo.item?.revisadoEn === null);
+      // Lo que manda la hoja cuando se escanea el mismo: "Va completo", tal cual.
+      const vaVerde = await editarX({ detalleId: verde.detalleId, ...vaCompleto(verde) });
+      ok("18: el mismo, desde la hoja, es va completo", vaVerde.cuerpo.ok === true && vaVerde.cuerpo.item.reemplazo === null && vaVerde.cuerpo.item.preparado === 2, json(vaVerde));
+      ok("18: y otra vez pendiente", (await editarX({ detalleId: verde.detalleId, pendiente: true })).cuerpo.item?.revisadoEn === null);
+
+      // ── Uno que no es del catálogo de este depósito: 409, y no escribe ────
+      const ajeno = await editarX({ detalleId: verde.detalleId, preparado: 2, unidadPreparada: "UNIDAD", reemplazoProductoId: M.ids.ACEITE });
+      ok("18: un producto de otro depósito no se puede mandar (409)", ajeno.status === 409 && ajeno.cuerpo.ok === false, json(ajeno));
+      ok("18: y la línea sigue pendiente", lineaX(await detalleX(pX), "POETT VERDE").revisadoEn === null);
+
+      // ── Cambiar: va el rosa en lugar del verde ────────────────────────────
+      const cambiado = await editarX({ detalleId: verde.detalleId, preparado: 2, unidadPreparada: "UNIDAD", reemplazoProductoId: X.ids["POETT ROSA"] });
+      ok("18: va POETT ROSA en lugar de POETT VERDE", cambiado.cuerpo.ok === true && cambiado.cuerpo.item.productoNombre === "POETT VERDE" && cambiado.cuerpo.item.reemplazo?.productoNombre === "POETT ROSA" && cambiado.cuerpo.item.revisadoEn != null, json(cambiado));
+      guardarCambio("cambioDetalleCambiado", await detalleX(pX));
+
+      // ── Deshacer: vuelve al verde, pendiente ──────────────────────────────
+      const deshecho = await editarX({ detalleId: verde.detalleId, pendiente: true });
+      ok("18: deshacer el cambio deja el verde pendiente y sin reemplazo", deshecho.cuerpo.ok === true && deshecho.cuerpo.item.reemplazo === null && deshecho.cuerpo.item.revisadoEn === null && deshecho.cuerpo.item.preparado === 0, json(deshecho));
+
+      // ── Corregir después de cambiar lo vuelve a lo pedido ─────────────────
+      ok("18: cambiar de nuevo", (await editarX({ detalleId: verde.detalleId, preparado: 2, unidadPreparada: "UNIDAD", reemplazoProductoId: X.ids["POETT ROSA"] })).cuerpo.item?.reemplazo?.productoLocalId === X.ids["POETT ROSA"]);
+      const corregido = await editarX({ detalleId: verde.detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
+      ok("18: escribir lo preparado sin reemplazo es decidir sobre lo pedido: borra el cambio", corregido.cuerpo.item?.reemplazo === null && corregido.cuerpo.item.preparado === 1, json(corregido));
+      ok("18: y de nuevo el rosa, 2", (await editarX({ detalleId: verde.detalleId, preparado: 2, unidadPreparada: "UNIDAD", reemplazoProductoId: X.ids["POETT ROSA"] })).cuerpo.item?.reemplazo?.productoNombre === "POETT ROSA");
+      ok("18: la lavandina va completa", (await editarX({ detalleId: lavandina.detalleId, ...vaCompleto(lavandina) })).cuerpo.ok === true);
+      const jabon = lineaX(detNuevoX, "JABON X3");
+      ok("18: no hay jabón", (await editarX({ detalleId: jabon.detalleId, ...NO_HAY })).cuerpo.ok === true);
+      guardarCambio("cambioDetalleListo", await detalleX(pX));
+
+      // ── Enviar: la mercadería y el stock son del rosa ─────────────────────
+      const stockX = async () =>
+        Object.fromEntries((await c.stockLocal.findMany({ where: { localId: X.deposito.id, productoId: { in: Object.values(X.ids) } } })).map((s) => [Object.keys(X.ids).find((k) => X.ids[k] === s.productoId), Number(s.cantidad)]));
+      const stockAntesX = await stockX();
+      const envioX = await pedir(R16.enviar, "POST", `${B}/pos-transferencias/enviar`, sDepoX, { posId: pX });
+      ok("18: se envía", envioX.cuerpo.ok === true, json(envioX).slice(0, 400));
+      const stockDespuesX = await stockX();
+      const tX = envioX.cuerpo.item?.id;
+      const lineasTX = await c.transferenciaDetalle.findMany({
+        where: { transferenciaId: tX },
+        include: { producto: { include: { base: { select: { nombre: true } } } }, reemplazaA: { select: { nombre: true } } },
+        orderBy: { id: "asc" },
+      });
+      const viajeX = {
+        lineas: lineasTX.map((l) => ({ nombre: l.producto?.base?.nombre, cantidad: Number(l.cantidad), unidadEnviada: l.unidadEnviada, pediste: l.reemplazaA?.nombre ?? null })),
+        bajaDelStock: Object.fromEntries(Object.keys(stockAntesX).map((k) => [k, Math.round((stockAntesX[k] - stockDespuesX[k]) * 1000) / 1000])),
+      };
+      guardarCambio("cambioViaje", viajeX);
+      ok("18: la transferencia lleva 2 POETT ROSA (pediste POETT VERDE) y 3 LAVANDINA; ni verde ni jabón",
+        json([...viajeX.lineas].sort((a, b) => a.nombre.localeCompare(b.nombre))) === json([
+          { nombre: "LAVANDINA", cantidad: 3, unidadEnviada: "UNIDAD", pediste: null },
+          { nombre: "POETT ROSA", cantidad: 2, unidadEnviada: "UNIDAD", pediste: "POETT VERDE" },
+        ]),
+        json(viajeX.lineas));
+      ok("18: el stock baja del rosa y de la lavandina; el verde y el jabón no se tocan",
+        viajeX.bajaDelStock["POETT ROSA"] === 2 && viajeX.bajaDelStock.LAVANDINA === 3 && viajeX.bajaDelStock["POETT VERDE"] === 0 && viajeX.bajaDelStock["JABON X3"] === 0,
+        json(viajeX.bajaDelStock));
+      const lineaPedido = await c.posTransferenciaDetalle.findUnique({ where: { id: verde.detalleId }, select: { productoId: true, reemplazoProductoId: true } });
+      ok("18: el renglón guarda los dos: lo pedido y lo que fue", lineaPedido.productoId === X.ids["POETT VERDE"] && lineaPedido.reemplazoProductoId === X.ids["POETT ROSA"], json(lineaPedido));
+
+      // ── Lo que lee el local ────────────────────────────────────────────────
+      const recX = await pedir(R16.recepcion, "GET", `${B}/transferencias/detalle?id=${tX}`, X.sPin);
+      guardarCambio("cambioRecepcion", recX);
+      const rosaRec = (recX.cuerpo.item?.items || []).find((d) => d.nombre === "POETT ROSA");
+      ok("18: la recepción dice que el rosa va por el verde", rosaRec?.pediste === "POETT VERDE" && (recX.cuerpo.item.items || []).find((d) => d.nombre === "LAVANDINA")?.pediste === null, json(recX.cuerpo.item?.items?.map((d) => [d.nombre, d.pediste])));
+      // El handler recibe el id por `params`, como lo pasa Next: `pedir` no lo manda.
+      const histXr = await (async () => {
+        const url = `${B}/pedidos/historial/${pX}`;
+        const req = new Request(url, { method: "GET", headers: { cookie: X.sPin } });
+        Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
+        const r = await historialDetalle.GET(req, { params: Promise.resolve({ id: String(pX) }) });
+        return { status: r.status, cuerpo: await r.json().catch(() => ({})) };
+      })();
+      guardarCambio("cambioHistorialDetalle", histXr);
+      const verdeHist = (histXr.cuerpo.pedido?.items || []).find((i) => i.nombre === "POETT VERDE");
+      ok("18: el detalle del pedido del local dice que fue el rosa", verdeHist?.reemplazoNombre === "POETT ROSA" && (histXr.cuerpo.pedido.items || []).find((i) => i.nombre === "LAVANDINA")?.reemplazoNombre === null, json(histXr).slice(0, 600));
+
+      guardarCambio("cambioEscrituras", escriturasX);
+      guardarCambio("cambioIds", { posId: pX, transferenciaId: tX, deposito: X.deposito.nombre, local: X.local.nombre, rosa: X.ids["POETT ROSA"], verde: X.ids["POETT VERDE"] });
+      if (process.env.ESCRIBIR_FIXTURE_CAMBIO) {
+        writeFileSync("app/modulos/pos-transferencias/cambiarPorOtro.fixture.json", `${JSON.stringify(cambio, null, 2)}\n`);
+        console.log("  · fixture de cambiar por otro escrito");
+      }
+    }
   }
 
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {

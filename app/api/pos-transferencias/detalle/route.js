@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { elDepositoCuentaPorKilo, esProductoFiambre } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { esDepositoDelPedido } from "@/lib/pedidos/depositosDelPedido";
+import { INCLUDE_REEMPLAZO, reemplazoDeLinea } from "@/lib/pedidos/reemplazoDeLinea";
 
 export async function GET(req) {
   try {
@@ -80,6 +81,7 @@ export async function GET(req) {
           },
         },
         resueltoPorDeposito: { select: { nombre: true } },
+        ...INCLUDE_REEMPLAZO,
       },
       orderBy: { createdAt: "asc" },
     });
@@ -157,6 +159,9 @@ export async function GET(req) {
         // Qué depósito la resolvió, para "Lo preparó …" (2026-10-28).
         resueltoPorDepositoId: detalle.resueltoPorDepositoId,
         resueltoPorNombre: detalle.resueltoPorDeposito?.nombre ?? null,
+        // El producto que va en lugar del pedido, o null (2026-11-03): lo
+        // preparado es de ése. Ver `lib/pedidos/reemplazoDeLinea.js`.
+        reemplazo: reemplazoDeLinea(detalle),
 
         productoNombre: productoLocal?.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || "",
