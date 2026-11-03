@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-03 23:23
+**Última actualización:** 2026-11-03 23:34
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-03: feat: el costo se reparte hasta el suelto, con una sola definición
 - 2026-11-03: feat: columnas del tercer nivel de empaque, vacías y sin lectores
 - 2026-11-03: refactor: embudo de la escala para el tercer nivel de empaque
 - 2026-10-31: fix(productos): la lista de precios se baja solo de la ubicación actual, dice "Categoría" y busca al elegir
