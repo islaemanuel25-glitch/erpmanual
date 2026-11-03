@@ -16,8 +16,34 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261103120000_precios_del_30_10_vuelven_a_su_regla` — de datos, pedida por
-Emanuel el 2026-11-03. Corrige las dos correcciones de precios del 30/10 con su
+Ninguna. Producción está en **102 migraciones**, la última
+`20261103120000_precios_del_30_10_vuelven_a_su_regla`.
+
+La `20261103120000_precios_del_30_10_vuelven_a_su_regla` se aplicó con el
+despliegue de `4f2c09e4` (2026-11-03), antes de levantar la imagen, con
+`DEPLOY_MIGRACION_AUTORIZADA=1` dada por Emanuel ("autorizo la migración de
+precios del 30/10"); quedó en la bitácora. El clasificador la marcó NO ADITIVA
+por lo previsto: los `DROP TABLE` son solo de las cuatro tablas temporales
+`_rev_*` que crea ella misma. Quinto chequeo del backup: la fila 12176 (COCA
+COLA 2.25L, Mini unidas) estaba en `pre-4f2c09e` a $37.100 con margen 30. El
+contenedor informó las **102** del árbol, imprimió "Applying migration" y
+`migrate status` cerró con "Database schema is up to date!".
+
+Comprobada contra la base, en solo lectura, con el informe del generador
+(corrido con el node de la imagen: el node 18 del servidor no lo carga).
+ProductoLocal: 748 revertidas, 1.262 recalculadas con su regla, 10 que no se
+bajaron, 51 sin regla devueltas a su valor previo, 164 salteadas por edición a
+mano posterior y 12 combos intactos. ProductoBase: 23 revertidas, 355
+recalculadas, 3 que no se bajaron, 4 sin regla y 8 salteadas. Las 747 filas y
+las 23 fichas revertidas de `precios_bajo_su_regla` quedaron iguales a
+`respaldo.backup_precios_ubicacion_20261030`. Coca-Cola: las 6 filas en $27.600
+/ −3,16 y $30.400, y ninguna fila del proveedor 19 distinta de antes del 30/10.
+Cruzando ids contra `respaldo.backup_precios_ubicacion_20261103` (11.747
+filas), ninguna fila cambió fuera de las escritas en
+`respaldo.reversion_20261030_resultado`.
+
+La que estaba pendiente decía, al momento de aplicarse: corrige las dos
+correcciones de precios del 30/10 con su
 regla: solo cambia lo que NO tenía %. Las 768 filas y 23 fichas de
 `precios_bajo_su_regla` vuelven a `respaldo.backup_precios_ubicacion_20261030`.
 De las 1.479 filas y 370 fichas de `precios_sin_regla`, Coca-Cola (proveedor 19),
@@ -49,9 +75,6 @@ se espera ver está en el encabezado de la migración; las 6 filas de Coca-Cola
 tienen que quedar en $27.600 / −3,16 (COCA COLA 2.25L, Mini unidas) y $30.400.
 Candado contra Postgres: `scripts/correcciones/reversionPrecios20261030.test.mjs`
 con `PG_PRUEBA_URL`.
-
-Producción está en **101 migraciones**, la última
-`20261031180000_fila_lista_contenido_ml`.
 
 La `20261031180000_fila_lista_contenido_ml` —aditiva: la columna nula
 `ImportacionListaFila.contenidoMl`, el tamaño de la presentación del renglón,
