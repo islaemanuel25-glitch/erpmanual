@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-03 23:34
+**Última actualización:** 2026-11-03 23:59
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-03: feat: la venta descuenta en tres escalas y cobra el suelto en el servidor (camino del suelto por la ruta SIN VERIFICAR)
 - 2026-11-03: feat: el costo se reparte hasta el suelto, con una sola definición
 - 2026-11-03: feat: columnas del tercer nivel de empaque, vacías y sin lectores
 - 2026-11-03: refactor: embudo de la escala para el tercer nivel de empaque

@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-11-03 23:01
+**Última actualización:** 2026-11-03 23:59
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-03: feat: la venta descuenta en tres escalas y cobra el suelto en el servidor (camino del suelto por la ruta SIN VERIFICAR)
 - 2026-11-03: refactor: embudo de la escala para el tercer nivel de empaque
 - 2026-11-01: refactor: borrar los turnos y cierres viejos; /modulos/turnos-y-cierres queda como el único lugar
 - 2026-10-29: fix(productos): el buscador del catálogo busca como la caja

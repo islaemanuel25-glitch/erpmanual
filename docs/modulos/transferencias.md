@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-11-03 23:23
+**Última actualización:** 2026-11-03 23:59
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-11-03: feat: la venta descuenta en tres escalas y cobra el suelto en el servidor (camino del suelto por la ruta SIN VERIFICAR)
 - 2026-11-03: feat: columnas del tercer nivel de empaque, vacías y sin lectores
 - 2026-11-03: fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
 - 2026-11-03: feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
