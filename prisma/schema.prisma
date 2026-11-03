@@ -627,6 +627,22 @@ model ProductoBase {
   area_fisica_id    Int?
   unidad_medida     UnidadMedida
   factor_pack       Int?
+  // ── EL TERCER NIVEL DE EMPAQUE (docs/roadmap/tercer-nivel-empaque.md) ─────
+  //
+  // Cuántos sueltos trae cada unidad: un atado trae 20 cigarrillos, una caja de
+  // café 10 unidades. NULL = 1, que es lo de siempre: el producto no se vende
+  // más chico. La base exige mayor que 1 (CHECK en la migración): un 1 escrito
+  // diría lo mismo que el vacío de otra forma.
+  //
+  // Lo lee `unidadesDeStockPorEscalon` (lib/conversiones/stock.js). NADIE lo
+  // escribe hasta la tanda 9: cargarlo cambia QUÉ SIGNIFICA `StockLocal.cantidad`
+  // —pasa a contar sueltos— y exige multiplicar el stock existente en la misma
+  // transacción. Por eso el libro de stock lo vigila como reinterpretación.
+  sueltos_por_unidad Int?
+  // Cómo se llama la unidad cuando trae sueltos: "atado", "caja". NULL =
+  // "unidades". El escalón de abajo se rotula siempre "sueltos". Es solo un
+  // rótulo: no cambia ninguna cantidad, así que no reinterpreta nada.
+  nombre_unidad      String?
   modo_pedido       ModoPedido   @default(BULTO)
   modo_envio        ModoEnvio?
   modo_stock        ModoStock    @default(BULTO)
@@ -892,6 +908,11 @@ model ProductoLocal {
   descripcion  String?
   precio_costo Decimal? @db.Decimal(12, 2)
   precio_venta Decimal? @db.Decimal(12, 2)
+  // El precio de venta del SUELTO en esta ubicación (tercer nivel de empaque).
+  // Se carga aparte: el suelto NO es la unidad dividida por sus sueltos. NULL =
+  // no se vende suelto acá. La base exige mayor que cero: un cero no es un
+  // precio. Nadie lo escribe hasta la tanda 9.
+  precio_venta_suelto Decimal? @db.Decimal(12, 2)
   margen       Decimal? @db.Decimal(6, 2)
   // Cómo se calcula el precio de venta EN ESTA UBICACIÓN. Es por ubicación igual
   // que el precio: dos locales pueden usar reglas distintas para el mismo producto.
@@ -1227,6 +1248,11 @@ model CostoBaseVersion {
   modoCompraProveedor String
   modoVentaDeposito   String
   esCombo             Boolean
+  // `ProductoBase.sueltos_por_unidad` del momento. Lo agrega la migración
+  // `20261103230000_tercer_nivel_empaque`: las versiones anteriores quedan en
+  // NULL, que es 1 —ningún producto tenía sueltos—, así que no hay historia
+  // que reconstruir.
+  sueltosPorUnidad    Int?
 
   camposCambiados String[]
   origen          String
@@ -1531,6 +1557,12 @@ model TransferenciaDetalle {
   /// El factor CONGELADO. Sin esto, cambiar `factor_pack` de 8 a 12 reescribe
   /// cuántas unidades físicas dice haber movido una transferencia vieja.
   factorPresentacion Int?
+  /// Los sueltos por unidad CONGELADOS al despachar (tercer nivel de empaque).
+  /// `cantidad` está en la escala de StockLocal de ese momento; si la ficha
+  /// cambia de N con la transferencia en tránsito, la recepción y la
+  /// cancelación convierten con este. NULL = 1. Nadie lo escribe hasta la
+  /// tanda 5.
+  sueltosPorUnidadCongelado Int?
   /// El peso de referencia CONGELADO, solo para PIEZA. Sin esto, editar
   /// `pesoReferenciaKg` después de despachar cambia cuántos kilos acredita
   /// `confirmar-recepcion` al destino.
@@ -2232,6 +2264,13 @@ model VentaDetalle {
   // NULL en combos (su consumo vive en VentaDetalleComponente) y en servicios (sin stock).
   productoLocalId    Int?
   cantidadStock      Decimal? @db.Decimal(12, 3)
+  // Los sueltos por unidad del producto AL VENDER, congelados (tercer nivel de
+  // empaque). `cantidadStock` está en la escala de StockLocal de ese momento: si
+  // después la ficha pasa a 20 sueltos por unidad, anular esta venta tiene que
+  // convertir con el N de entonces y no con el de hoy. NULL = 1, que es lo que
+  // vale toda venta hecha antes de que el producto tuviera sueltos. Nadie lo
+  // escribe hasta la tanda 4.
+  sueltosPorUnidadCongelado Int?
 
   // ── OFERTA APLICADA A ESTA LÍNEA — SNAPSHOT ────────────────────────────────
   //

@@ -16,8 +16,49 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **104 migraciones**, la última
-`20261103210000_recargo_fijo_en_cada_unidad`.
+Producción está en **104 migraciones**, la última
+`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **105**; falta una:
+
+- `20261103230000_tercer_nivel_empaque` — **NO ADITIVA para el clasificador.**
+
+Tanda 2 del tercer nivel de empaque (`docs/roadmap/tercer-nivel-empaque.md`).
+**No cambia ningún comportamiento**: agrega columnas nulas que nadie escribe.
+
+- Columnas: `ProductoBase.sueltos_por_unidad` y `ProductoBase.nombre_unidad`,
+  `ProductoLocal.precio_venta_suelto`, `VentaDetalle.sueltosPorUnidadCongelado`,
+  `TransferenciaDetalle.sueltosPorUnidadCongelado` y
+  `CostoBaseVersion.sueltosPorUnidad`. Todas nacen en NULL, con CHECK que solo
+  miran valores no nulos (mayor que 1, texto no vacío, precio mayor que cero):
+  no pueden fallar sobre filas existentes.
+- Los dos libros: reemplaza `libro_stock_reinterpretacion_producto`,
+  `libro_costo_base_insertar` y `libro_costo_base_registrar` (idénticas a las de
+  origen más `sueltos_por_unidad`) y recrea `ProductoBase_libro_reinterpretacion`
+  y `ProductoBase_costo_version` con la columna agregada, cada uno dentro de un
+  `DO` que lo recrea SOLO si ya existe. En producción existen los dos.
+- **Qué marca el clasificador** (`--dir`, corrido el 2026-11-03): `bloque DO`.
+  Son los dos bloques de arriba; no escriben ni borran filas. Sale con 1, así que
+  hace falta `DEPLOY_MIGRACION_AUTORIZADA=1` dada por Emanuel.
+- **Compatibilidad con la versión que sigue atendiendo** durante la ventana: el
+  código viejo no lee ni escribe ninguna de las columnas nuevas, y los triggers
+  recreados solo agregan un campo a lo que ya capturaban.
+- **Candados de tiempo:** `SET LOCAL lock_timeout = '3s'` arriba de todo. Toma
+  candados de `ProductoBase`, `ProductoLocal`, `VentaDetalle` y
+  `TransferenciaDetalle` para los `ALTER TABLE`; si el POS los tiene tomados, la
+  migración falla en 3 s en vez de esperar con las ventas detrás, y se reintenta.
+- **Verificada en desarrollo** (sesión de nube, `erpazul_al` local con las 105
+  aplicadas por `migrate dev`, sin deriva): las seis columnas existen, nulas y
+  vacías; los cinco CHECK existen y `sueltos_por_unidad = 1` se rechaza; en una
+  transacción revertida, cargar 20 sueltos deja una `ReinterpretacionDeStock` y
+  una versión `CAMBIO` con `sueltosPorUnidad = 20`, y `nombre_unidad` no deja
+  rastro en ningún libro. `scripts/pruebas-db/libroCostos.mjs` (111) y
+  `libroStock.mjs` (101) en verde sobre bases construidas con las 105.
+- **Para comprobar después de aplicarla, en solo lectura:** que las seis
+  columnas existan y tengan cero valores no nulos, y que `pg_get_triggerdef` de
+  los dos triggers nombre `sueltos_por_unidad`.
+
+---
+
+## Historial reciente
 
 La `20261103210000_recargo_fijo_en_cada_unidad` —de datos: recalcula las filas
 con regla "Recargo fijo por unidad" que quedaron con el recargo sumado una vez al
