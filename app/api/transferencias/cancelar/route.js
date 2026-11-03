@@ -91,6 +91,10 @@ const SELECT_TRANSFERENCIA = {
           nombre: true,
           productoLocalId: true,
           cantidadStock: true,
+          // Tercer nivel de empaque: lo que `deltaDeDevolucion` necesita para
+          // devolver en la escala de hoy.
+          sueltosPorUnidadCongelado: true,
+          productoBase: { select: { sueltos_por_unidad: true } },
           componentes: { select: { productoLocalId: true, cantidad: true } },
         },
       },

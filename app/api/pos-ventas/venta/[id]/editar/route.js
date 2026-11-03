@@ -18,8 +18,9 @@ import {
   cargarMapsProductos, enriquecerReconstruccion, estadoReconstruccionUI,
   COD_TURNO_CERRADO, mensajeBloqueoTurno,
 } from "@/lib/pos-ventas/correccionCompletaServer";
+import { modoDeLineaGuardada } from "@/lib/pos-ventas/lineaSuelta";
 
-const j = (b, s = 200) => NextResponse.json(b, { status: s });
+const j =(b, s = 200) => NextResponse.json(b, { status: s });
 
 export async function GET(req, { params }) {
   try {
@@ -76,8 +77,16 @@ export async function GET(req, { params }) {
         esCombo,
         esFiambrePieza: info.modoVentaDeposito === "PIEZA" && Number(info.pesoReferenciaKg) > 0,
         unidad: info.unidad_medida || null,
-        // modoVentaLinea NO se persistió en legacy → null (no se infiere).
-        modoVentaLinea: null,
+        // modoVentaLinea NO se persistió → null (no se infiere). La única
+        // excepción es el SUELTO (tercer nivel de empaque): con N congelado se
+        // deduce sin ambigüedad (`modoDeLineaGuardada`), y sin decirlo el editor
+        // devolvería la línea como unidad y descontaría N veces más.
+        modoVentaLinea: modoDeLineaGuardada({
+          cantidad: d.cantidad,
+          cantidadStock: d.cantidadStock,
+          sueltosPorUnidadCongelado: d.sueltosPorUnidadCongelado,
+          esDeposito: venta.local?.es_deposito === true,
+        }),
         baseStock: baseStockMap[d.productoBaseId] || null,
         // Consumo físico congelado + servicio (snapshot histórico):
         cantidadStock: d.cantidadStock != null ? Number(d.cantidadStock) : null,

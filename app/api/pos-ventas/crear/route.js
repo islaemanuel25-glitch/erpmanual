@@ -59,6 +59,7 @@ import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ve
 import { cargarMapasDeProductos } from "@/lib/pos-ventas/mapasDeProductos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
+import { MODO_SUELTO, resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
 
 // Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
 // MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
@@ -669,6 +670,52 @@ async function procesarCrear(req, intento) {
       descuentoPorPuntosVal = chequeo.esperado;
     }
 
+    // === LÍNEAS SUELTAS — SERVER-AUTHORITATIVE (tercer nivel de empaque) =====
+    //
+    // Una línea en modo SUELTO vende el escalón más chico: el cigarrillo del
+    // atado. Quién la puede vender, a qué precio y a qué costo lo decide
+    // `resolverLineaSuelta` —el mismo que usa la corrección—, y el precio y el
+    // costo del navegador se pisan, como en los servicios. El descuento de stock
+    // (1 por suelto) lo hace `cantidadParaStockNormal` más abajo, con el mismo
+    // `modoVentaLinea`. Solo consulta la base si el carrito trae alguna.
+    const itemsSueltos = items.filter((i) => i.modoVentaLinea === MODO_SUELTO);
+    if (itemsSueltos.length > 0) {
+      const filasSuelto = await prisma.productoLocal.findMany({
+        where: { localId, baseId: { in: [...new Set(itemsSueltos.map((i) => i.productoBaseId))] } },
+        select: {
+          baseId: true, precio_venta_suelto: true, precio_costo: true,
+          base: {
+            select: {
+              precio_costo: true, unidad_medida: true, factor_pack: true,
+              sueltos_por_unidad: true, es_combo: true, modalidad: true,
+            },
+          },
+        },
+      });
+      const filaSueltoPorBase = new Map(filasSuelto.map((f) => [f.baseId, f]));
+      for (const item of itemsSueltos) {
+        const fila = filaSueltoPorBase.get(item.productoBaseId);
+        if (!fila) {
+          return NextResponse.json(
+            { ok: false, error: `Producto ${item.nombre || item.productoBaseId} no encontrado en este local`, code: CODIGO_RECHAZO_VENTA.PRODUCTO_NO_EN_LOCAL },
+            { status: 400 }
+          );
+        }
+        const r = resolverLineaSuelta({ esDeposito, base: fila.base, productoLocal: fila, lista: listaResuelta });
+        if (!r.ok) {
+          return NextResponse.json(
+            { ok: false, error: `${item.nombre || "Producto"}: ${r.error}`, code: r.motivo },
+            { status: 400 }
+          );
+        }
+        item.precio = r.precio;
+        // Sin costo válido se guarda 0, igual que una línea normal sin costo: no
+        // se cae al costo de la UNIDAD, que sería 20 veces el del suelto.
+        item.precioCosto = r.precioCosto ?? 0;
+        item.esSuelto = true;
+      }
+    }
+
     // === OFERTAS Y RECARGO COMERCIAL — SERVER-AUTHORITATIVE ==================
     //
     // El POS puede MOSTRAR un precio de oferta, pero no puede imponerlo: el que
@@ -812,6 +859,9 @@ async function procesarCrear(req, intento) {
         cantidad: item.cantidad,
         precioNormal: item.precio,
         esServicio: item.esServicio === true,
+        // Una oferta es un precio por UNIDAD: aplicada a un suelto lo cobraría
+        // al precio del atado. El motor la saltea y dice por qué.
+        esSuelto: item.esSuelto === true,
         subtotalFijado: item.subtotalFijado ?? null,
       })),
       ofertasPorProductoLocal,
@@ -1441,6 +1491,9 @@ async function procesarCrear(req, intento) {
             // consumo vive en VentaDetalleComponente); SERVICIO → null (sin stock).
             productoLocalId: l.consumoFisico?.productoLocalId ?? null,
             cantidadStock: l.consumoFisico?.cantidadStock ?? null,
+            // El N con que se calculó `cantidadStock` (tercer nivel de empaque).
+            // Anular o corregir convierte con éste y no con el de la ficha de hoy.
+            sueltosPorUnidadCongelado: l.consumoFisico?.sueltosPorUnidadCongelado ?? null,
             // Snapshot de la oferta. `precio` (arriba) ya es lo COBRADO; esto es
             // lo que habría costado sin oferta y cuál era. `ofertaNombre` se
             // congela para que la línea se pueda leer aunque la oferta se borre.

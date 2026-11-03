@@ -95,6 +95,10 @@ const SELECT_VENTA = {
       esServicio: true,
       productoLocalId: true,
       cantidadStock: true,
+      // Tercer nivel de empaque: el N de la venta y el de hoy. `deltaDeDevolucion`
+      // devuelve el consumo convertido entre los dos.
+      sueltosPorUnidadCongelado: true,
+      productoBase: { select: { sueltos_por_unidad: true } },
       componentes: { select: { productoLocalId: true, cantidad: true } },
     },
   },

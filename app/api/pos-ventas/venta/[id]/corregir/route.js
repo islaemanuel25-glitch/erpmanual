@@ -238,6 +238,8 @@ export async function POST(req, { params }) {
             comisionLinea: comisionLinea > 0 ? comisionLinea : null,
             esServicio, importeBaseServicio: svc ? svc.importeBaseServicio : null, recargoServicioPct: svc ? svc.recargoServicioPct : null, recargoServicioImporte: svc ? svc.recargoServicioImporte : null,
             productoLocalId: l.consumoFisico?.productoLocalId ?? null, cantidadStock: l.consumoFisico?.cantidadStock ?? null,
+            // El N con que se recalculó el consumo (tercer nivel de empaque), igual que en crear.
+            sueltosPorUnidadCongelado: l.consumoFisico?.sueltosPorUnidadCongelado ?? null,
           },
         });
         if (esCombo && l.componentesCongelables?.length) {

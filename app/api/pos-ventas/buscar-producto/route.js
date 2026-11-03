@@ -9,6 +9,8 @@ import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
+import { resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
+import { sueltosParaCongelar } from "@/lib/conversiones/stock";
 import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
 import {
   candidatosDeLaCaja,
@@ -415,6 +417,15 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         ? Number(precioCostoUnitario.toFixed(2))
         : Number(baseUnitariaCosto.toFixed(2));
 
+      // ── EL SUELTO (tercer nivel de empaque) ──────────────────────────────
+      // Precio y costo de UN suelto, con la MISMA pieza que los cobra en `crear`
+      // (`resolverLineaSuelta`): precio de la ubicación con la lista aplicada, y
+      // costo por `costoDelSuelto`. Null cuando el producto no se vende suelto
+      // acá —sin sueltos, sin precio de suelto, o en el depósito—, que hoy es
+      // todo producto. La copia de `stock_locales/buscar-producto` no lo trae
+      // todavía: es de la tanda 7.
+      const suelto = resolverLineaSuelta({ esDeposito, base: pl.base, productoLocal: pl, lista: listaAplicable });
+
       return {
         productoBaseId: pl.baseId,
         productoLocalId: pl.id,
@@ -448,6 +459,11 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         pesoReferenciaKg: fiambreFijo ? pesoReferenciaKg : undefined,
         // Trazabilidad de lista de precios aplicada (null si no aplica)
         aplicacionLista,
+        // Tercer nivel de empaque: cuántos sueltos trae la unidad (null = no
+        // tiene) y lo que vale UN suelto si se puede vender acá.
+        sueltosPorUnidad: sueltosParaCongelar(pl.base),
+        precioVentaSuelto: suelto.ok ? suelto.precio : null,
+        precioCostoSuelto: suelto.ok ? suelto.precioCosto : null,
       };
     });
 }
