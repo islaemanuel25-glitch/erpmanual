@@ -25,8 +25,12 @@ Las tablas:
 
 - `CostoBaseVersion` guarda el estado de `ProductoBase` que decide el costo y su
   lectura: `precioCosto`, `unidadMedida`, `factorPack`, `pesoReferenciaKg`,
-  `pesoEsFijo`, `modoCompraProveedor`, `modoVentaDeposito`, `esCombo` y
-  `grupoId` [código].
+  `pesoEsFijo`, `modoCompraProveedor`, `modoVentaDeposito`, `esCombo`,
+  `sueltosPorUnidad` y `grupoId` [código]. `sueltosPorUnidad` lo agregó
+  `20261103230000_tercer_nivel_empaque`, que extiende la captura de un libro ya
+  activo: reemplaza las dos funciones de captura de la base y recrea su trigger
+  solo si existe. Las extensiones se declaran en `MIGRACIONES_DE_EXTENSION` y el
+  candado 1.e les exige esa forma [código] [probado contra Postgres].
 - `CostoUbicacionVersion` guarda el estado de `ProductoLocal`: el costo propio
   **crudo** (NULL = hereda de la base) y `esDeposito`, congelado del `Local` en
   ese momento [código].

@@ -91,18 +91,35 @@ por ella `cantidadParaStockNormal`, `toUnidades`/`fromUnidades` y
 resultado es idéntico al de antes. La atadura de las 32 combinaciones se
 extendió con el escalón suelto y tiene contraprueba.
 
-### 2 · Las columnas — LLEVA MIGRACIÓN
+### 2 · Las columnas — LLEVA MIGRACIÓN — HECHA
 
-- `ProductoBase.sueltos_por_unidad` (entero, nulo, mayor que 1 si está) y
-  `ProductoBase.nombre_unidad` (texto, nulo).
-- `ProductoLocal.precio_venta_suelto` (nulo).
-- N congelado en `VentaDetalle` y en `TransferenciaDetalle`.
-- Las dos columnas de `ProductoBase` entran en la lista de campos de
-  reinterpretación: la del trigger de la migración del libro, la de
-  `lib/stock/libro/libroStock.js` y `CAMPOS_DE_ESCALA_BASE` de
-  `lib/stock/libro/valorDelStock.js`.
-- `prisma generate` y una consulta contra Postgres. El embudo empieza a leer la
-  columna; como nadie la escribe, sigue valiendo 1.
+Migración `20261103230000_tercer_nivel_empaque`, anotada en
+`docs/deploy/MIGRACIONES-SIN-APLICAR.md` (no aditiva para el clasificador por
+sus dos bloques `DO`).
+
+- `ProductoBase.sueltos_por_unidad` (entero, nulo, CHECK mayor que 1) y
+  `ProductoBase.nombre_unidad` (texto, nulo, CHECK no vacío).
+- `ProductoLocal.precio_venta_suelto` (nulo, CHECK mayor que cero).
+- `sueltosPorUnidadCongelado` en `VentaDetalle` y en `TransferenciaDetalle`
+  (nulo = 1, CHECK mayor que 1).
+- **Solo `sueltos_por_unidad` reinterpreta**: `nombre_unidad` es un rótulo y no
+  cambia ninguna cantidad ni costo, así que ningún libro lo mira
+  **[decisión técnica]**. Entra en el trigger de reinterpretación del libro de
+  stock, en `CAMPOS_QUE_REINTERPRETAN` de `libroStock.js`, en
+  `CAMPOS_DE_ESCALA_BASE` de `valorDelStock.js` y, para que esa última no mire
+  un dato que nunca llega, en la captura del libro de costos: columna
+  `CostoBaseVersion.sueltosPorUnidad` y `CAMPOS_BASE` de `lib/libros/libroCostos.js`.
+- Los triggers de los dos libros se recrean solo si ya existen; la migración no
+  activa nada. `libro_costo_activar()` queda como estaba: crea el trigger con la
+  lista vieja, pero en una base que aplica todas las migraciones en orden esta
+  migración corre después de la activación y lo recrea.
+- **El embudo sigue sin leer la columna** (`SUELTOS_POR_UNIDAD_SIN_DATO = 1`).
+  Empieza a leerla la tanda que la necesite, con la venta, las entradas y las
+  pantallas ya preparadas; leerla antes sería abrir la puerta que la regla de
+  orden cierra.
+- Pendiente para la tanda 3: un candado que vea que un cambio de
+  `sueltosPorUnidad` entre versiones se trata como cambio de escala. Hoy no se
+  puede observar, porque el embudo devuelve 1 de los dos lados.
 
 ### 3 · El costo hacia abajo — sin migración
 
