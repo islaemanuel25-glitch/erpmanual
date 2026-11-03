@@ -121,9 +121,14 @@ try {
     await c.stockLocal.create({ data: { localId: A.depo.id, productoId: pl.id, cantidad: 50 } });
     return pl.id;
   };
-  const coca = await delDeposito("Coca 2L", `77${marca}1`.slice(0, 13), bebidas.id);
-  const agua = await delDeposito("Agua x10", `77${marca}2`.slice(0, 13), bebidas.id, { unidad_medida: "pack", factor_pack: 10 });
-  const yerba = await delDeposito("Yerba 1kg", `77${marca}3`.slice(0, 13), almacen.id);
+  // Trece dígitos con el último distinto: con `77${marca}N`.slice(0, 13) el
+  // dígito final se cortaba y los cuatro productos tenían el mismo código.
+  const codigo = (n) => `${`77${marca}`.slice(0, 12)}${n}`;
+  const coca = await delDeposito("Coca 2L", codigo(1), bebidas.id);
+  const agua = await delDeposito("Agua x10", codigo(2), bebidas.id, { unidad_medida: "pack", factor_pack: 10 });
+  const yerba = await delDeposito("Yerba 1kg", codigo(3), almacen.id);
+  // La que el depósito manda en lugar de la de 1 kg (sección 6). El local no la pide.
+  const yerbaMedio = await delDeposito("Yerba 500g", codigo(4), almacen.id);
 
   const R = {
     setCantidad: await import("../../app/api/pedidos/set-cantidad/route.js"),
@@ -201,12 +206,24 @@ try {
   medido.sinSesion = await pedirPdf(posId, "");
   ok("401", medido.sinSesion.status === 401, json(medido.sinSesion));
 
+  // ── 6. Un renglón cambiado por otro producto (2026-11-03) ───────────────
+  // El depósito no tiene la yerba de 1 kg y manda 4 de 500 g en su lugar: el
+  // renglón dice la que va, con "Pidió: Yerba 1kg" debajo. La coca y el agua
+  // siguen como estaban.
+  console.log("\n── 6. El depósito cambia la yerba por otra y lo baja");
+  const cambio = await pedir(R.editar, "POST", `${BASE}/pos-transferencias/detalle/editar`, pinDepo, { detalleId: linea(yerba).detalleId, preparado: 4, unidadPreparada: "UNIDAD", reemplazoProductoId: yerbaMedio });
+  ok("va la yerba de 500 g en lugar de la de 1 kg", cambio.status === 200 && cambio.cuerpo.item?.reemplazo?.productoNombre === "Yerba 500g", json(cambio));
+  medido.reemplazo = await pedirPdf(posId, sesionDepo);
+  ok("200 y application/pdf", medido.reemplazo.status === 200 && medido.reemplazo.contentType === "application/pdf", json(medido.reemplazo));
+  console.log("   ", json(medido.reemplazo.textos));
+
   // Lo que el candado necesita para comparar sin la marca de la corrida.
   medido.siembra = {
     posId,
     local: A.local.nombre,
     deposito: A.depo.nombre,
     categorias: [bebidas.nombre, almacen.nombre],
+    codigos: { yerba: codigo(3), yerbaMedio: codigo(4) },
     costo: "4321",
     venta: "8765",
   };

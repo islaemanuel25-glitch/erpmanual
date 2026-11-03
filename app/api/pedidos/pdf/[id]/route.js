@@ -35,6 +35,7 @@ import { BASE_CON_CATEGORIA } from "@/lib/pedidos/itemDelPedido";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 import { estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
 import { lineaDelPdf, datosDelPdfDelPedido, nombreDelArchivo } from "@/lib/pedidos/pdfDelPedido";
+import { INCLUDE_REEMPLAZO } from "@/lib/pedidos/reemplazoDeLinea";
 import { armarPedidoAlDepositoPdf } from "@/lib/pdf/pedidoAlDepositoPdf";
 
 const NO_ENCONTRADO = { ok: false, error: "No se encontró ese pedido." };
@@ -93,7 +94,8 @@ export async function GET(req, { params }) {
         origen: { select: { nombre: true } },
         destino: { select: { nombre: true } },
         detalles: {
-          include: { producto: { include: BASE_CON_CATEGORIA } },
+          // Con el producto que va, si el depósito lo cambió por otro.
+          include: { producto: { include: BASE_CON_CATEGORIA }, ...INCLUDE_REEMPLAZO },
           orderBy: { id: "asc" },
         },
         transferencias: {
