@@ -16,20 +16,28 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **103 migraciones**, la última
-`20261103142413_pedido_cambiar_por_otro`. Falta una:
+Ninguna. Producción está en **104 migraciones**, la última
+`20261103210000_recargo_fijo_en_cada_unidad`.
 
-- `20261103210000_recargo_fijo_en_cada_unidad` — DE DATOS. Recalcula el precio
-  de venta de las filas con regla "Recargo fijo por unidad" que quedaron con el
-  recargo sumado una sola vez al bulto (Casiano, cartón de 10: $41.000 → $44.000).
-  Las devolvió así `20261103120000`; también entran las que tienen hoy exactamente
-  esa cuenta equivocada. Respaldo en `respaldo.backup_recargo_unidad_20261103`,
-  decisiones en `respaldo.recargo_unidad_20261103_resultado`, informe por NOTICE.
-  El clasificador la marca NO ADITIVA (comprobado con `--desde 057a8ce`): los
-  `DROP TABLE`, `DELETE` y `UPDATE` sobre sus tablas temporales `_rec_*`, los
-  bloques `DO` y los `UPDATE` de precios. Falso positivo para el schema; hace falta
-  `DEPLOY_MIGRACION_AUTORIZADA=1` con la autorización de Emanuel. No toca el
-  schema: la versión vieja de la app sigue funcionando con ella aplicada.
+La `20261103210000_recargo_fijo_en_cada_unidad` —de datos: recalcula las filas
+con regla "Recargo fijo por unidad" que quedaron con el recargo sumado una vez al
+bulto— se aplicó con el despliegue de `a4a8e10e` (2026-11-03), antes de levantar
+la imagen, con `DEPLOY_MIGRACION_AUTORIZADA=1` dada por Emanuel ("autorizo la
+migración de recargo fijo"); quedó en la bitácora. El clasificador la marcó NO
+ADITIVA por lo previsto: `DROP TABLE`, `DELETE` y `UPDATE` sobre sus temporales
+`_rec_*`, bloques `DO` y los `UPDATE` de precios. El contenedor informó las
+**104** del árbol, imprimió "Applying migration" y `migrate status` cerró con
+"Database schema is up to date!".
+
+No escribió ningún precio, como había anticipado la simulación con ROLLBACK del
+mismo día: las 75 filas de la migración de la mañana ya se habían corregido a
+mano con respaldo en `respaldo.backup_recargo_fijo_20261103`, y ninguna fila
+tenía hoy la cuenta equivocada por el cálculo normal. La huella de precio y
+margen de todo `ProductoLocal` dio igual antes y después. Quedaron
+`respaldo.backup_recargo_unidad_20261103` (250 filas con recargo fijo) y
+`respaldo.recargo_unidad_20261103_resultado` con una sola fila, SALTEADA: Lucky
+20 convertible xl de Casiano, en $63.000 contra $66.000 de su regla, editada a
+mano el 2026-11-03 18:27 — para revisar desde la app.
 
 La `20261103142413_pedido_cambiar_por_otro` —aditiva: dos columnas nulas con su
 FK, `PosTransferenciaDetalle.reemplazoProductoId` (el producto que el depósito
