@@ -106,6 +106,12 @@ try {
       "20261022180000_control_stock_sistema_al_contar",
       // Los máximos por categoría de "Stock alto".
       "20261029120000_maximo_stock_por_categoria",
+      // El tercer nivel de empaque: agrega columnas a ProductoBase, y el
+      // cliente de Prisma las pide en cada `productoBase.create`. Sin ella esta
+      // prueba se cayó desde la tanda 2 (`4ed995c`) con "The column
+      // ProductoBase.sueltos_por_unidad does not exist"; el control además la
+      // lee para valorizar al costo del suelto (tanda 6).
+      "20261103230000_tercer_nivel_empaque",
     ],
   });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
