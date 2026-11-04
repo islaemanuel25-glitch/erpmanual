@@ -16,9 +16,29 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **104 migraciones**, la última
-`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **107**; faltan tres,
-en este orden:
+Ninguna. Producción está en **107 migraciones**, la última
+`20261104200000_componente_con_sueltos_congelados`.
+
+---
+
+## Historial reciente
+
+Las tres del tercer nivel de empaque se aplicaron, en orden, con el despliegue de
+`cc828095` (2026-11-04 07:43), antes de levantar la imagen. El clasificador marcó
+solo `20261103230000_tercer_nivel_empaque` (por sus bloques `DO`) y se aplicó con
+`DEPLOY_MIGRACION_AUTORIZADA=1` dada por Emanuel ("autorizo la migración del
+tercer nivel"); quedó en la bitácora. Antes, Emanuel señaló que los dos caminos
+SIN VERIFICAR de la tanda —la venta suelta por las rutas reales y la compra de 1
+cartón— están cubiertos por `scripts/pruebas-db/tercerNivelEmpaque.mjs`
+(secciones A y C, sobre las rutas `pos-ventas/crear`, `venta/[id]/anular` y
+`compras-proveedor/recibir/[id]`); se comprobó leyendo el archivo, sin correrlo
+en el servidor. El contenedor informó las **107** del árbol, imprimió "Applying
+migration" tres veces y `migrate status` cerró con "Database schema is up to
+date!". Comprobadas contra la base, en solo lectura: las ocho columnas existen,
+nullable y con cero valores no nulos; los seis CHECK existen; y
+`pg_get_triggerdef` de `ProductoBase_libro_reinterpretacion` y
+`ProductoBase_costo_version` nombra `sueltos_por_unidad`. Lo que decían al
+quedar pendientes:
 
 - `20261103230000_tercer_nivel_empaque` — **NO ADITIVA para el clasificador.**
 
@@ -80,10 +100,6 @@ las dos de arriba. La versión que sigue atendiendo durante la ventana no la lee
 ni la escribe. Aplicada en desarrollo con `migrate dev`, sin deriva. **Para
 comprobar después de aplicarla, en solo lectura:** que la columna y el CHECK
 existan y que tenga cero valores no nulos.
-
----
-
-## Historial reciente
 
 La `20261103210000_recargo_fijo_en_cada_unidad` —de datos: recalcula las filas
 con regla "Recargo fijo por unidad" que quedaron con el recargo sumado una vez al
