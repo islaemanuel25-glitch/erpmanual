@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-11-04 15:27
+**Última actualización:** 2026-11-04 15:48
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-04: feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango
 - 2026-11-04: fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
 - 2026-11-03: fix: el recargo fijo por unidad vuelve a sumarse a cada unidad del bulto
 - 2026-10-31: feat: listas — el renglón muestra su presentación, la hoja ordena y busca por tamaño (SIN VERIFICAR EN PANTALLA)

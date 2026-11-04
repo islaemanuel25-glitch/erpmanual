@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-04 15:27
+**Fecha:** 2026-11-04 15:48
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
+- feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango, fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
 - Archivos: 3 modificados (3 total)
 
 ### productos
