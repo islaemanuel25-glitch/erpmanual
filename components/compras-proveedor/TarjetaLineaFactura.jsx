@@ -46,7 +46,7 @@ import SunmiAccionRapida, { TEXTO_COINCIDE } from "@/components/sunmi/SunmiAccio
 import { formatearMoneda } from "@/lib/moneda";
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import { DECISION_DE_PRECIO, decisionVigente, textoDeDecision } from "@/lib/compras-proveedor/decisionDePrecio";
-import { tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
+import { esMismoPrecio } from "@/lib/proveedores/listas/rangoAumento";
 import {
   AVISO_NO_DA_EL_PAPEL,
   AVISO_PAPEL_CORRIDO,
@@ -78,8 +78,23 @@ export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 
 /**
- * CÓMO ESTÁ EL ERP CONTRA EL PAPEL, AL LADO DEL RENGLÓN ERP: "+0,5 %" en verde
- * cuando el ERP está más caro, "−52,6 %" en rojo cuando está más barato.
+ * EL COLOR DE LA VARIACIÓN DEL PAPEL CONTRA EL ERP (Emanuel, 2026-11-04).
+ *
+ * Verde si baja —el papel es más barato—, advertencia si sube, gris si es el
+ * mismo precio con la tolerancia de siempre (`esMismoPrecio`). No es
+ * `tonoDelPorcentaje` de listas: ahí verde es suba, y en una recepción una suba
+ * del proveedor es lo que hay que mirar.
+ */
+export function tonoDeLaVariacionDelPapel(variacionPct) {
+  if (variacionPct === null || variacionPct === undefined) return "sunmi-text-muted";
+  const v = Number(variacionPct);
+  if (!Number.isFinite(v) || esMismoPrecio(v)) return "sunmi-text-muted";
+  return v < 0 ? "sunmi-text-success" : "sunmi-text-warning";
+}
+
+/**
+ * CUÁNTO VARÍA EL PAPEL CONTRA EL ERP, AL LADO DEL RENGLÓN ERP: "−12,1 %" en
+ * verde cuando el papel es más barato, "+52,6 %" en advertencia cuando es más caro.
  *
  * Es el renglón ERP de esta tarjeta, sacado tal cual para que la hoja de
  * Corregir lo muestre con la misma pieza (Emanuel, 2026-10-29). Recibe el `erp`
@@ -89,7 +104,7 @@ export function PorcentajeDelErp({ erp }) {
   if (!erp?.texto) return null;
   return (
     <span
-      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDelPorcentaje(erp.pct)}`}
+      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDeLaVariacionDelPapel(erp.pct)}`}
     >
       {erp.texto}
     </span>
@@ -225,7 +240,7 @@ export default function TarjetaLineaFactura({
   //
   // Un precio distinto dentro de la variación normal del proveedor se decide en
   // la hoja, pero no se pinta de alerta: el porcentaje del renglón ERP ya lo
-  // dice. Lo que sí la lleva es lo que se pasa —PICNIC 38g, −52,6 %—.
+  // dice. Lo que sí la lleva es lo que se pasa —PICNIC 38g, +52,6 %—.
   const tono = esNoPedida && !sinPedidoPrevio
     ? "sunmi-state-danger"
     : estado === ESTADO_LINEA.COINCIDE || dejaSuPrecio || precioDistintoDentroDeLaVariacion(fila)
@@ -361,10 +376,10 @@ export default function TarjetaLineaFactura({
               )}
 
               {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
-                  El precio interno y cuánto está contra el papel: "+" y verde
-                  cuando el ERP está más caro —el depósito gana—, "−" y rojo
-                  cuando está más barato, gris si es el mismo
-                  (`gananciaDelRenglonPct` y `tonoDelPorcentaje`). El signo y el
+                  El precio interno y cuánto varía el papel contra él: "−" y
+                  verde cuando el papel es más barato, "+" y advertencia
+                  cuando es más caro, gris si es el mismo
+                  (`variacionDelPapelPct` y `tonoDeLaVariacionDelPapel`). El signo y el
                   color dicen lo mismo a propósito: un color solo no se lee.
 
                   No se dibuja si no hay con qué comparar —renglón sin vincular,

@@ -1130,7 +1130,12 @@ export default function HojaCorregirLinea({
                 consigo mismo. Queda lo único que hay: lo que dice la factura. */}
             {/* Sin papel queda solo lo pedido: lo contado está en el campo de
                 abajo, y no hay un tercer número que decir. */}
-            <span className="text-sm3 sunmi-text-muted">
+            {/* LA DIFERENCIA CON LO PEDIDO SE DICE ACÁ Y EN NINGÚN OTRO LADO
+                (Emanuel, 2026-11-04): en el color de advertencia del tema. Los
+                campos de abajo quedan con su borde normal: pintarlos de rojo
+                —el de sueltas vacío incluido— se leía como un error de carga, y
+                una cantidad distinta de lo pedido no lo es. */}
+            <span className={`text-sm3 ${cantidadDifiere ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
               {sinPapel
                 ? `Pediste ${limpio(fila.cantidadPedida)}`
                 : soloLaFrase
@@ -1160,7 +1165,6 @@ export default function HojaCorregirLinea({
                   valor={bultos}
                   onCambiar={setBultos}
                   etiqueta={rotuloDeCompletos}
-                  difiere={cantidadDifiere}
                   // `minimo` 0 y no 1: "no llegó nada" es una respuesta válida
                   // en una recepción. Sin `normalizaAlSalir`, porque el vacío
                   // se guarda como `null` —no contado— y un 0 como 0.
@@ -1180,7 +1184,6 @@ export default function HojaCorregirLinea({
                     valor={sueltas}
                     onCambiar={setSueltas}
                     etiqueta="Sueltas"
-                    difiere={cantidadDifiere}
                     minimo={0}
                     tipo="number"
                     claseMarco="flex-1"
