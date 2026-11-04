@@ -46,6 +46,7 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
+import { TITULO_SIN_PRODUCTO, explicacionSinProducto } from "@/lib/proveedores/listas/sinProducto";
 
 const PAGE_SIZE = 20;
 
@@ -124,6 +125,19 @@ export function botonesDeLaLista(item) {
       href: `/modulos/proveedores/listas/${item?.id}/pueden-ser`,
       color: "secondary",
       debajo: explicacionDelPaquete2(proveedor),
+    });
+  }
+  // ── EL 3, "SIN PRODUCTO EN TU CATÁLOGO" (Emanuel, 2026-11-04) ──────────
+  // Con la misma regla que el 2: solo si hay alguno. El número lo cuenta el
+  // servidor con el `where` de su pantalla (`filasSinProductoWhere`).
+  const s = Number(item?.paquetes?.sinProducto ?? 0);
+  if (s > 0) {
+    botones.push({
+      clave: "SIN_PRODUCTO",
+      texto: `${TITULO_SIN_PRODUCTO} · ${s}`,
+      href: `/modulos/proveedores/listas/${item?.id}/sin-producto`,
+      color: "secondary",
+      debajo: explicacionSinProducto(proveedor),
     });
   }
   return botones;

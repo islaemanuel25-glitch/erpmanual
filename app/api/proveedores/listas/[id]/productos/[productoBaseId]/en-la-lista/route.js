@@ -16,8 +16,8 @@
 //
 // ── POR QUÉ NO ALCANZA CON LOS DOS ENDPOINTS QUE YA HABÍA ──────────────────
 //
-// `vincular` contesta: dada una FILA sin producto, a cuál del catálogo
-// corresponde. `otra-fila` contesta: dada una fila atada al producto equivocado,
+// `vincular` (`filas/[filaId]/vincular`) contesta: dada una FILA sin producto,
+// a cuál del catálogo corresponde. `otra-fila` contesta: dada una fila atada al producto equivocado,
 // cuál es el renglón correcto. Acá el producto está y NO tiene ninguna fila: es
 // la tercera combinación, y era la única sin pantalla.
 //

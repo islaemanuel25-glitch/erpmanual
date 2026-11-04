@@ -10,7 +10,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { esImportacionAbierta, paginacion } from "@/lib/proveedores/listas/persistencia";
-import { asegurarPuedenSer, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
+import { asegurarPuedenSer, filasSinProductoWhere, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
 import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
@@ -154,7 +154,9 @@ export async function GET(req) {
         // confirmado. Una lista de antes que nunca lo calculó, lo calcula acá.
         if (!esImportacionAbierta(i.estado)) return { id: i.id, listos, actualizados, paquetes: null };
         await asegurarPuedenSer(prisma, { ...i, grupoId });
-        const [tusProductos, porConfirmar, confirmados] = await Promise.all([
+        // El 3 (2026-11-04): los renglones sin producto, con el `where` de su
+        // pantalla (`filasSinProductoWhere`).
+        const [tusProductos, porConfirmar, confirmados, sinProducto] = await Promise.all([
           prisma.productoBase.count({
             where: { AND: [universoWhere, { sumadoEnListas: { none: { importacionId: i.id } } }] },
           }),
@@ -162,8 +164,16 @@ export async function GET(req) {
             where: porConfirmarWhere({ importacionId: i.id, proveedorId: i.proveedor?.id }),
           }),
           prisma.productoSumadoALaLista.count({ where: { importacionId: i.id } }),
+          prisma.importacionListaFila.count({
+            where: filasSinProductoWhere({ importacionId: i.id, proveedorId: i.proveedor?.id }),
+          }),
         ]);
-        return { id: i.id, listos, actualizados, paquetes: { tusProductos, puedenSer: porConfirmar + confirmados } };
+        return {
+          id: i.id,
+          listos,
+          actualizados,
+          paquetes: { tusProductos, puedenSer: porConfirmar + confirmados, sinProducto },
+        };
       })
     );
     const porImportacion = new Map(conteos.map((c) => [c.id, c]));
@@ -176,7 +186,7 @@ export async function GET(req) {
         umbralVariacionPct: Number(i.umbralVariacionPct),
         productosListos: porImportacion.get(i.id)?.listos ?? 0,
         productosActualizados: porImportacion.get(i.id)?.actualizados ?? 0,
-        // `{ tusProductos, puedenSer }` de una abierta; null de una cerrada.
+        // `{ tusProductos, puedenSer, sinProducto }` de una abierta; null de una cerrada.
         paquetes: porImportacion.get(i.id)?.paquetes ?? null,
       })),
       conteo: { aMedias, terminadas, canceladas, todas: aMedias + terminadas + canceladas },

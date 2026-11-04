@@ -15,7 +15,8 @@
 //
 // ── POR QUÉ NO ALCANZA CON `vincular` ──────────────────────────────────────
 //
-// `vincular` contesta la pregunta inversa: dada una fila del archivo SIN
+// `vincular` —`filas/[filaId]/vincular`, el paquete 3 "Sin producto en tu
+// catálogo"— contesta la pregunta inversa: dada una fila del archivo SIN
 // producto, a cuál del catálogo corresponde. Acá el producto ya está, la fila ya
 // está, y lo que está mal es cuál con cuál. Son dos preguntas y dos pantallas.
 //

@@ -2015,6 +2015,6 @@ function ChipDeEstado({ cabecera }) {
  * `SunmiPantallaDeTrabajo`. El ancho máximo es para que en la computadora las
  * tarjetas no se estiren de punta a punta.
  */
-function Marco({ children }) {
+export function Marco({ children }) {
   return <div className="sunmi-bg w-full min-h-full p-2 lg:p-3 max-w-3xl mx-auto space-y-3">{children}</div>;
 }
