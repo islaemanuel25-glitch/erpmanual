@@ -34,6 +34,7 @@ import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { filasDeIdentidad, METODO_DETECCION } from "@/lib/proveedores/identidad/servicioIdentidad";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
+import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 
 /** Un número que llegó de la pantalla, o null. Vacío es null, no cero. */
 function numeroONull(v) {
@@ -46,7 +47,7 @@ export async function POST(req) {
   try {
     const ctx = await resolveLocalAndGrupo(req);
     if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.recibir");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -185,12 +186,29 @@ export async function POST(req) {
       }
     }
 
+    // ── SI EL PEDIDO NACIÓ DE LA FACTURA, SU LÍNEA SIGUE A LA ESCALA ELEGIDA ─
+    //
+    // Elegir por unidad o por bulto, o confirmar el pack del proveedor, cambia
+    // la escala que dicta el papel. En un pedido nacido de factura la línea la
+    // dicta el papel, así que se corre la MISMA siembra que al leer y al
+    // vincular: rehace la línea sembrada en UNIDAD que ahora es BULTO
+    // (`lineaSembradaQueRehacer`). En un pedido normal vuelve con una consulta.
+    let siembra = null;
+    if (unidadGuardadaEn != null || presentacionGuardada != null) {
+      try {
+        siembra = await sembrarPedidoDesdeFactura(prisma, { pedidoId, grupoId, localId });
+      } catch (e) {
+        console.error("No se pudo rehacer la línea del pedido con la escala elegida:", e?.message);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       pedidoDetalleId: detalle?.id ?? null,
       guardado: Object.keys(aGuardar),
       unidadGuardadaEn,
       presentacionGuardada,
+      siembra: siembra?.ok === true ? siembra : null,
       queHacer: "Queda guardado. Si refrescás la pantalla, sigue estando.",
     });
   } catch {
