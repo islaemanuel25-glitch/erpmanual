@@ -423,6 +423,35 @@ try {
   igual("con sueltos: diferencia de 5 sueltos, a $60 cada uno, $300", [fila?.diferencia, fila?.costoUnitario, fila?.importe], [-5, 60, -300]);
   const filaSin = (dif.filas || []).find((f) => f.productoLocalId === plSin.id);
   igual("sin sueltos: la misma diferencia vale $1.200 cada una", [filaSin?.diferencia, filaSin?.costoUnitario, filaSin?.importe], [-5, 1200, -6000]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("G. Cómo se escribe el stock, por el listado real");
+  // ══════════════════════════════════════════════════════════════════════════
+  // La ficha con sus nombres, como la va a cargar la tanda 9.
+  await c.productoBase.update({ where: { id: base.id }, data: { nombre_bulto: "cartón" } });
+  const rutaListar = await import("../../app/api/stock_locales/listar/route.js");
+  const { presentacionCantidadStock } = await import("../../lib/stock/presentacion.js");
+  const listar = async (localId, q) => {
+    const url = `http://ci/api/stock_locales/listar?localId=${localId}&q=${encodeURIComponent(q)}`;
+    const req = new Request(url, { method: "GET", headers: cabeceras(localId) });
+    Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
+    return leer(await rutaListar.GET(req));
+  };
+  const itemDe = (r, baseId) => (r.items || []).find((i) => i.baseId === baseId);
+
+  // Se fijan los números del caso: 200 en el depósito, 195 en el local.
+  const filaDep = await c.stockLocal.findUnique({ where: { localId_productoId: { localId: deposito.id, productoId: plDeposito.id } } });
+  await c.stockLocal.update({ where: { id: filaDep.id }, data: { cantidad: 200, enTransito: 0 } });
+
+  const enDeposito = itemDe(await listar(deposito.id, "Cigarrillos"), base.id);
+  igual("el listado trae los sueltos y los nombres de la ficha", [enDeposito?.sueltosPorUnidad, enDeposito?.nombreUnidad, enDeposito?.nombreBulto], [SUELTOS, "atado", "cartón"]);
+  igual("200 en el depósito se escribe \"1 cartón\"", presentacionCantidadStock(enDeposito, true).texto, "1 cartón");
+  const enLocal = itemDe(await listar(local.id, "Cigarrillos"), base.id);
+  igual("195 en el local se escribe \"9 atados y 15 sueltos\"", presentacionCantidadStock(enLocal, false).texto, "9 atados y 15 sueltos");
+
+  // Contraprueba: el pack sin sueltos, por el mismo listado, se escribe como hoy.
+  const sinEnLocal = itemDe(await listar(local.id, "Pack sin"), baseSin.id);
+  igual("el pack sin sueltos, como hoy", presentacionCantidadStock(sinEnLocal, false).texto, "195 uds");
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);

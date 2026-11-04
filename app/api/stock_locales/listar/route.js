@@ -5,7 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { productoVisibleWhere } from "@/lib/visibilidad";
-import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
+import { mapStockItemLocal, mapStockItemDeposito, CAMPOS_DE_ESCALA_DEL_STOCK } from "@/lib/stock/mapItem";
 import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarra";
 // Búsqueda de texto de stock (nombre / código de barras / secundario). La
 // comparte el Control de stock.
@@ -284,6 +284,8 @@ export async function GET(req) {
             pesoReferenciaKg: true,
             pesoEsFijo: true,
             modoVentaDeposito: true,
+            // Con qué se escribe el stock en tres niveles (tercer nivel de empaque).
+            ...CAMPOS_DE_ESCALA_DEL_STOCK,
           },
         },
         // La fila de ESTE local: `StockLocal` es único por (local, producto), no
@@ -502,6 +504,8 @@ export async function GET(req) {
             pesoReferenciaKg: true,
             pesoEsFijo: true,
             modoVentaDeposito: true,
+            // Con qué se escribe el stock en tres niveles (tercer nivel de empaque).
+            ...CAMPOS_DE_ESCALA_DEL_STOCK,
           },
         },
         // ── `limitesConfiguradosAt` TAMBIÉN ACÁ, Y FALTABA ─────────────────

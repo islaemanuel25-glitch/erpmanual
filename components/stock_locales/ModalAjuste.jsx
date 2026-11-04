@@ -13,7 +13,7 @@ import {
   motivoExigeDetalle,
   motivosParaDireccion,
 } from "@/lib/stock/motivosDeDiferencia";
-import { presentacionCantidadStock, textoDeBultos, unidadFisicaDeItem } from "@/lib/stock/presentacion";
+import { presentacionCantidadStock, textoDeBultos, textoDeStockEnTresNiveles, unidadFisicaDeItem } from "@/lib/stock/presentacion";
 import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
@@ -210,7 +210,11 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
 
           {(() => {
             const stockNum = Number(producto.stock || 0);
-            if (usarBultos) {
+            // Con sueltos, el stock actual se escribe en tres niveles en el
+            // renglón de abajo, el de siempre; el desglose en bultos no aplica.
+            // Sin sueltos es null y no cambia nada.
+            const tresNiveles = textoDeStockEnTresNiveles(producto, esDeposito);
+            if (usarBultos && tresNiveles === null) {
               const presentacionLabel =
                 unidadMedida === "cajon"
                   ? `Cajón x${factorPack}`
@@ -253,9 +257,9 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
               <p className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
                 Stock actual:{" "}
                 <strong className="sunmi-text-strong">
-                  {esPieza || esKg
+                  {tresNiveles ?? (esPieza || esKg
                     ? presentacionCantidadStock(producto, esDeposito).texto
-                    : `${Math.round(stockNum)} unidades`}
+                    : `${Math.round(stockNum)} unidades`)}
                 </strong>
                 {esPieza && stockNum > 0 && (
                   <span className="sunmi-text-muted">

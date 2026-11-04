@@ -5,6 +5,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { fromUnidades } from "@/lib/conversiones/stock";
+import { textoDeStockEnTresNiveles } from "@/lib/stock/presentacion";
 import { rankearProductos } from "@/lib/pos-ventas/rankearProductos";
 import {
   ENTER,
@@ -293,8 +294,13 @@ function BuscadorProductos({
               const factorPack = Number(p.factorPack) || 1;
               const mostrarDesglose =
                 esDeposito && factorPack > 1 && p.unidadMedida !== "kg" && !p.esFiambreFijo;
+              // Con sueltos, el stock se escribe en tres niveles ("9 atados y
+              // 15 sueltos"); sin ellos es null y sigue el texto de siempre.
+              const tresNiveles = textoDeStockEnTresNiveles(p, esDeposito);
               if (p.sinStock && p.disponibleParaVenta === false) {
                 stockNode = <span className="pos-text-danger font-semibold">Sin stock</span>;
+              } else if (tresNiveles !== null) {
+                stockNode = <span>Stock: {tresNiveles}</span>;
               } else if (mostrarDesglose) {
                 const { bultos, sueltas } = fromUnidades({ unidades: Number(p.stock), factorPack });
                 stockNode = (

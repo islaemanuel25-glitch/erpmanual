@@ -464,6 +464,10 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         sueltosPorUnidad: sueltosParaCongelar(pl.base),
         precioVentaSuelto: suelto.ok ? suelto.precio : null,
         precioCostoSuelto: suelto.ok ? suelto.precioCosto : null,
+        // Cómo se llaman la unidad y el bulto, para escribir el stock en tres
+        // niveles (tanda 7). Null = los rótulos de siempre.
+        nombreUnidad: pl.base?.nombre_unidad ?? null,
+        nombreBulto: pl.base?.nombre_bulto ?? null,
       };
     });
 }

@@ -914,6 +914,7 @@ function NuevaTransferenciaPage() {
                 onAgregar={handleAgregarManual}
                 modo={modoAgregarManual}
                 onModoChange={setModoAgregarManual}
+                origenEsDeposito={origen?.es_deposito === true}
               />
             }
           />

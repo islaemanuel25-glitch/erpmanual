@@ -5,7 +5,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { esFiambreFijo as checkFiambreFijo, sueltosParaCongelar } from "@/lib/conversiones/stock";
+import { resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
 import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import {
@@ -208,6 +209,23 @@ function mapProductos(lista, esDeposito) {
       modoSalidaDefault,
       esFiambreFijo: fiambreFijo || false,
       pesoReferenciaKg: fiambreFijo ? pesoReferenciaKg : undefined,
+      // ── EL TERCER NIVEL DE EMPAQUE (pendiente desde la tanda 4) ────────
+      // Lo mismo que devuelve el buscador del POS, con la MISMA pieza
+      // (`resolverLineaSuelta`) y no con una cuenta propia. Esta copia no
+      // resuelve lista de precios, así que el suelto tampoco: el precio cargado.
+      // Null en todo producto sin sueltos o en el depósito.
+      ...camposDelSuelto(pl, esDeposito),
     };
   });
+}
+
+function camposDelSuelto(pl, esDeposito) {
+  const suelto = resolverLineaSuelta({ esDeposito, base: pl.base, productoLocal: pl, lista: null });
+  return {
+    sueltosPorUnidad: sueltosParaCongelar(pl.base),
+    precioVentaSuelto: suelto.ok ? suelto.precio : null,
+    precioCostoSuelto: suelto.ok ? suelto.precioCosto : null,
+    nombreUnidad: pl.base?.nombre_unidad ?? null,
+    nombreBulto: pl.base?.nombre_bulto ?? null,
+  };
 }

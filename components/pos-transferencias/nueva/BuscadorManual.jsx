@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { textoDeStockEnTresNiveles } from "@/lib/stock/presentacion";
 
 export default function BuscadorManual({
   texto,
@@ -12,6 +13,9 @@ export default function BuscadorManual({
   onAgregar,
   modo,
   onModoChange,
+  // El stock que se muestra es el del origen: en un depósito, un producto con
+  // sueltos se escribe en bultos ("1 cartón"); en un local, en unidades.
+  origenEsDeposito = false,
 }) {
   const [focusIndex, setFocusIndex] = useState(-1);
   const [escuchando, setEscuchando] = useState(false);
@@ -232,7 +236,13 @@ export default function BuscadorManual({
                 <div className="text-sm font-medium truncate">{p.nombre}</div>
                 <div className="text-[11px] sunmi-text-muted">
                   {p.codigoBarra && <span className="mr-3">Cod: {p.codigoBarra}</span>}
-                  {p.stockActual != null && <span>Stock: {Number(p.stockActual).toLocaleString("es-AR")}</span>}
+                  {p.stockActual != null && (
+                    <span>
+                      Stock:{" "}
+                      {textoDeStockEnTresNiveles({ ...p, stock: p.stockActual }, origenEsDeposito) ??
+                        Number(p.stockActual).toLocaleString("es-AR")}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
