@@ -243,7 +243,7 @@ export async function POST(req, { params }) {
           },
         });
         if (esCombo && l.componentesCongelables?.length) {
-          await tx.ventaDetalleComponente.createMany({ data: l.componentesCongelables.map((c) => ({ ventaDetalleId: detalle.id, productoBaseId: c.productoBaseId, productoLocalId: c.productoLocalId, cantidad: c.cantidad, precioCosto: c.costoUnitario })) });
+          await tx.ventaDetalleComponente.createMany({ data: l.componentesCongelables.map((c) => ({ ventaDetalleId: detalle.id, productoBaseId: c.productoBaseId, productoLocalId: c.productoLocalId, cantidad: c.cantidad, precioCosto: c.costoUnitario, sueltosPorUnidadCongelado: c.sueltosPorUnidadCongelado ?? null })) });
         }
       }
       await tx.ventaPago.createMany({ data: pagosConComision.map((t) => ({ ventaId, medio: t.medio, monto: t.monto, comisionPct: t.comisionPct, comision: t.comision, neto: t.neto })) });

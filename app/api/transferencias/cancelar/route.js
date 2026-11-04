@@ -96,7 +96,12 @@ const SELECT_TRANSFERENCIA = {
           // devolver en la escala de hoy.
           sueltosPorUnidadCongelado: true,
           productoBase: { select: { sueltos_por_unidad: true } },
-          componentes: { select: { productoLocalId: true, cantidad: true } },
+          componentes: {
+            select: {
+              productoLocalId: true, cantidad: true, sueltosPorUnidadCongelado: true,
+              productoBase: { select: { sueltos_por_unidad: true } },
+            },
+          },
         },
       },
     },

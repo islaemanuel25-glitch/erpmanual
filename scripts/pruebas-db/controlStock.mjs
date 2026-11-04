@@ -115,6 +115,9 @@ try {
       // Y el nombre del bulto (tanda 7), por lo mismo: otra columna de
       // ProductoBase que el cliente pide, y que el control lee para escribir.
       "20261104120000_nombre_del_bulto",
+      // Y el N de los componentes de combo (tanda 9): el cliente lo pide al
+      // leer `VentaDetalleComponente`.
+      "20261104200000_componente_con_sueltos_congelados",
     ],
   });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });

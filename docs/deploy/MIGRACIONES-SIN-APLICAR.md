@@ -17,7 +17,7 @@ Si la lista está vacía, el despliegue es solo de código.
 ## Pendientes
 
 Producción está en **104 migraciones**, la última
-`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **106**; faltan dos,
+`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **107**; faltan tres,
 en este orden:
 
 - `20261103230000_tercer_nivel_empaque` — **NO ADITIVA para el clasificador.**
@@ -66,6 +66,20 @@ cambia nada de lo que se ve ni de ningún número; ningún libro la mira. La
 versión que sigue atendiendo no la lee ni la escribe. Aplicada en desarrollo con
 `migrate dev`, sin deriva. **Para comprobar después de aplicarla, en solo
 lectura:** que la columna exista y tenga cero valores no nulos.
+
+- `20261104200000_componente_con_sueltos_congelados` — **aditiva** (clasificador
+  `--dir`, corrido el 2026-11-04: sale con 0).
+
+Tanda 9 del tercer nivel de empaque. Una columna nula,
+`VentaDetalleComponente.sueltosPorUnidadCongelado` (el N con que se descontó cada
+componente de combo), con un CHECK que solo mira valores no nulos (mayor que 1):
+no puede fallar sobre filas existentes. **Esta tanda es la que activa el dato**:
+la ficha ya puede cargar sueltos por unidad y el código nuevo escribe esta
+columna al vender un combo, así que **va antes de levantar la imagen**, igual que
+las dos de arriba. La versión que sigue atendiendo durante la ventana no la lee
+ni la escribe. Aplicada en desarrollo con `migrate dev`, sin deriva. **Para
+comprobar después de aplicarla, en solo lectura:** que la columna y el CHECK
+existan y que tenga cero valores no nulos.
 
 ---
 

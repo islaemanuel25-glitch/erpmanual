@@ -99,7 +99,13 @@ const SELECT_VENTA = {
       // devuelve el consumo convertido entre los dos.
       sueltosPorUnidadCongelado: true,
       productoBase: { select: { sueltos_por_unidad: true } },
-      componentes: { select: { productoLocalId: true, cantidad: true } },
+      // Lo mismo por componente de combo (tanda 9): su N y el de hoy.
+      componentes: {
+        select: {
+          productoLocalId: true, cantidad: true, sueltosPorUnidadCongelado: true,
+          productoBase: { select: { sueltos_por_unidad: true } },
+        },
+      },
     },
   },
 };

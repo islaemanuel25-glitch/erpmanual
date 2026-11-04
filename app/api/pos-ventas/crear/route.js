@@ -1512,6 +1512,7 @@ async function procesarCrear(req, intento) {
               productoLocalId: c.productoLocalId,
               cantidad: c.cantidad, // cantidad por combo × combos vendidos
               precioCosto: c.costoUnitario,
+              sueltosPorUnidadCongelado: c.sueltosPorUnidadCongelado ?? null,
             })),
           });
         }
