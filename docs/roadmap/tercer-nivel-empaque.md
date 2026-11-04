@@ -314,11 +314,42 @@ terminó `20261030230000_precios_sin_regla`; `azulChatVentasResumen.mjs` cae
 porque su base no tiene `Usuario.sesionInvalidadaEn`. No son de este plan y no
 se tocaron.
 
-### 7 · Las pantallas — sin migración
+### 7 · Cómo se escribe el stock — LLEVA MIGRACIÓN (aditiva) — HECHA
 
-`fromUnidades` pasa a tres niveles. Rótulos: el nombre del bulto que ya existe,
-`nombre_unidad` (o "unidades" si está vacío) y "sueltos". "1 cartón" en el
-depósito, "9 atados y 15 sueltos" en el local; el suelto nunca aparece solo.
+**Corrección de Emanuel:** el depósito ve "1 cartón", no "1 pack" ni "1 bulto".
+No había ningún campo que nombrara el bulto del producto, así que entra
+`ProductoBase.nombre_bulto` (`20261104120000_nombre_del_bulto`, aditiva, anotada
+en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`). **La ficha la carga en la tanda 9**,
+en singular, junto con los sueltos y el nombre de la unidad. Vacío = "bulto",
+el rótulo de hoy.
+
+- `fromUnidades` acepta `sueltosPorUnidad` y parte en bultos, unidades y
+  sueltos. Sin sueltos devuelve el objeto de siempre, sin la clave nueva.
+- **Una sola función de texto:** `textoDeStockEnTresNiveles` en
+  `lib/stock/presentacion.js`. Escribe "1 cartón" en el depósito, "10 atados"
+  en el local, "9 atados y 15 sueltos" si se abrió uno, y "15 sueltos" solo
+  cuando no hay un atado entero; el suelto nunca pasa de N − 1. El plural lo
+  arma `pluralDe` ("cartón" → "cartones"). Para un producto sin sueltos
+  devuelve null, y cada superficie sigue con su texto de siempre.
+- **Dónde se aplica:** `presentacionCantidadStock` y `formatLimiteStock` (tabla
+  y tarjeta de Stock, Stock Diario, Valor del Stock, Azul Chat), el modal de
+  ajuste, el buscador del POS y el buscador del pedido de transferencias. Los
+  datos llegan por `mapItem` (con `CAMPOS_DE_ESCALA_DEL_STOCK` en cada consulta),
+  `buscar-producto`, `mapItemCatalogo` y la escala del Stock Diario (que suma los
+  campos solo si hay sueltos, para no cambiar la respuesta de hoy).
+- **La copia de `stock_locales/buscar-producto`** ahora devuelve los sueltos,
+  el precio y el costo del suelto (con `resolverLineaSuelta`, sin lista: esa
+  copia no resuelve listas) y los nombres.
+- **Verificado:** los textos de antes y de ahora sobre 9.120 combinaciones sin
+  sueltos dan idéntico; el candado de base pasa por el listado real y escribe
+  "1 cartón" y "9 atados y 15 sueltos" (y el pack sin sueltos, "195 uds").
+- **Pendiente para la tanda 8:** el chip y el renglón de stock del CARRITO del
+  POS (sus líneas se arman campo por campo en el reducer y no llevan los
+  nombres) y los campos de los modales de límites, que se cargan en bultos.
+- **Valor del Stock y "¿Por qué cambió?"** escriben con la escala de la VERSIÓN
+  del libro de costos, que guarda los sueltos pero no los nombres: con sueltos
+  dicen "bulto" y "unidad". Si hace falta el nombre, el libro tendría que
+  capturarlo (extensión de la captura, como en la tanda 2).
 Tabla de stock, buscador del POS, `lib/stock/mapItem.js`, Stock Diario y
 transferencias. **Y la copia de `app/api/stock_locales/buscar-producto`**, que
 en la tanda 4 quedó sin el precio y el costo del suelto a propósito: se le
@@ -332,7 +363,8 @@ servidor de la tanda 4.
 ### 9 · La activación — migración solo si hace falta
 
 La ficha muestra "se vende más chico: cuántos sueltos trae cada unidad", el
-nombre de la unidad y el precio del suelto por ubicación. Al guardar el dato se
+nombre de la unidad, **el nombre del bulto (`nombre_bulto`, desde la tanda 7)** y
+el precio del suelto por ubicación. Los dos nombres van en singular. Al guardar el dato se
 multiplica el stock existente (trampa 2). No se deja cambiar con transferencias
 en tránsito ni conteos abiertos. Es la primera tanda que cambia algo para el
 usuario. Lleva migración solo si el bloqueo necesita una restricción en la base.
