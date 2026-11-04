@@ -272,6 +272,7 @@ export async function GET(req, context) {
           admiteKilos,
           porKilo,
           precioLista: fila.precioConIva,
+          cajaDelCatalogo,
         });
         if (!falta) return null;
         const kilos = falta === FALTA.KILOS;

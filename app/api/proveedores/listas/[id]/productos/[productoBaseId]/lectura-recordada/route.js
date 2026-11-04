@@ -56,6 +56,7 @@ import {
   claveDelPackDeLaLista,
   kilosValidos,
   packDeLaListaValido,
+  packsPosibles,
 } from "@/lib/proveedores/listas/cajaRecordada";
 import { CAMPOS_PRODUCTO_PARA_LEER } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { CANTIDAD_MAX } from "@/lib/proveedores/listas/confirmarPresentacion";
@@ -228,8 +229,7 @@ export async function POST(req, context) {
     const caja = cajaDelCatalogo(producto);
     if (caja !== null) {
       if (!packDeLaListaValido(cantidad, caja)) {
-        const divisores = [];
-        for (let d = 2; d < caja; d++) if (caja % d === 0) divisores.push(d);
+        const divisores = packsPosibles(caja);
         return NextResponse.json(
           {
             ok: false,
