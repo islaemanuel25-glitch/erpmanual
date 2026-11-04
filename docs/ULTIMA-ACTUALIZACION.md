@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-04 10:27
+**Fecha:** 2026-11-04 15:27
 
 ## Módulos modificados recientemente
+
+### proveedores
+- fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
+- Archivos: 3 modificados (3 total)
 
 ### productos
 - feat: la ficha activa el tercer nivel de empaque ("+ Se vende más chico"), feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados, feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
