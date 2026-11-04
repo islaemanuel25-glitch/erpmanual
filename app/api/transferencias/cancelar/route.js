@@ -66,6 +66,7 @@ const SELECT_TRANSFERENCIA = {
       cantidad: true,
       recibido: true,
       unidadEnviada: true,
+      sueltosPorUnidadCongelado: true,
       producto: {
         select: { base: { select: { id: true, nombre: true, factor_pack: true } } },
       },
@@ -254,7 +255,9 @@ export async function POST(req) {
         // esta fila de Prisma. Devuelve `null` cuando el dato no es representable,
         // y acá eso se saltea igual que un cero: esta ruta devuelve stock y no
         // puede inventar cuánto.
-        const unidades = fisicasEnviadasDe(d);
+        // Con el N CONGELADO al despachar (tercer nivel de empaque): el origen
+        // descontó factor × N por bulto, y es eso lo que vuelve. Null = 1.
+        const unidades = fisicasEnviadasDe(d, { sueltosPorUnidad: d.sueltosPorUnidadCongelado });
         if (unidades == null || unidades <= 0) continue;
 
         // El detalle apunta al ProductoLocal del DESTINO; el del origen se

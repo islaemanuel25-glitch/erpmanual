@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
-import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo } from "@/lib/conversiones/stock";
+import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo, sueltosParaCongelar, toUnidades } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { fiambreAlCerrar, papelQueNoCierra } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import {
@@ -190,6 +190,8 @@ export async function POST(req, { params }) {
                     pesoEsFijo: true,
                     pesoPromedioKg: true,
                     actualizaPromedioPorRecepcion: true,
+                    // Tercer nivel de empaque: cuántos sueltos entran por unidad.
+                    sueltos_por_unidad: true,
                     // EL COSTO MAESTRO DE HOY. Lo leen tres defensas del cierre
                     // —la escala de `costoLineaAMaestro`, el freno por la
                     // variación del proveedor y la frontera— y faltaba acá:
@@ -960,6 +962,23 @@ export async function POST(req, { params }) {
                   `revisá si son bultos o unidades sueltas.`
               );
             }
+          }
+        }
+
+        // ── EL TERCER NIVEL DE EMPAQUE (tanda 5) ───────────────────────────
+        //
+        // Todo lo de arriba cuenta UNIDADES (atados): la hoja, el papel y el
+        // control de escala hablan en unidades, y así se compararon. La fila de
+        // stock, con sueltos, cuenta sueltos: cada unidad que entra son N. Se
+        // convierte acá, recién después del control, por el embudo de entrada
+        // (`toUnidades` con los sueltos de la ficha). El kilo no tiene sueltos.
+        // Sin sueltos —hoy, todo producto— no cambia el número.
+        if (!vaPorPeso) {
+          const sueltosPorUnidad = sueltosParaCongelar(base);
+          if (sueltosPorUnidad) {
+            incremento = Math.round(
+              toUnidades({ cantidad: incremento, unidad: "UNIDAD", factorPack: 1, sueltosPorUnidad }) * 1000
+            ) / 1000;
           }
         }
 

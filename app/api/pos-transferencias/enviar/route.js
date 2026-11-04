@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
+import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg, sueltosParaCongelar } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
@@ -265,6 +265,10 @@ export async function POST(req) {
           baseQueVa: base,
           productoLocalOrigen: productoQueVa,
           factorPack,
+          // Tercer nivel de empaque: el depósito manda bultos o unidades, y con
+          // sueltos cada unidad son N de stock. Lo usa la validación de abajo y
+          // `crearTransferencia`, que lo congela en la línea.
+          sueltosPorUnidad: sueltosParaCongelar(base),
           reemplazaABaseId: productoQueVa === detalle.producto ? null : detalle.producto?.baseId ?? null,
         };
       })
@@ -331,6 +335,7 @@ export async function POST(req) {
         cantidad: item.cantidadRaw,
         unidad: item.unidadEnviada,
         factorPack: item.factorPack,
+        sueltosPorUnidad: item.sueltosPorUnidad,
       });
 
       if (unidadesNecesarias > stockDisp) {
@@ -433,6 +438,7 @@ export async function POST(req) {
           cantidad: item.cantidadRaw,
           unidadEnviada: item.unidadEnviada,
           factorPack: item.factorPack,
+          sueltosPorUnidad: item.sueltosPorUnidad,
           productoLocalOrigen: item.productoLocalOrigen,
           // ── ACÁ LA PRESENTACIÓN SÍ ESTABA, Y SE PERDÍA IGUAL ──────────────
           //

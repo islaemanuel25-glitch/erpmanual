@@ -439,7 +439,12 @@ export async function POST(req) {
           // El factor de la presentación CANÓNICA, el mismo que resolvió el
           // stock. Sin esto, 6 packs de 24 se leerían como 6 unidades del otro
           // lado de la misma transacción.
-          factor: escalaDeRecepcion(d).factorPack,
+          //
+          // Con tercer nivel de empaque, las físicas cuentan sueltos: una
+          // presentación son factor × N unidades de stock, con el N congelado
+          // en la línea. Null = 1, el factor de siempre.
+          factor: (Number(escalaDeRecepcion(d).factorPack) || 1) * (d.sueltosPorUnidadCongelado > 1 ? d.sueltosPorUnidadCongelado : 1),
+          sueltosPorUnidad: d.sueltosPorUnidadCongelado ?? null,
           // ── EL PRODUCTO QUE APARECIÓ AL ABRIR LOS BULTOS ────────────────
           //
           // Una línea agregada no tiene VentaDetalle del cual sacar el precio

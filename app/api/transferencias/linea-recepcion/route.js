@@ -8,6 +8,7 @@ import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 import { ERRORES_RECEPCION, resolverUnidadEnviada } from "@/lib/transferencias/recepcion";
 import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
 import { presentacionParaGuardar } from "@/lib/transferencias/costoTransferencia";
+import { sueltosParaCongelar } from "@/lib/conversiones/stock";
 import {
   PRESENTACION,
   agrupa,
@@ -342,6 +343,9 @@ export async function POST(req) {
           factorPresentacion: agrupa(presentacion.presentacion) ? presentacion.factor : null,
           pesoPiezaKg:
             presentacion.presentacion === PRESENTACION.PIEZA ? presentacion.pesoPiezaKg : null,
+          // Y los sueltos por unidad, por el mismo motivo (tercer nivel de
+          // empaque): de este N sale cuántos sueltos entran por unidad contada.
+          sueltosPorUnidadCongelado: sueltosParaCongelar(producto.base),
           precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
           // La escala de ese precio: la presentación de la ficha AHORA, para que
           // editarla después no relea el precio con otro factor.

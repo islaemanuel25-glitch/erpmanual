@@ -319,6 +319,14 @@ jobs:
           # descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatPedidosPendientes.mjs
+          # Tercer nivel de empaque (cartón → atado → suelto): vender 1 suelto,
+          # 1 atado y 1 cartón y anularlas vuelve el stock exacto; una
+          # transferencia de 1 cartón suma 200 al confirmar y devuelve 200 al
+          # cancelar, con el N congelado. Es el único lugar que recorre ese
+          # camino entero, porque ningún producto real tiene sueltos todavía.
+          # Rutas reales, base descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/tercerNivelEmpaque.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #

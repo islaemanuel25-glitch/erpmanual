@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { productoVisibleWhere } from "@/lib/visibilidad";
-import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre, unidadesDeStockPorEscalon } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
@@ -176,16 +176,25 @@ export async function GET(req) {
       let sugeridoCantidad;
       let sugeridoUnidad;
 
+      // Cuántas unidades de stock son un bulto y una unidad: el embudo. Con
+      // tercer nivel de empaque el faltante está en sueltos y se pide en bultos
+      // o unidades (atados); sin sueltos, el bulto es el factor y la unidad 1.
+      const escalones = unidadesDeStockPorEscalon({
+        factor_pack: base.factor_pack,
+        sueltos_por_unidad: base.sueltos_por_unidad,
+        unidad_medida: base.unidad_medida,
+      });
+
       if (modoVentaDep === "PIEZA" && pesoRef > 0 && esProductoFiambre(base)) {
         sugeridoCantidad = Math.ceil(faltanteUnidades / pesoRef);
         sugeridoUnidad = "UNIDAD";
       } else if (modoPedido === "BULTO" && factorPack > 1) {
-        // Por bulto: ceil(faltanteUnidades / factor)
-        sugeridoCantidad = Math.ceil(faltanteUnidades / factorPack);
+        // Por bulto: ceil(faltante / unidades de stock por bulto)
+        sugeridoCantidad = Math.ceil(faltanteUnidades / escalones.bulto);
         sugeridoUnidad = "BULTO";
       } else {
-        // Por unidad: faltanteUnidades
-        sugeridoCantidad = faltanteUnidades;
+        // Por unidad: el faltante, o —con sueltos— las unidades que lo cubren.
+        sugeridoCantidad = escalones.unidad > 1 ? Math.ceil(faltanteUnidades / escalones.unidad) : faltanteUnidades;
         sugeridoUnidad = "UNIDAD";
       }
 
