@@ -350,6 +350,9 @@ export async function GET(req) {
             recargoFijoUnidad: true,
             codigo_barra_propio: true,
             recargoServicioPct: true,
+            // El precio del suelto de esta ubicación (tercer nivel de empaque):
+            // la ficha que se abre desde la tarjeta lo muestra y lo reenvía.
+            precio_venta_suelto: true,
             // Última revisión del precio EN ESTA UBICACIÓN. Sin esta columna el
             // control "Precios +30 días" no puede filtrar, y el select acotado
             // devolvería `undefined` —que la clasificación leería como "sin

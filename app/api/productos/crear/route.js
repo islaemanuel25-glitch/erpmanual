@@ -12,6 +12,8 @@ import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { esModalidadServicio, validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
+import { TEXTO_CAMBIO_DE_ESCALA, interpretarSueltosPorUnidad } from "@/lib/productos/cambioDeEscala";
+import { splitUiToDb } from "@/lib/mappers/producto";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -105,6 +107,26 @@ export async function POST(req) {
     // mira ningún índice.
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId, prisma);
 
+    // Tercer nivel de empaque: un producto nuevo no tiene stock que
+    // reinterpretar, así que los sueltos por unidad se guardan como un campo más
+    // (con las mismas validaciones que la edición).
+    const sueltos = interpretarSueltosPorUnidad(body.sueltos_por_unidad);
+    if (sueltos.ok === false) {
+      return NextResponse.json({ ok: false, error: sueltos.error, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    const sueltosPorUnidad = sueltos.ok ? sueltos.valor : null;
+    if (sueltosPorUnidad !== null && body.unidad_medida === "kg") {
+      return NextResponse.json({ ok: false, error: TEXTO_CAMBIO_DE_ESCALA.KG, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    if (sueltosPorUnidad !== null && Boolean(body.es_combo)) {
+      return NextResponse.json({ ok: false, error: TEXTO_CAMBIO_DE_ESCALA.COMBO, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    const { localData: localDeLaFicha } = splitUiToDb(body);
+    const precioSuelto = localDeLaFicha.precio_venta_suelto ?? null;
+    if (precioSuelto !== null && !(Number.isFinite(precioSuelto) && precioSuelto > 0)) {
+      return NextResponse.json({ ok: false, error: "El precio del suelto tiene que ser mayor que cero, o quedar vacío.", campo: "precio_venta_suelto" }, { status: 400 });
+    }
+
     // 4) Armar baseData
     const baseData = {
       grupoId,
@@ -165,6 +187,12 @@ export async function POST(req) {
       pesoPromedioKg: num(body.pesoPromedioKg),
       actualizaPromedioPorRecepcion: body.actualizaPromedioPorRecepcion !== false,
     };
+    // Solo si hay algo que guardar: un alta sin el dato escribe exactamente lo
+    // de siempre.
+    if (sueltosPorUnidad !== null) baseData.sueltos_por_unidad = sueltosPorUnidad;
+    const { baseData: nombresDeLaFicha } = splitUiToDb(body);
+    if (nombresDeLaFicha.nombre_unidad) baseData.nombre_unidad = nombresDeLaFicha.nombre_unidad;
+    if (nombresDeLaFicha.nombre_bulto) baseData.nombre_bulto = nombresDeLaFicha.nombre_bulto;
 
     // modo_envio default
     if (body.modo_envio) {
@@ -271,6 +299,8 @@ export async function POST(req) {
             // null lo mandaría al control "Precios +30 días" desde el minuto
             // cero, y ese control existe para señalar lo que quedó viejo.
             precioRevisadoAt: new Date(),
+            // El precio del suelto es de la ubicación que carga la ficha.
+            ...(precioSuelto !== null && id === localId ? { precio_venta_suelto: precioSuelto } : {}),
           })),
           skipDuplicates: true,
         });
@@ -314,6 +344,7 @@ export async function POST(req) {
             activo: base.activo,
             // Nace revisado, igual que en el caso de depósito de arriba.
             precioRevisadoAt: new Date(),
+            ...(precioSuelto !== null ? { precio_venta_suelto: precioSuelto } : {}),
           },
         ],
         skipDuplicates: true,

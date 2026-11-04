@@ -397,7 +397,7 @@ dato, un solo resultado, como hoy.
 - Candados: `lib/pos-ventas/posSuelto.test.mjs` (H1–H7) y la sección H de
   `scripts/pruebas-db/tercerNivelEmpaque.mjs`, con contraprueba en los dos.
 
-### 9 · La activación — migración solo si hace falta
+### 9 · La activación — LLEVA MIGRACIÓN (aditiva) — HECHA
 
 La ficha muestra "se vende más chico: cuántos sueltos trae cada unidad", el
 nombre de la unidad, **el nombre del bulto (`nombre_bulto`, desde la tanda 7)** y
@@ -405,6 +405,60 @@ el precio del suelto por ubicación. Los dos nombres van en singular. Al guardar
 multiplica el stock existente (trampa 2). No se deja cambiar con transferencias
 en tránsito ni conteos abiertos. Es la primera tanda que cambia algo para el
 usuario. Lleva migración solo si el bloqueo necesita una restricción en la base.
+
+**Lo que quedó de la tanda 8, resuelto:** la "baja" de 10.067 a 10.017 candados
+no fue tal: 10.067 era el total de la tanda 7 y 10.017 los que PASAN en la 8
+(10.074 en total; la diferencia son los 55 omitidos y 2 `todo` de siempre). No
+se perdió ninguno. El suelto vendido con lista de precios de cliente quedó en el
+candado de base (sección H: lista al costo + 25 %, el suelto cobra $75). El
+modal de límites escrito por script quedó igual que con el editor (sin barras,
+tabs ni CR en el diff) y el hook del trinquete corrido sobre él no avisa nada.
+
+**Cómo quedó (verificado en código y contra la base):**
+
+- **La ficha** (`components/productos/FormProducto.jsx`): dentro del campo del
+  factor, un `SunmiLinkButton` "+ Se vende más chico", cerrado por defecto y
+  abierto si el producto ya tiene el dato. Al abrirlo, tres `Field` +
+  `SunmiInput` copiados del factor: sueltos por unidad, nombre de la unidad y
+  nombre del bulto. Va adentro del campo para no mover la grilla: 146 fichas sin
+  el dato renderizadas antes y después difieren solo en el enlace. No aparece en
+  un producto por kilo (el servidor también lo rechaza) ni en un combo.
+- **El precio del suelto**: en Precios, `Field` + `SunmiInput` "Venta suelto",
+  solo si el producto tiene el dato. Se guarda en el `ProductoLocal` de la
+  ubicación que edita, por las dos rutas (dueño y no dueño), como el código propio.
+- **El cambio de escala** (`lib/productos/cambioDeEscala.js`): una transacción
+  que guarda `sueltos_por_unidad` y reinterpreta cantidad, tránsito, mínimo y
+  máximo de todas las ubicaciones y las cantidades de `ComboComponente`, con
+  `cantidadDeStockEnLaEscalaDeHoy` (la misma conversión que anulaciones y
+  correcciones). Declara el origen `CAMBIO_DE_ESCALA` en los dos libros; la
+  `ReinterpretacionDeStock` la escribe el trigger. Vaciar el dato es la misma
+  operación al revés. Corre antes que el resto de la ficha: si se rechaza, no se
+  guarda nada. Solo el dueño de la ficha lo cambia (403 para un local sobre un
+  producto del depósito).
+- **Cuándo no se deja**: con transferencias en `Enviada`, `Recibiendo`,
+  `Confirmando` o `Cancelando`; con un control de stock ABIERTO en una ubicación
+  del producto; si alguna cantidad no da entera en la escala nueva (vaciar con
+  sueltos abiertos) **[decisión técnica: no se redondea en silencio, se dice
+  cuál]**; en kilo o en combo. Cada caso con su mensaje.
+- **El costo del día** (`escalaDeCierre` en `costoCongeladoPorDia`): el día en
+  que cambian los sueltos, el precio sigue siendo el de las 00:00 pero la escala
+  es la del cierre; la apertura se valoriza con la de las 00:00. El candado de
+  los $12.000 está en verde y sin la marca `todo`. Cubre también el producto que
+  nace y carga el dato el mismo día. Un cambio de COSTO del mismo día sigue
+  esperando al corte. Los movimientos `CAMBIO_DE_ESCALA` valen cero en "¿Por qué
+  cambió?".
+- **Migración `20261104200000_componente_con_sueltos_congelados`** (aditiva):
+  `VentaDetalleComponente.sueltosPorUnidadCongelado`, lo que la tanda 5 dejó
+  anotado. La venta y la corrección de un combo la escriben; la anulación, la
+  cancelación de una venta interna y la corrección la leen. Sin ella, anular un
+  combo vendido antes de cargar el dato devolvía 1 donde el stock ya cuenta 20.
+- **Candados:** `lib/productos/cambioDeEscala.test.mjs` (I1–I7),
+  `components/productos/fichaSeVendeMasChico.test.mjs` (F1–F3), tres en
+  `valorDelStock.test.mjs`, y la sección I del candado de base: ciclo completo por
+  las rutas reales (ficha → stock × 20 y costo del día en la escala nueva →
+  anular un combo viejo → precio del suelto del local → vender 1 suelto → vaciar
+  bloqueado por tránsito → bloqueado por sueltos abiertos → vaciar). Contraprueba
+  en todos.
 
 ### 10 · Los datos — sin migración, desde la aplicación
 

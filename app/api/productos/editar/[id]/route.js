@@ -27,6 +27,13 @@ import {
 } from "@/lib/productos/codigoBarraPropio";
 import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 import { propagarCostoALocales } from "@/lib/precios/propagarCostoALocales";
+import {
+  TEXTO_CAMBIO_DE_ESCALA,
+  cambiarSueltosPorUnidad,
+  interpretarSueltosPorUnidad,
+} from "@/lib/productos/cambioDeEscala";
+
+const TEXTO_PRECIO_SUELTO_INVALIDO = "El precio del suelto tiene que ser mayor que cero, o quedar vacío.";
 
 // ── Detección de "guardado engañoso" ────────────────────────────────────────
 // Cuando la ruta es 'override' (un local edita un producto de depósito), SOLO se
@@ -92,6 +99,11 @@ function detectarCambioFichaMaestra(baseData, base) {
   }
   if (!_eqNum(_factorNorm(baseData.factor_pack, base?.unidad_medida), _factorNorm(base?.factor_pack, base?.unidad_medida))) {
     return "factor_pack";
+  }
+  // Los nombres de la unidad y del bulto (tercer nivel de empaque) solo se
+  // comparan si el cliente los mandó: uno que no los maneja no los cambia.
+  for (const k of ["nombre_unidad", "nombre_bulto"]) {
+    if (baseData[k] !== undefined && !_eqStr(baseData[k], base?.[k])) return k;
   }
   return null;
 }
@@ -180,7 +192,7 @@ export async function PUT(req, context) {
     // Existencia + pertenencia al grupo del alcance.
     const baseScope = await prisma.productoBase.findUnique({
       where: { id: baseId },
-      select: { id: true, grupoId: true, es_combo: true, creadoEnLocalId: true, precio_costo: true },
+      select: { id: true, grupoId: true, es_combo: true, creadoEnLocalId: true, precio_costo: true, sueltos_por_unidad: true },
     });
     if (!baseScope) {
       return NextResponse.json({ ok: false, error: "Producto no encontrado" }, { status: 404 });
@@ -342,9 +354,44 @@ export async function PUT(req, context) {
     // Editar la base o el override (capturamos la respuesta para luego persistir el
     // código propio en la MISMA ubicación operante, cualquiera sea la ruta).
     let resp;
+    // ── TERCER NIVEL DE EMPAQUE: LOS SUELTOS POR UNIDAD Y SU PRECIO ─────────
+    //
+    // Los sueltos por unidad cambian qué significa el stock, así que no se
+    // guardan como un campo más: van por `cambiarSueltosPorUnidad`, que en UNA
+    // transacción guarda el dato y reinterpreta stock, tránsito, límites y
+    // combos, o no escribe nada y dice por qué. Corre antes que el resto de la
+    // ficha: si se rechaza, no se guardó nada.
+    const sueltos = interpretarSueltosPorUnidad(payload.sueltos_por_unidad);
+    if (sueltos.ok === false) {
+      return NextResponse.json({ ok: false, error: sueltos.error, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    const sueltosFinales = sueltos.ok ? sueltos.valor : baseScope.sueltos_por_unidad ?? null;
+    if (sueltosFinales !== null && baseData.unidad_medida === "kg") {
+      return NextResponse.json({ ok: false, error: TEXTO_CAMBIO_DE_ESCALA.KG, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    const precioSuelto = localData.precio_venta_suelto;
+    if (precioSuelto !== undefined && precioSuelto !== null && !(Number.isFinite(precioSuelto) && precioSuelto > 0)) {
+      return NextResponse.json({ ok: false, error: TEXTO_PRECIO_SUELTO_INVALIDO, campo: "precio_venta_suelto" }, { status: 400 });
+    }
+
     if (ruta === "base") {
+      if (sueltos.ok && sueltos.valor !== (baseScope.sueltos_por_unidad ?? null)) {
+        const cambio = await prisma.$transaction((tx) =>
+          cambiarSueltosPorUnidad(tx, { baseId, nuevo: sueltos.valor, unidadMedida: baseData.unidad_medida })
+        );
+        if (!cambio.ok) {
+          return NextResponse.json({ ok: false, error: cambio.error, campo: "sueltos_por_unidad" }, { status: 409 });
+        }
+      }
       resp = await editarBase(baseId, baseData, operandoEnLocalId, localData);
     } else {
+      // Los sueltos por unidad son de la ficha maestra, como el factor.
+      if (sueltos.ok && sueltos.valor !== (baseScope.sueltos_por_unidad ?? null)) {
+        return NextResponse.json(
+          { ok: false, error: mensajeFichaMaestraNoEditable(), campo: "sueltos_por_unidad" },
+          { status: 403 }
+        );
+      }
       // ruta === "override": producto de depósito editado desde un local. Solo se
       // persiste el override. Si el payload intenta cambiar la ficha maestra (que este
       // alcance NO guarda), rechazar en vez de devolver un éxito engañoso.
@@ -357,6 +404,23 @@ export async function PUT(req, context) {
         );
       }
       resp = await editarOverride(baseId, operandoEnLocalId, localData);
+    }
+
+    // El precio del suelto es de ESTA ubicación, como su precio de venta: se
+    // guarda en su ProductoLocal, cualquiera sea la ruta. Solo si cambió, para
+    // no escribir una fila por un guardado que no lo tocó.
+    if (precioSuelto !== undefined) {
+      const actual = await prisma.productoLocal.findUnique({
+        where: { localId_baseId: { localId: operandoEnLocalId, baseId } },
+        select: { precio_venta_suelto: true },
+      });
+      const antes = actual?.precio_venta_suelto == null ? null : Number(actual.precio_venta_suelto);
+      if (actual && antes !== precioSuelto) {
+        await prisma.productoLocal.update({
+          where: { localId_baseId: { localId: operandoEnLocalId, baseId } },
+          data: { precio_venta_suelto: precioSuelto },
+        });
+      }
     }
 
     // Persistir el código propio en el ProductoLocal de la ubicación operante (existe
@@ -485,6 +549,12 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null, localData 
     proveedor3_id: baseData.proveedor3_id ? Number(baseData.proveedor3_id) : null,
     area_fisica_id: baseData.area_fisica_id ? Number(baseData.area_fisica_id) : null,
   };
+
+  // Tercer nivel de empaque: los nombres de la unidad y del bulto, si vinieron.
+  // Son rótulos: no cambian ninguna cantidad. Los sueltos por unidad ya los
+  // guardó `cambiarSueltosPorUnidad`, con su reinterpretación.
+  if (baseData.nombre_unidad !== undefined) dataFinal.nombre_unidad = baseData.nombre_unidad;
+  if (baseData.nombre_bulto !== undefined) dataFinal.nombre_bulto = baseData.nombre_bulto;
 
   // Fiambre fields
   if (baseData.modoCompraProveedor !== undefined) {

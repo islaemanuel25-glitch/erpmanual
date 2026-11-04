@@ -29,6 +29,12 @@
 //      con el precio del cigarrillo; el del depósito, uno solo. Vender el
 //      suelto con el carrito y el payload reales descuenta 1 y cobra $100.
 //      Escanear el código agrega el atado. Sin `conSueltos` y sin el dato, uno.
+//      Con lista de precios de cliente, el suelto cobra el precio de la lista.
+//   I. LA FICHA ACTIVA EL DATO (tanda 9), por `productos/editar`: con un control
+//      abierto no se deja; cargarlo multiplica stock, límites y combos, deja la
+//      reinterpretación y el costo del día en la escala nueva; anular un combo
+//      vendido antes devuelve × 20; el local carga su precio del suelto y vende
+//      1; vaciar se frena con tránsito y con sueltos abiertos, y si no, divide.
 //
 // Las contrapruebas de C a F son un pack igual SIN sueltos: rechaza la forma
 // nueva, acepta la cantidad como hoy, y su diferencia vale $1.200 por unidad.
@@ -536,6 +542,192 @@ try {
   const dLista = await c.ventaDetalle.findFirst({ where: { ventaId: vLista.ventaId }, select: { precio: true, precioCosto: true, listaPrecioId: true } });
   igual("cobra $75 con la lista, cuesta $60 y queda la lista anotada",
     [n(dLista?.precio), n(dLista?.precioCosto), dLista?.listaPrecioId], [75, 60, lista.id]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("I. La ficha activa el dato: cargar, vender, vaciar (tanda 9)");
+  // ══════════════════════════════════════════════════════════════════════════
+  // Hasta acá el producto nacía con el dato escrito a mano. Ahora lo carga la
+  // ficha por su ruta real (`productos/editar`), sobre un producto que ya tiene
+  // stock. Un local nuevo, porque en el primero quedó abierto el control de la
+  // sección F —que sirve justamente para ver el bloqueo por conteo abierto—.
+  // (Los dos libros ya vienen activos: la base se arma con todas las migraciones.)
+  const local2 = await c.local.create({ data: { nombre: "Local del ciclo" } });
+  await c.grupoLocal.create({ data: { grupoId: grupo.id, localId: local2.id } });
+  await c.configuracionLocal.create({ data: { localId: local2.id, exigirOperador: false } });
+  const opLocal2 = await crearOperadorDeCaja(c, { localId: local2.id, nombre: "Operador local 2" });
+  const turnoLocal2 = await abrirTurnoDePrueba(c, { localId: local2.id, vendedorId: usuario.id, operadorId: opLocal2.id });
+
+  // El cartón de siempre, SIN el dato: 10 atados en el local, 2 cartones en el
+  // depósito, límites 2 y 20 atados, y un combo del local que lleva 1 atado.
+  const baseCiclo = await c.productoBase.create({
+    data: {
+      grupoId: grupo.id, creadoEnLocalId: deposito.id, nombre: "Atados del ciclo", unidad_medida: "pack", factor_pack: FACTOR,
+      modo_envio: "MIXTO", precio_costo: 12000, precio_venta: 15000, redondeo_100: false, activo: true,
+    },
+  });
+  const plCicloDep = await c.productoLocal.create({ data: { localId: deposito.id, baseId: baseCiclo.id, activo: true, precio_venta: 15000 } });
+  const plCiclo = await c.productoLocal.create({ data: { localId: local2.id, baseId: baseCiclo.id, activo: true, precio_venta: 1500 } });
+  await c.stockLocal.create({ data: { localId: deposito.id, productoId: plCicloDep.id, cantidad: 2 * FACTOR } });
+  await c.stockLocal.create({ data: { localId: local2.id, productoId: plCiclo.id, cantidad: 10, stockMin: 2, stockMax: 20 } });
+  const baseCombo = await c.productoBase.create({
+    data: { grupoId: grupo.id, creadoEnLocalId: local2.id, nombre: "Combo del ciclo", unidad_medida: "unidad", es_combo: true, precio_costo: 1200, precio_venta: 2000, redondeo_100: false, activo: true },
+  });
+  const plCombo = await c.productoLocal.create({ data: { localId: local2.id, baseId: baseCombo.id, activo: true, precio_venta: 2000 } });
+  const comp = await c.comboComponente.create({
+    data: { comboProductoLocalId: plCombo.id, comboLocalId: local2.id, componenteProductoLocalId: plCiclo.id, componenteLocalId: local2.id, cantidad: 1 },
+  });
+
+  const filaDe = async (localId, productoId) => {
+    const s = await c.stockLocal.findUnique({ where: { localId_productoId: { localId, productoId } } });
+    return [n(s.cantidad), n(s.enTransito), n(s.stockMin), n(s.stockMax)];
+  };
+  const venderEn = async (localId, turno, operador, items, total) =>
+    leer(await rutaVenta.POST(new Request("http://ci/api/pos-ventas/crear", {
+      method: "POST", headers: cabeceras(localId, operador),
+      body: JSON.stringify({
+        clientTxnId: `tercer-nivel-ciclo-${++nVenta}`, localId, turnoId: turno.id, formaPago: "efectivo", totalPantalla: total,
+        pagos: [{ medio: "EFECTIVO", monto: total }], items,
+      }),
+    })));
+
+  // Un combo vendido ANTES de cargar el dato: descuenta 1 atado.
+  const vCombo = await venderEn(local2.id, turnoLocal2, opLocal2,
+    [{ productoBaseId: baseCombo.id, nombre: "Combo del ciclo", esServicio: false, cantidad: 1, precio: 2000, precioCosto: 1200, modoVentaLinea: "NORMAL" }], 2000);
+  ok("vender un combo antes del dato", vCombo.status === 200 && vCombo.ok === true, `${vCombo.status} ${vCombo.error || ""}`);
+  igual("el combo descontó 1 atado: quedan 9", (await filaDe(local2.id, plCiclo.id))[0], 9);
+
+  // La ficha, como la manda el formulario: todos los campos de la base, más los nuevos.
+  const rutaEditar = await import("../../app/api/productos/editar/[id]/route.js");
+  const fichaDe = async (baseId, extra = {}) => {
+    const b = await c.productoBase.findUnique({ where: { id: baseId } });
+    const num = (v) => (v == null ? null : Number(v));
+    return {
+      nombre: b.nombre, descripcion: b.descripcion, sku: b.sku, codigo_barra: b.codigo_barra, codigo_barra_secundario: b.codigo_barra_secundario,
+      categoria_id: b.categoria_id, proveedor_id: b.proveedor_id, proveedor2_id: b.proveedor2_id, proveedor3_id: b.proveedor3_id, area_fisica_id: b.area_fisica_id,
+      unidad_medida: b.unidad_medida, factor_pack: b.factor_pack, modo_pedido: b.modo_pedido, modo_envio: b.modo_envio, modo_stock: b.modo_stock,
+      peso_kg: num(b.peso_kg), volumen_ml: num(b.volumen_ml), precio_costo: num(b.precio_costo), precio_venta: num(b.precio_venta), margen: num(b.margen),
+      precio_sugerido: num(b.precio_sugerido), iva_porcentaje: num(b.iva_porcentaje), fecha_vencimiento: b.fecha_vencimiento, redondeo_100: b.redondeo_100,
+      activo: b.activo, imagen_url: b.imagen_url, es_combo: b.es_combo, modalidad: b.modalidad, modoCompraProveedor: b.modoCompraProveedor,
+      pesoReferenciaKg: num(b.pesoReferenciaKg), pesoEsFijo: b.pesoEsFijo, modoVentaDeposito: b.modoVentaDeposito,
+      actualizaPromedioPorRecepcion: b.actualizaPromedioPorRecepcion,
+      sueltos_por_unidad: b.sueltos_por_unidad, nombre_unidad: b.nombre_unidad ?? "", nombre_bulto: b.nombre_bulto ?? "",
+      ...extra,
+    };
+  };
+  const guardarFicha = async (baseId, localId, extra) =>
+    leer(await rutaEditar.PUT(
+      new Request(`http://ci/api/productos/editar/${baseId}?localId=${localId}`, {
+        method: "PUT", headers: cabeceras(localId), body: JSON.stringify(await fichaDe(baseId, extra)),
+      }),
+      { params: Promise.resolve({ id: String(baseId) }) }
+    ));
+
+  // Bloqueo por conteo abierto: un producto del primer local, donde el control
+  // de la sección F sigue abierto.
+  const baseConControl = await c.productoBase.create({
+    data: { grupoId: grupo.id, creadoEnLocalId: deposito.id, nombre: "Pack con control abierto", unidad_medida: "pack", factor_pack: FACTOR, precio_costo: 12000, precio_venta: 15000, redondeo_100: false, activo: true },
+  });
+  const plConControl = await c.productoLocal.create({ data: { localId: local.id, baseId: baseConControl.id, activo: true } });
+  await c.stockLocal.create({ data: { localId: local.id, productoId: plConControl.id, cantidad: 3 } });
+  const conControl = await guardarFicha(baseConControl.id, deposito.id, { sueltos_por_unidad: SUELTOS });
+  igual("con un control abierto no se deja cargar el dato", [conControl.status, /control de stock abierto en Local/.test(conControl.error || "")], [409, true]);
+  igual("y no tocó nada", [(await c.productoBase.findUnique({ where: { id: baseConControl.id } })).sueltos_por_unidad, (await filaDe(local.id, plConControl.id))[0]], [null, 3]);
+
+  // CARGAR EL DATO desde la ficha del dueño (el depósito).
+  const cargado = await guardarFicha(baseCiclo.id, deposito.id, { sueltos_por_unidad: SUELTOS, nombre_unidad: "atado", nombre_bulto: "cartón" });
+  ok("la ficha guarda 20 sueltos por unidad", cargado.status === 200 && cargado.ok === true, `${cargado.status} ${cargado.error || ""}`);
+  const fichaCargada = await c.productoBase.findUnique({ where: { id: baseCiclo.id } });
+  igual("con sus nombres", [fichaCargada.sueltos_por_unidad, fichaCargada.nombre_unidad, fichaCargada.nombre_bulto], [SUELTOS, "atado", "cartón"]);
+  igual("el local: 9 atados son 180, y los límites 40 y 400", await filaDe(local2.id, plCiclo.id), [180, 0, 40, 400]);
+  igual("el depósito: 2 cartones son 400", (await filaDe(deposito.id, plCicloDep.id))[0], 400);
+  igual("el combo pasa a llevar 20 sueltos", n((await c.comboComponente.findUnique({ where: { id: comp.id } })).cantidad), 20);
+  const reinterp = await c.reinterpretacionDeStock.findMany({ where: { entidad: "ProductoBase", entidadId: baseCiclo.id } });
+  igual("queda anotada la reinterpretación", reinterp.map((r) => [r.campo, r.valorAnterior, r.valorPosterior, r.origen]), [["sueltos_por_unidad", null, "20", "CAMBIO_DE_ESCALA"]]);
+  const movs = await c.movimientoStock.findMany({ where: { origen: "CAMBIO_DE_ESCALA", origenRef: String(baseCiclo.id) } });
+  igual("y el libro de stock tiene sus dos movimientos con su origen", movs.length, 2);
+
+  // EL COSTO DEL DÍA, con las versiones reales que dejó el Libro de Costos: el
+  // producto nació hoy y hoy cargó el dato. Cierra en $12.000 (200 × $60).
+  const { costoCongeladoPorDia, valorizarCadena } = await import("../../lib/stock/libro/valorDelStock.js");
+  const versionesBase = await c.$queryRaw`
+    SELECT b."version"::text AS "version", b."productoBaseId", b."tipo"::text AS "tipo", to_char(b."dia", 'YYYY-MM-DD') AS "dia",
+           b."precioCosto"::text AS "precioCosto", b."unidadMedida", b."factorPack", b."pesoReferenciaKg"::text AS "pesoReferenciaKg",
+           b."pesoEsFijo", b."modoCompraProveedor", b."modoVentaDeposito", b."esCombo", b."sueltosPorUnidad", b."origen"
+    FROM "CostoBaseVersion" b WHERE b."productoBaseId" = ${baseCiclo.id} ORDER BY b."instante", b."version"`;
+  const versionesUbic = await c.$queryRaw`
+    SELECT u."version"::text AS "version", u."productoLocalId", u."productoBaseId", u."tipo"::text AS "tipo", to_char(u."dia", 'YYYY-MM-DD') AS "dia",
+           u."precioCosto"::text AS "precioCosto", u."esDeposito"
+    FROM "CostoUbicacionVersion" u WHERE u."productoLocalId" = ${plCicloDep.id} ORDER BY u."instante", u."version"`;
+  const ultima = versionesBase.at(-1);
+  igual("el Libro de Costos versionó la escala nueva, con su origen", [ultima?.sueltosPorUnidad, ultima?.origen], [SUELTOS, "CAMBIO_DE_ESCALA"]);
+  const hoyLibro = ultima?.dia;
+  const valorDelDia = (bases) =>
+    valorizarCadena({
+      dias: [hoyLibro], cantidadAlAbrir: 0, cierres: new Map([[hoyLibro, 400000]]),
+      costoDelDia: costoCongeladoPorDia({ ubicaciones: versionesUbic, basesPorId: new Map([[baseCiclo.id, bases]]) }),
+    }).porDia?.[0];
+  igual("el depósito cierra el día en $24.000 (2 cartones), no en $480.000", valorDelDia(versionesBase) / 100, 24000);
+  // Contraprueba: sin la versión del cambio de escala, el día valía 400 × $1.200.
+  igual("contraprueba: sin el cambio de escala del día, $480.000", valorDelDia(versionesBase.slice(0, -1)) / 100, 480000);
+
+  // Anular el combo vendido ANTES: devuelve 1 atado, que hoy son 20.
+  const anuladoCombo = await anular(vCombo.ventaId, local2.id);
+  ok("anular el combo vendido antes del dato", anuladoCombo.status === 200 && anuladoCombo.ok === true, `${anuladoCombo.status} ${anuladoCombo.error || ""}`);
+  igual("devuelve 20 sueltos, no 1: 200", (await filaDe(local2.id, plCiclo.id))[0], 200);
+
+  // EL PRECIO DEL SUELTO, por ubicación: lo carga el local desde su ficha.
+  // El formulario del local manda SU precio de venta (el del atado), no el de la ficha.
+  const conPrecio = await guardarFicha(baseCiclo.id, local2.id, { precio_venta: 1500, precio_venta_suelto: 100 });
+  ok("el local carga su precio del suelto", conPrecio.status === 200 && conPrecio.ok === true, `${conPrecio.status} ${conPrecio.error || ""}`);
+  igual("queda en SU ubicación y no en la del depósito",
+    [n((await c.productoLocal.findUnique({ where: { id: plCiclo.id } })).precio_venta_suelto), (await c.productoLocal.findUnique({ where: { id: plCicloDep.id } })).precio_venta_suelto],
+    [100, null]);
+  const noDueno = await guardarFicha(baseCiclo.id, local2.id, { precio_venta: 1500, sueltos_por_unidad: 10 });
+  igual("el local no puede cambiar los sueltos: son de la ficha maestra", noDueno.status, 403);
+
+  // VENDER 1 SUELTO desde el buscador real.
+  const enLocal2 = await buscar(local2.id, "Atados del ciclo");
+  igual("el buscador del local devuelve el atado y el suelto", nombres(enLocal2, baseCiclo.id), ["Atados del ciclo", "Atados del ciclo · suelto"]);
+  const gemeloCiclo = (enLocal2.items || []).find((i) => i.esSuelto === true);
+  const carritoCiclo = posVentaReducer(initialState, { type: ActionTypes.ADD_ITEM, payload: { producto: gemeloCiclo } }).carrito;
+  const vSueltoCiclo = await venderEn(local2.id, turnoLocal2, opLocal2, itemsCrearPayload(carritoCiclo), 100);
+  ok("vender 1 suelto", vSueltoCiclo.status === 200 && vSueltoCiclo.ok === true, `${vSueltoCiclo.status} ${vSueltoCiclo.error || ""}`);
+  igual("descuenta 1: 199", (await filaDe(local2.id, plCiclo.id))[0], 199);
+
+  // VACIAR, BLOQUEADO POR TRÁNSITO: 1 cartón en camino al local.
+  const origenCiclo = await c.productoLocal.findUnique({ where: { id: plCicloDep.id }, include: { base: true } });
+  const tCiclo = await c.$transaction(async (tx) => (await crearTransferencia({
+    tx, origenId: deposito.id, destinoId: local2.id, creadoPorId: usuario.id, politicaStockOrigen: DESCONTAR_Y_TRANSITO,
+    items: [{ baseId: baseCiclo.id, productoLocalOrigenId: plCicloDep.id, productoLocalOrigen: origenCiclo, factorPack: FACTOR, cantidad: 1, unidadEnviada: "BULTO" }],
+  })).transferencia);
+  igual("el cartón salió: 200 en el depósito y 200 en tránsito", (await filaDe(deposito.id, plCicloDep.id)).slice(0, 2), [200, 200]);
+  const conTransito = await guardarFicha(baseCiclo.id, deposito.id, { sueltos_por_unidad: null });
+  igual("con una transferencia en camino no se deja vaciar", [conTransito.status, /en camino/.test(conTransito.error || "")], [409, true]);
+  igual("y no tocó nada", [(await c.productoBase.findUnique({ where: { id: baseCiclo.id } })).sueltos_por_unidad, (await filaDe(deposito.id, plCicloDep.id)).slice(0, 2)], [SUELTOS, [200, 200]]);
+
+  // Contraprueba del bloqueo: cancelada la transferencia, lo que frena es otra
+  // cosa —199 sueltos no son atados enteros— y el mensaje lo dice.
+  const canceladaCiclo = await leer(await rutaCancelar.POST(new Request("http://ci/api/transferencias/cancelar", {
+    method: "POST", headers: cabeceras(deposito.id),
+    body: JSON.stringify({ transferenciaId: tCiclo.id, motivo: "Prueba de CI: el remito salió por error" }),
+  })));
+  ok("cancelar la transferencia", canceladaCiclo.status === 200, `${canceladaCiclo.status} ${canceladaCiclo.error || ""}`);
+  const conAbierto = await guardarFicha(baseCiclo.id, deposito.id, { sueltos_por_unidad: null });
+  igual("sin tránsito, 199 sueltos no se dejan vaciar: no son atados enteros",
+    [conAbierto.status, /el stock de Local del ciclo no da un número entero/.test(conAbierto.error || "")], [409, true]);
+
+  // Se venden 19 sueltos más (180 = 9 atados) y ahí sí: vaciar es la inversa.
+  const carrito19 = posVentaReducer(initialState, { type: ActionTypes.ADD_ITEM, payload: { producto: gemeloCiclo, cantidadInicial: 19 } }).carrito;
+  const v19 = await venderEn(local2.id, turnoLocal2, opLocal2, itemsCrearPayload(carrito19), 1900);
+  ok("vender 19 sueltos", v19.status === 200 && v19.ok === true, `${v19.status} ${v19.error || ""}`);
+  const vaciado = await guardarFicha(baseCiclo.id, deposito.id, { sueltos_por_unidad: null });
+  ok("vaciar el dato", vaciado.status === 200 && vaciado.ok === true, `${vaciado.status} ${vaciado.error || ""}`);
+  igual("el local vuelve a atados: 9, con límites 2 y 20", await filaDe(local2.id, plCiclo.id), [9, 0, 2, 20]);
+  igual("el depósito vuelve a 20", (await filaDe(deposito.id, plCicloDep.id))[0], 20);
+  igual("el combo vuelve a llevar 1", n((await c.comboComponente.findUnique({ where: { id: comp.id } })).cantidad), 1);
+  igual("y queda anotada la segunda reinterpretación",
+    (await c.reinterpretacionDeStock.findMany({ where: { entidad: "ProductoBase", entidadId: baseCiclo.id }, orderBy: { id: "asc" } })).map((r) => [r.valorAnterior, r.valorPosterior]),
+    [[null, "20"], ["20", null]]);
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);

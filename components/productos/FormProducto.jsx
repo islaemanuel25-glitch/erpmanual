@@ -6,6 +6,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSelectConCrearRapido from "@/components/sunmi/SunmiSelectConCrearRapido";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
@@ -78,8 +79,8 @@ const FOCUS_ORDER = [
   "nombre", "codigo_barra", "codigo_barra_secundario", "sku", "descripcion",
   "categoria_id", "area_fisica_id",
   "proveedor_id", "proveedor2_id", "proveedor3_id",
-  "unidad_medida", "factor_pack", "peso_kg", "volumen_ml",
-  "precio_costo", "margen", "precio_venta", "iva_porcentaje",
+  "unidad_medida", "factor_pack", "sueltos_por_unidad", "nombre_unidad", "nombre_bulto", "peso_kg", "volumen_ml",
+  "precio_costo", "margen", "precio_venta", "precio_venta_suelto", "iva_porcentaje",
   "precio_sugerido", "fecha_vencimiento", "imagen_url",
   "redondeo_100", "es_combo", "activo",
   "modo_pedido", "modo_envio",
@@ -163,6 +164,11 @@ export default function FormProducto({
     area_fisica_id: o.area_fisica_id ?? o.areaFisicaId ?? "",
     unidad_medida: o.unidad_medida ?? o.unidadMedida ?? "unidad",
     factor_pack: toNum(o.factor_pack ?? o.factorPack ?? ""),
+    // Tercer nivel de empaque: "se vende más chico".
+    sueltos_por_unidad: toNum(o.sueltos_por_unidad ?? o.sueltosPorUnidad ?? ""),
+    nombre_unidad: o.nombre_unidad ?? o.nombreUnidad ?? "",
+    nombre_bulto: o.nombre_bulto ?? o.nombreBulto ?? "",
+    precio_venta_suelto: toNum(o.precio_venta_suelto ?? o.precioVentaSuelto ?? ""),
     peso_kg: toNum(o.peso_kg ?? o.pesoKg ?? ""),
     volumen_ml: toNum(o.volumen_ml ?? o.volumenMl ?? ""),
     precio_costo: toNum(o.precio_costo ?? o.precioCosto ?? ""),
@@ -218,10 +224,17 @@ export default function FormProducto({
     return camelToForm({ ...initial, modo_pedido: modoPedido });
   });
 
+  // "+ Se vende más chico" (tercer nivel de empaque): cerrado por defecto, y
+  // abierto si el producto ya tiene el dato.
+  const [masChicoAbierto, setMasChicoAbierto] = useState(() => Number(form.sueltos_por_unidad) > 1);
+  const tieneSueltos = Number(form.sueltos_por_unidad) > 1;
+
   useEffect(() => {
     const initial = initialData || { unidad_medida: "unidad", redondeo_100: true };
     const modoPedido = calcularModoPedidoDefault(initial);
-    setForm(camelToForm({ ...initial, modo_pedido: modoPedido }));
+    const inicial = camelToForm({ ...initial, modo_pedido: modoPedido });
+    setForm(inicial);
+    setMasChicoAbierto(Number(inicial.sueltos_por_unidad) > 1);
     setTimeout(() => scrollRef.current?.scrollTo(0, 0), 30);
   }, [initialData]);
 
@@ -709,6 +722,12 @@ export default function FormProducto({
       pesoEsFijo: Boolean(p.pesoEsFijo),
       modoVentaDeposito: p.modoVentaDeposito || "PESO",
       actualizaPromedioPorRecepcion: p.actualizaPromedioPorRecepcion !== false,
+      // Tercer nivel de empaque. Vacío = sin sueltos: el backend lo lleva a null,
+      // y si el producto tenía el dato, lo vacía con su reinterpretación.
+      sueltos_por_unidad: p.sueltos_por_unidad === "" ? null : Number(p.sueltos_por_unidad),
+      nombre_unidad: p.nombre_unidad ?? "",
+      nombre_bulto: p.nombre_bulto ?? "",
+      precio_venta_suelto: p.precio_venta_suelto === "" ? null : Number(p.precio_venta_suelto),
     };
 
     // Servicio de importe variable: no maneja precio, margen ni redondeo. Se envían
@@ -1208,6 +1227,39 @@ export default function FormProducto({
                   />
                 )}
               </div>
+              {/* Tercer nivel de empaque: cartón → atado → suelto. Va adentro del
+                  campo del factor para no mover la grilla de la ficha: cerrado,
+                  lo único nuevo es el enlace. Un producto por kilo no se vende
+                  más chico (el servidor lo rechaza). */}
+              {form.unidad_medida !== "kg" &&
+                (masChicoAbierto ? (
+                  <>
+                    <Field label="Sueltos por unidad" fieldKey="sueltos_por_unidad">
+                      <SunmiInput
+                        type="number"
+                        value={form.sueltos_por_unidad}
+                        onWheel={(e) => e.target.blur()}
+                        onChange={(e) => setNumber("sueltos_por_unidad", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Nombre de la unidad" fieldKey="nombre_unidad">
+                      <SunmiInput
+                        value={form.nombre_unidad}
+                        placeholder="atado"
+                        onChange={(e) => setField("nombre_unidad", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Nombre del bulto" fieldKey="nombre_bulto">
+                      <SunmiInput
+                        value={form.nombre_bulto}
+                        placeholder="cartón"
+                        onChange={(e) => setField("nombre_bulto", e.target.value)}
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <SunmiLinkButton onClick={() => setMasChicoAbierto(true)}>+ Se vende más chico</SunmiLinkButton>
+                ))}
             </Field>
 
             <Field label="Peso del producto (kg)" fieldKey="peso_kg">
@@ -1424,6 +1476,20 @@ export default function FormProducto({
                 )}
               </div>
             </Field>
+
+            {/* El precio del suelto de ESTA ubicación (tercer nivel de empaque):
+                solo si el producto se vende más chico. Vacío = el POS no
+                ofrece el suelto acá. */}
+            {tieneSueltos && (
+              <Field label="Venta suelto" fieldKey="precio_venta_suelto">
+                <SunmiInput
+                  type="number"
+                  value={form.precio_venta_suelto}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setNumber("precio_venta_suelto", e.target.value)}
+                />
+              </Field>
+            )}
 
             {showPreciosRef && (
               <Field label="Venta unitario ref." fieldKey="precio_venta_unitario_ref">
