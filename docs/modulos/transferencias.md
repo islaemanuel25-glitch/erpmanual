@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-11-04 01:04
+**Última actualización:** 2026-11-04 02:08
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-11-04: feat: los componentes de combo congelan su N (migración aditiva)
 - 2026-11-04: feat: el producto puede nombrar su bulto (columna nula, aditiva)
 - 2026-11-04: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
 - 2026-11-03: feat: la venta descuenta en tres escalas y cobra el suelto en el servidor (camino del suelto por la ruta SIN VERIFICAR)

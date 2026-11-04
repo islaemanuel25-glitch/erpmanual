@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-04 01:04
+**Última actualización:** 2026-11-04 02:08
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-04: feat: la ficha activa el tercer nivel de empaque ("+ Se vende más chico")
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
 - 2026-11-04: feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
 - 2026-11-04: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
