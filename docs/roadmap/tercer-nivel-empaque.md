@@ -272,10 +272,47 @@ sugeridos con sueltos.
 - `PedidoProveedorDetalle.stockIngresado` no tiene N congelado. Hoy nada lo lee
   para revertir; si algo empieza a hacerlo, necesita la columna.
 
-### 6 · La carga manual — sin migración
+### 6 · La carga manual — sin migración — HECHA
 
-Ajuste, importación, control de stock y límites: se cargan como "unidades +
-sueltos" y se guardan en sueltos.
+**Lo que quedó sin verificar en la tanda 5, verificado** en el mismo candado de
+base (`tercerNivelEmpaque.mjs`, secciones C y D): recibir una compra de 1 cartón
+suma 200 al depósito, y los pedidos sugeridos con 400 sueltos de faltante piden
+2 cartones (sin sueltos serían 40).
+
+- **Una sola pieza:** `cantidadDeStockDeUnaCarga` en el embudo. Acepta
+  `cantidad` (unidades de stock, como siempre: pasa tal cual) o `unidades` +
+  `sueltos` (solo un producto con sueltos; "9 atados y 15 sueltos" = 195).
+  Rechaza con mensaje la forma nueva sin sueltos, las dos formas juntas y lo que
+  no sea entero. `interpretarLimiteDeUnaCarga` (`lib/stock/limites.js`) hace lo
+  mismo para un límite que llega como `{ unidades, sueltos }`.
+- **La usan:** el ajuste (`stock_locales/ajustar`, modo ajuste y modo límites),
+  la ruta duplicada `stock_locales/limites` y el conteo del control
+  (`control/conteos` → `fijarTotal`).
+- **El control trae `sueltos_por_unidad`** en su `SELECT_BASE` (el hallazgo de
+  la tanda 3): la diferencia de un conteo se valoriza al costo del suelto.
+- **La importación no se tocó [verificado en código]:** solo crea productos con
+  stock en cero, no carga ninguna cantidad. Tampoco puede cargar el dato antes de
+  la tanda 9: no mapea `sueltos_por_unidad`.
+- Candado de base (secciones E y F): ajustar "9 atados y 15 sueltos" deja 195;
+  los límites se guardan en sueltos; contar "9 atados y 15 sueltos" sobre 200 da
+  5 de diferencia a $60 = $300. Contraprueba: el mismo pack sin sueltos rechaza
+  la forma nueva, acepta la cantidad de siempre, y su diferencia vale $1.200 por
+  unidad. Sacar la columna del `SELECT_BASE` del control pone el candado en rojo.
+
+**Lo que la tanda 2 había roto y nadie vio [verificado ejecutando]:**
+`scripts/pruebas-db/controlStock.mjs` arma su base con una lista de migraciones
+elegida a mano que terminaba el 29/10. Desde `4ed995c` el cliente de Prisma pide
+`ProductoBase.sueltos_por_unidad` y esa base no lo tenía: la prueba, que corre
+en el CI, se caía en la siembra. Se sumó la migración del tercer nivel a la
+lista; vuelve a pasar (189).
+
+**Tres pruebas de base que fallan desde ANTES de este plan** (comprobado sobre
+`7ba0415`, anterior a la tanda 1): `stockDiario.mjs`, `stockDiarioApi.mjs` y
+`valorDelStock.mjs` caen al aplicar por psql
+`20261103120000_precios_del_30_10_vuelven_a_su_regla`, que no encuentra cuándo
+terminó `20261030230000_precios_sin_regla`; `azulChatVentasResumen.mjs` cae
+porque su base no tiene `Usuario.sesionInvalidadaEn`. No son de este plan y no
+se tocaron.
 
 ### 7 · Las pantallas — sin migración
 
