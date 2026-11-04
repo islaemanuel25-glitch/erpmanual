@@ -1,5 +1,5 @@
-// LIVERPOOL ROJO: LA DIFERENCIA CON LO PEDIDO NO ES UN ERROR DE CARGA, Y UN
-// PAPEL MÁS BARATO NO ES UNA SUBA.
+// LIVERPOOL ROJO: LA DIFERENCIA CON LO PEDIDO NO ES UN ERROR DE CARGA, Y EL
+// PORCENTAJE DEL ERP DICE CUÁNTO ME QUEDA.
 //
 //   node --import ./scripts/alias-loader.mjs --test components/compras-proveedor/liverpoolRojo.test.mjs
 //
@@ -11,8 +11,10 @@
 //    carga. La diferencia con lo pedido se dice en el renglón "Pediste X · la
 //    factura dice Y", en el color de advertencia del tema, y los campos quedan
 //    con su borde normal.
-// 2. El renglón ERP decía "+12,1 %" en verde sobre un papel 12,1 % más barato.
-//    Ahora es la variación del papel respecto del ERP: "−12,1 %", verde.
+// 2. El renglón ERP dice "+12,1 %" en verde sobre un papel 12,1 % más barato, y
+//    está bien así: es "cuánto me queda", el ERP contra el papel, como lo fijó
+//    Emanuel en octubre. El 2026-11-04 se dio vuelta a "−12,1 %" por un error de
+//    la orden y se deshizo el mismo día; este candado lo deja escrito.
 //
 // La hoja se MONTA en un DOM (jsdom) y no se dibuja con `renderToStaticMarkup`:
 // los campos se llenan en un efecto al abrir, y sin efectos la cantidad queda
@@ -98,10 +100,10 @@ test("1 · CONTRAPRUEBA: SIN DIFERENCIA EL RENGLÓN QUEDA APAGADO", async () => 
   assert.match(cuantoEntro(html), /class="text-sm3 sunmi-text-muted">Pediste 16/);
 });
 
-test("2 · EL PAPEL 12,1 % MÁS BARATO DICE −12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
+test("2 · EL PAPEL 12,1 % MÁS BARATO DICE +12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
   const f = liverpool();
   for (const html of [renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f })), await hojaMontada(f)]) {
-    assert.match(html, /sunmi-text-success">−12,1 %</);
-    assert.doesNotMatch(html, /\+12,1 %/);
+    assert.match(html, /sunmi-text-success">\+12,1 %</);
+    assert.doesNotMatch(html, /−12,1 %/);
   }
 });
