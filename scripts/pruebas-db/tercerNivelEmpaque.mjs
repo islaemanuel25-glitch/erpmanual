@@ -23,6 +23,12 @@
 //   F. CONTEO de un control en "unidades + sueltos": contar 9 atados y 15
 //      sueltos sobre 200 da 5 sueltos de diferencia, valorizados a $60 cada uno
 //      (el costo del suelto), no a $1.200.
+//   G. CÓMO SE ESCRIBE el stock por el listado real: "1 cartón" en el
+//      depósito, "9 atados y 15 sueltos" en el local.
+//   H. EL POS: el buscador del local devuelve el atado y su gemelo " · suelto"
+//      con el precio del cigarrillo; el del depósito, uno solo. Vender el
+//      suelto con el carrito y el payload reales descuenta 1 y cobra $100.
+//      Escanear el código agrega el atado. Sin `conSueltos` y sin el dato, uno.
 //
 // Las contrapruebas de C a F son un pack igual SIN sueltos: rechaza la forma
 // nueva, acepta la cantidad como hoy, y su diferencia vale $1.200 por unidad.
@@ -452,6 +458,58 @@ try {
   // Contraprueba: el pack sin sueltos, por el mismo listado, se escribe como hoy.
   const sinEnLocal = itemDe(await listar(local.id, "Pack sin"), baseSin.id);
   igual("el pack sin sueltos, como hoy", presentacionCantidadStock(sinEnLocal, false).texto, "195 uds");
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("H. El POS: el suelto como un resultado más del buscador");
+  // ══════════════════════════════════════════════════════════════════════════
+  // El buscador real del POS pide `conSueltos=1`; la línea del carrito la arma
+  // el reducer real con el resultado que eligió el cajero, y lo que se manda es
+  // `itemsCrearPayload`, lo mismo que manda la pantalla.
+  await c.productoBase.update({ where: { id: base.id }, data: { codigo_barra: "7790000000017" } });
+  const rutaBuscar = await import("../../app/api/pos-ventas/buscar-producto/route.js");
+  const { posVentaReducer, ActionTypes, initialState } = await import("../../app/modulos/pos-ventas/reducer/posVentaReducer.js");
+  const { itemsCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
+  const buscar = async (localId, q, { conSueltos = true } = {}) => {
+    const url = `http://ci/api/pos-ventas/buscar-producto?localId=${localId}&q=${encodeURIComponent(q)}${conSueltos ? "&conSueltos=1" : ""}`;
+    return leer(await rutaBuscar.GET(new Request(url, { method: "GET", headers: cabeceras(localId) })));
+  };
+  const nombres = (r, baseId) => (r.items || []).filter((i) => i.productoBaseId === baseId).map((i) => i.nombre);
+
+  const enElLocal = await buscar(local.id, "Cigarrillos");
+  igual("en el local, dos resultados: el atado y el suelto",
+    nombres(enElLocal, base.id), ["Cigarrillos de prueba", "Cigarrillos de prueba · suelto"]);
+  const gemelo = (enElLocal.items || []).find((i) => i.esSuelto === true);
+  igual("el suelto trae el precio del cigarrillo y el mismo stock", [gemelo?.precioVenta, gemelo?.stock], [100, 195]);
+  igual("en el depósito, uno solo", nombres(await buscar(deposito.id, "Cigarrillos"), base.id), ["Cigarrillos de prueba"]);
+
+  // Vender el resultado suelto: el carrito real, el payload real, la ruta real.
+  const carrito = posVentaReducer(initialState, { type: ActionTypes.ADD_ITEM, payload: { producto: gemelo } }).carrito;
+  igual("la línea del carrito va en modo SUELTO, se llama \" · suelto\" y cobra 100",
+    [carrito[0]?.modoVentaLinea, carrito[0]?.nombre, carrito[0]?.precio], ["SUELTO", "Cigarrillos de prueba · suelto", 100]);
+  const vPos = await leer(await rutaVenta.POST(new Request("http://ci/api/pos-ventas/crear", {
+    method: "POST",
+    headers: cabeceras(local.id, opLocal),
+    body: JSON.stringify({
+      clientTxnId: `tercer-nivel-pos-${++nVenta}`, localId: local.id, turnoId: turnoLocal.id, formaPago: "efectivo", totalPantalla: 100,
+      pagos: [{ medio: "EFECTIVO", monto: 100 }],
+      items: itemsCrearPayload(carrito),
+    }),
+  })));
+  ok("vender el resultado suelto: la venta se registra", vPos.status === 200 && vPos.ok === true, `${vPos.status} ${vPos.error || ""}`);
+  igual("descuenta 1", await stock(local.id, plLocal.id), [194, 0]);
+  const dPos = await detalleDe(vPos.ventaId);
+  igual("y cobra el precio del suelto", [n(dPos?.precio), n(dPos?.cantidadStock)], [100, 1]);
+
+  // Escanear el código agrega el atado, nunca el suelto.
+  const escaneo = await buscar(local.id, "7790000000017");
+  igual("escanear el código devuelve solo el atado", nombres(escaneo, base.id), ["Cigarrillos de prueba"]);
+  const lineaEscaneada = posVentaReducer(initialState, { type: ActionTypes.ADD_ITEM, payload: { producto: escaneo.items?.[0] } }).carrito[0];
+  igual("y la línea que agrega es la de siempre", lineaEscaneada?.modoVentaLinea, "NORMAL");
+
+  // Contrapruebas: sin `conSueltos` (ofertas, combos, consumo, corrección) y el
+  // pack sin sueltos dan un solo resultado, como hoy.
+  igual("sin conSueltos, uno solo", nombres(await buscar(local.id, "Cigarrillos", { conSueltos: false }), base.id), ["Cigarrillos de prueba"]);
+  igual("el pack sin sueltos, uno solo", nombres(await buscar(local.id, "Pack sin"), baseSin.id), ["Pack sin sueltos"]);
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);

@@ -1,4 +1,5 @@
 import { combinarSubtotalFijado } from "@/lib/pos-ventas/lineaPorImporte";
+import { MODO_SUELTO, escalaDeLineaDelCarrito, esLaMismaLinea, topeDeLineaDelCarrito } from "@/lib/pos-ventas/lineaSuelta";
 
 // Estado inicial del reducer
 export const initialState = {
@@ -63,9 +64,11 @@ export function posVentaReducer(state, action) {
       const { producto, cantidadInicial, subtotalFijado } = action.payload;
       const esKg = producto.unidadMedida === "kg";
       const cantAdd = cantidadInicial ?? 1;
-      const idx = state.carrito.findIndex(
-        (item) => item.productoBaseId === producto.productoBaseId
-      );
+      // El atado y su suelto (tercer nivel de empaque) son el mismo producto pero
+      // líneas distintas: se cobran y se descuentan distinto. Sin sueltos, las
+      // dos mitades de la comparación dan false y la identidad es la de siempre.
+      const esSuelto = producto.esSuelto === true;
+      const idx = state.carrito.findIndex((item) => esLaMismaLinea(item, producto));
 
       if (idx >= 0) {
         // Item existente: incrementar cantidad y moverlo al principio
@@ -116,7 +119,7 @@ export function posVentaReducer(state, action) {
             // no queda en silencio: el backend rechaza la venta con
             // TOTAL_DESACTUALIZADO y la pantalla se refresca.
             oferta: producto.oferta ?? null,
-            stockMax: producto.stock,
+            stockMax: topeDeLineaDelCarrito(producto),
             modoSalida: producto.modoSalidaDefault || "UNIDAD",
             precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,
             precioVentaBulto: producto.precioVentaBulto ?? producto.precioVenta,
@@ -128,7 +131,10 @@ export function posVentaReducer(state, action) {
             // normal. El unitario parte de precio_venta ÷ factor_pack (= "Venta unitario ref."
             // de Productos) con la lista aplicada en escala unitaria, no dividiendo el pack.
             factorPack: Number(producto.factorPack) || 1,
-            modoVentaLinea: "NORMAL", // "NORMAL" (formato pack) | "UNIDAD_REMANENTE" (unidad suelta)
+            // "NORMAL" (formato pack) | "UNIDAD_REMANENTE" (unidad suelta) | "SUELTO"
+            // (el resultado "· suelto" del buscador, tercer nivel de empaque).
+            modoVentaLinea: esSuelto ? MODO_SUELTO : "NORMAL",
+            ...escalaDeLineaDelCarrito(producto),
             precioVentaFormatoDepositoReal:
               producto.precioVentaFormatoDepositoReal ?? producto.precioVentaBulto ?? producto.precioVenta,
             precioVentaUnitarioReal:

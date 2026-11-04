@@ -355,10 +355,47 @@ transferencias. **Y la copia de `app/api/stock_locales/buscar-producto`**, que
 en la tanda 4 quedó sin el precio y el costo del suelto a propósito: se le
 agrega con la misma pieza (`resolverLineaSuelta`), no con una cuenta propia.
 
-### 8 · El POS en pantalla — sin migración
+### 8 · El POS en pantalla — sin migración — HECHA
 
-Selector de unidad o suelto en el carrito y en el reducer del POS, sobre el
-servidor de la tanda 4.
+**Decisión de Emanuel (2026-11-04), reemplaza el selector en el carrito:** el
+suelto aparece en el buscador del POS como UN PRODUCTO DIFERENTE. Si "Camel
+Yellow 20" tiene sueltos y la ubicación tiene precio de suelto, el buscador
+muestra dos resultados: "Camel Yellow 20" con el precio del atado y "Camel
+Yellow 20 · suelto" con el precio del cigarrillo. Por detrás es el mismo
+producto y comparten el stock. En el depósito, sin precio de suelto o sin el
+dato, un solo resultado, como hoy.
+
+- El resultado suelto es la MISMA fila del buscador, con otro nombre y otro
+  precio. Elegirlo agrega una línea en modo SUELTO (que el servidor de la tanda
+  4 ya cobra y descuenta); + y − suman de a un cigarrillo.
+- Escanear el código agrega siempre el atado: el suelto no tiene código propio.
+- El chip y el renglón de stock del carrito usan el texto de tres niveles.
+- Los límites se siguen cargando como hoy, convertidos por el embudo.
+- El valor del stock con sueltos toma los nombres del producto actual.
+
+**Cómo quedó (verificado en código y contra la base):**
+
+- El gemelo lo arma `gemeloSuelto` en `lib/pos-ventas/lineaSuelta.js`: el
+  mismo ítem que devuelve `buscar-producto`, con `esSuelto`, el nombre con
+  `SUFIJO_SUELTO`, el precio y el costo del suelto, sin códigos de barra y sin
+  oferta. La fila del buscador no se tocó: solo su `key` distingue al gemelo.
+- Los gemelos se piden con `conSueltos=1`, y lo pide solamente el buscador del
+  POS. Ofertas, combos, consumo del personal y corrección de ventas usan el
+  mismo endpoint y siguen recibiendo un resultado por producto. El camino del
+  código exacto (escáner) no agrega gemelos nunca.
+- En el carrito, atado y suelto son líneas distintas (`esLaMismaLinea`); el
+  tope de la línea de atado son los atados enteros y el de la suelta los
+  sueltos (`topeDeLineaDelCarrito`). Una línea sin sueltos no gana ningún campo.
+- Límites: `limiteEnLaEscalaDeCarga` / `limiteParaEnviar` en
+  `lib/stock/limites.js`. En el depósito pack se siguen escribiendo bultos
+  (bulto = factor × N por el embudo); fuera de él, con sueltos, se escriben
+  unidades y se mandan como `{ unidades }`, que la ruta de la tanda 6 lleva a
+  sueltos. Un límite guardado que no sea múltiplo de N (solo posible cargándolo
+  por otro camino) se muestra redondeado hacia abajo a unidades enteras.
+- Valor del stock: `escalaDelMomento(versiones, escalaDeHoy)` toma los nombres
+  de la identidad de hoy; sin sueltos `escalaDe` no los mira.
+- Candados: `lib/pos-ventas/posSuelto.test.mjs` (H1–H7) y la sección H de
+  `scripts/pruebas-db/tercerNivelEmpaque.mjs`, con contraprueba en los dos.
 
 ### 9 · La activación — migración solo si hace falta
 

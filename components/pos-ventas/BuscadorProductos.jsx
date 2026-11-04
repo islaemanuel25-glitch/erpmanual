@@ -39,6 +39,10 @@ function BuscadorProductos({
   // el POS de venta, donde un código perdido es un producto sin cobrar; ofertas
   // y combos usan este mismo buscador y siguen como estaban.
   avisarNoEncontrado = false,
+  // El suelto como un resultado más ("Camel Yellow 20 · suelto", tercer nivel
+  // de empaque). Lo pide solo el POS de venta: en ofertas, combos y el consumo
+  // del personal un suelto no se puede elegir.
+  conSueltos = false,
 }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
@@ -91,6 +95,7 @@ function BuscadorProductos({
         params.set("localId", String(localId));
         if (clienteId != null) params.set("clienteId", String(clienteId));
         if (fromVoice) params.set("fromVoice", "true");
+        if (conSueltos) params.set("conSueltos", "1");
         const res = await fetch(`${searchApi}?${params.toString()}`, {
           credentials: "include",
         });
@@ -135,7 +140,7 @@ function BuscadorProductos({
         setLoading(false);
       }
     },
-    [localId, clienteId, onAgregar, searchApi, avisarNoEncontrado]
+    [localId, clienteId, onAgregar, searchApi, avisarNoEncontrado, conSueltos]
   );
 
   // ── LA VOZ Y EL CAMPO SE FUERON AL KIT ────────────────────────────────────
@@ -314,7 +319,8 @@ function BuscadorProductos({
             }
             return (
               <div
-                key={p.productoBaseId}
+                // El gemelo " · suelto" es el mismo producto: la clave lo distingue.
+                key={p.esSuelto ? `${p.productoBaseId}-suelto` : p.productoBaseId}
                 onClick={() => handleAgregar(p)}
                 className={`flex items-center justify-between gap-2 px-2 py-2 rounded-lg pos-bg-surface-interactive transition cursor-pointer ${noDisponible ? "opacity-60" : ""}`}
               >

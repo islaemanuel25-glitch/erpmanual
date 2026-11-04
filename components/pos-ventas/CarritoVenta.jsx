@@ -8,6 +8,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import { fromUnidades } from "@/lib/conversiones/stock";
+import { textoDeStockDeLaLinea } from "@/lib/pos-ventas/lineaSuelta";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
 import { textoOfertaDeLinea } from "@/lib/ofertas/previewPos";
 
@@ -72,6 +73,10 @@ function letraFormato(unidad) {
 // Texto compacto del chip de stock (mobile). Stock real en unidades (stockMax).
 // Positivo → "Stock: 2p + 10u". Negativo → "Stock: -13u" (sin desglose en bultos).
 function stockChipText(item) {
+  // Con sueltos (tercer nivel de empaque) el stock se escribe en tres niveles,
+  // como en Stock; sin ellos la línea no trae `stockSueltos` y sigue lo de hoy.
+  const tresNiveles = textoDeStockDeLaLinea(item);
+  if (tresNiveles !== null) return `Stock: ${tresNiveles}`;
   const factor = Number(item.factorPack) || 1;
   const total = Number(item.stockMax) || 0;
   if (total < 0) return `Stock: ${total}u`;
@@ -97,9 +102,13 @@ function mostrarStockDeposito(item, esDeposito, mostrarStock) {
 function StockDeposito({ item }) {
   const factor = Number(item.factorPack) || 1;
   const total = Number(item.stockMax) || 0;
-  if (total < 0) {
+  // Con sueltos (tercer nivel de empaque), el mismo renglón del negativo escribe
+  // el stock en tres niveles. Sin sueltos es null y el renglón es el de siempre,
+  // con sus nodos de texto separados como estaban.
+  const tresNiveles = textoDeStockDeLaLinea(item);
+  if (total < 0 || tresNiveles !== null) {
     return (
-      <div className="text-[10px] pos-text-muted mt-0.5">Stock disponible: {total} uds</div>
+      <div className="text-[10px] pos-text-muted mt-0.5">Stock disponible: {tresNiveles ?? total}{tresNiveles === null ? " uds" : null}</div>
     );
   }
   const { bultos, sueltas } = fromUnidades({ unidades: total, factorPack: factor });

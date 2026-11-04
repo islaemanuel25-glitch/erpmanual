@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
-import { unidadFisicaDeItem } from "@/lib/stock/presentacion";
+import { sueltosParaCongelar } from "@/lib/conversiones/stock";
+import { limiteEnLaEscalaDeCarga, limiteParaEnviar } from "@/lib/stock/limites";
+import { nombreDeLaUnidad, pluralDe, unidadFisicaDeItem } from "@/lib/stock/presentacion";
 import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
@@ -18,6 +19,14 @@ export default function ModalLimites({ open, onClose, producto, local }) {
   const unidadMedida = producto?.unidadMedida || producto?.unidad_medida || "unidad";
   const esDeposito = local?.esDeposito || local?.es_deposito || false;
   const usarBultos = esDeposito && factorPack > 1 && (unidadMedida === "pack" || unidadMedida === "cajon");
+  // Tercer nivel de empaque: con sueltos la fila cuenta sueltos, y el límite se
+  // sigue escribiendo en bultos (depósito pack) o en unidades. Sin el dato es null
+  // y todo queda como siempre. Ver `limiteEnLaEscalaDeCarga`.
+  const sueltosPorUnidad = sueltosParaCongelar({
+    sueltos_por_unidad: producto?.sueltosPorUnidad ?? producto?.sueltos_por_unidad,
+    unidad_medida: unidadMedida,
+  });
+  const escala = { usarBultos, factorPack, sueltosPorUnidad };
 
   // Los límites se comparan contra `StockLocal.cantidad`, así que van en la
   // unidad de la fila: piezas para el peso fijo en el depósito, no kilos. La
@@ -25,7 +34,11 @@ export default function ModalLimites({ open, onClose, producto, local }) {
   const unidadFisica = producto ? unidadFisicaDeItem(producto, esDeposito) : null;
   const esPieza = unidadFisica === UNIDAD_FISICA_STOCK.PIEZA;
   const esKg = unidadFisica === UNIDAD_FISICA_STOCK.KG;
-  const sufijo = usarBultos ? " (bultos)" : esPieza ? " (pzs)" : "";
+  const sufijo = usarBultos
+    ? " (bultos)"
+    : sueltosPorUnidad
+      ? ` (${pluralDe(nombreDeLaUnidad(producto))})`
+      : esPieza ? " (pzs)" : "";
   const alEscribir = (set) => (e) => {
     const raw = e.target.value;
     // La pieza queda como se escribió y el guardado rechaza los decimales.
@@ -49,18 +62,10 @@ export default function ModalLimites({ open, onClose, producto, local }) {
       // pantalla: `|| ""` no distingue el 0 del null porque los dos son falsy.
       const aTexto = (v) => (v === null || v === undefined ? "" : String(v));
 
-      if (usarBultos) {
-        // Mostrar en bultos: convertir unidades → bultos
-        const minUds = producto.stockMin === null || producto.stockMin === undefined
-          ? null : Number(producto.stockMin);
-        const maxUds = producto.stockMax === null || producto.stockMax === undefined
-          ? null : Number(producto.stockMax);
-        setMinimo(minUds === null ? "" : String(fromUnidades({ unidades: minUds, factorPack }).bultos));
-        setMaximo(maxUds === null ? "" : String(fromUnidades({ unidades: maxUds, factorPack }).bultos));
-      } else {
-        setMinimo(aTexto(producto.stockMin));
-        setMaximo(aTexto(producto.stockMax));
-      }
+      // En bultos o en unidades cuando corresponde, por el embudo; si no, tal
+      // cual (`aTexto` sobre el valor que vuelve sin tocar).
+      setMinimo(aTexto(limiteEnLaEscalaDeCarga(producto.stockMin, escala)));
+      setMaximo(aTexto(limiteEnLaEscalaDeCarga(producto.stockMax, escala)));
       // Autofocus y seleccionar al abrir
       setTimeout(() => {
         minimoRef.current?.focus();
@@ -92,12 +97,8 @@ export default function ModalLimites({ open, onClose, producto, local }) {
         modo: "limites",
         localId: local.id,
         productoLocalId: producto.id,
-        nuevoMin: usarBultos && minVal != null
-          ? toUnidades({ cantidad: minVal, unidad: "BULTO", factorPack })
-          : minVal,
-        nuevoMax: usarBultos && maxVal != null
-          ? toUnidades({ cantidad: maxVal, unidad: "BULTO", factorPack })
-          : maxVal,
+        nuevoMin: limiteParaEnviar(minVal, escala),
+        nuevoMax: limiteParaEnviar(maxVal, escala),
       };
 
       const res = await fetch("/api/stock_locales/ajustar", {

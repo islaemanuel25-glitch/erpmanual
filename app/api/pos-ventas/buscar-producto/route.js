@@ -9,7 +9,7 @@ import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
-import { resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
+import { conGemelosSueltos, resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
 import { sueltosParaCongelar } from "@/lib/conversiones/stock";
 import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
 import {
@@ -46,6 +46,8 @@ export async function GET(req) {
     const clienteIdRaw = Number(searchParams.get("clienteId") || 0);
     const clienteId = Number.isFinite(clienteIdRaw) && clienteIdRaw > 0 ? clienteIdRaw : null;
     const fromVoice = searchParams.get("fromVoice") === "true";
+    // Los gemelos " · suelto" (tercer nivel de empaque), solo para quien los pide.
+    const conSueltos = searchParams.get("conSueltos") === "1";
 
     if (!localId) localId = Number(session.localId || 0);
 
@@ -175,13 +177,21 @@ export async function GET(req) {
     const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
     productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
 
-    const items = await construirItems(productosFull, {
+    // El suelto, como un resultado más (tercer nivel de empaque, decisión de
+    // Emanuel): cada producto que se vende suelto acá trae su gemelo
+    // " · suelto" justo detrás. Solo en la búsqueda por texto —el código exacto
+    // de arriba devuelve siempre el atado, porque el suelto no tiene código— y
+    // solo si lo pide quien busca (`conSueltos=1`): lo pide el buscador del POS.
+    // Ofertas, combos, el consumo del personal y la corrección de ventas usan
+    // este mismo endpoint y para ellos un suelto no es algo que se pueda elegir.
+    const encontrados = await construirItems(productosFull, {
       esDeposito,
       allowNegativeStock,
       listaAplicable,
       grupoId,
       localId,
     });
+    const items = conSueltos ? conGemelosSueltos(encontrados) : encontrados;
     return NextResponse.json({
       ok: true,
       items,

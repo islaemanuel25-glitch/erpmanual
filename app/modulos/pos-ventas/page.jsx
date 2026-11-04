@@ -66,6 +66,8 @@ import { ClipboardList, Printer, Undo2 } from "lucide-react";
 import TurnoOperativoDeCaja from "@/components/caja/TurnoOperativoDeCaja";
 import { useBajadaDePagina } from "@/app/context/AccionDePaginaContext";
 import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
+import { esLaMismaLinea, topeDeLineaDelCarrito } from "@/lib/pos-ventas/lineaSuelta";
+import { textoDeStockEnTresNiveles } from "@/lib/stock/presentacion";
 
 const MENSAJE_CANTIDAD_NO_DISPONIBLE =
   "No se pudo completar la venta con la cantidad solicitada. Actualizá el carrito e intentá nuevamente.";
@@ -840,14 +842,19 @@ export default function PosVentasPage() {
     // Aviso de stock bajo: solo si el local muestra stock. El producto se agrega
     // igual en los dos casos — esto avisa, no bloquea.
     if (mostrarStockPos) {
-      const enCarrito = state.carrito.find((i) => i.productoBaseId === producto.productoBaseId);
+      // Con la misma identidad de línea y el mismo tope que el carrito: el atado
+      // y su suelto son líneas distintas, y el tope del atado son los atados que
+      // caben, no los cigarrillos. El stock se dice como se escribe en Stock
+      // (tres niveles con sueltos); sin sueltos, el número de siempre.
+      const enCarrito = state.carrito.find((i) => esLaMismaLinea(i, producto));
       const cantidadResultante = enCarrito ? enCarrito.cantidad + 1 : 1;
-      const stockDisponible = producto.stock ?? Infinity;
+      const stockDisponible = topeDeLineaDelCarrito(producto) ?? Infinity;
       if (stockDisponible !== Infinity && cantidadResultante >= stockDisponible) {
-        showError(`Stock bajo: "${producto.nombre}" tiene ${stockDisponible} en stock`);
+        const enStock = textoDeStockEnTresNiveles(producto, contexto?.esDeposito === true) ?? stockDisponible;
+        showError(`Stock bajo: "${producto.nombre}" tiene ${enStock} en stock`);
       }
     }
-  }, [state.carrito, mostrarStockPos]);
+  }, [state.carrito, mostrarStockPos, contexto?.esDeposito]);
 
   // ---------------------------------------------------------------------------
   // Editar cantidad
@@ -2335,6 +2342,7 @@ export default function PosVentasPage() {
               esDeposito={contexto?.esDeposito === true}
               mostrarStock={mostrarStockPos}
               avisarNoEncontrado
+              conSueltos
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta
