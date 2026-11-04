@@ -334,8 +334,13 @@ export async function POST(req) {
     // al lado sería el segundo criterio de siempre. Devuelve sin tocar nada
     // —una consulta— cuando el pedido no nació de una factura, que es el caso
     // de todos los días.
+    //
+    // Corre AUNQUE la línea del pedido ya exista: la siembra también rehace la
+    // que quedó como foto de un producto que cambió (`lineaSembradaQueRehacer`).
+    // Nutrisur #491: el durazno se volvió a vincular a su línea de 12 BULTO a
+    // $1.500, y como la siembra no corría, la foto vieja sobrevivía.
     let siembra = null;
-    if (detalleDelPedido == null && linea.comprobante.pedidoId) {
+    if (linea.comprobante.pedidoId) {
       try {
         siembra = await sembrarPedidoDesdeFactura(prisma, {
           pedidoId: linea.comprobante.pedidoId,
