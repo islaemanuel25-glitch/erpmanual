@@ -216,7 +216,7 @@ export async function GET(req, context) {
       proveedorId: cab.proveedor?.id,
       productoBaseIds: [fila.productoBaseId],
     });
-    const { lecturas, confirmable, porQueNo, porKilo, admiteCaja, admiteKilos } = lecturasDeLaFila({
+    const { lecturas, confirmable, porQueNo, porKilo, admiteCaja, admiteKilos, cajaDelCatalogo } = lecturasDeLaFila({
       fila,
       producto: conLoRecordado(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
@@ -275,9 +275,17 @@ export async function GET(req, context) {
         });
         if (!falta) return null;
         const kilos = falta === FALTA.KILOS;
+        // Con la caja del catálogo se pregunta el pack de la lista, no la caja
+        // (DYSSA, 2026-11-04: caja de 24, la lista cotiza el pack de 6).
+        const caja = kilos ? null : cajaDelCatalogo;
         return {
           porKilo: kilos,
-          sugerido: respuestaSugerida({ porKilo: kilos, textos: [fila.descripcionProveedor, fila.productoBase?.nombre] }),
+          cajaDelCatalogo: caja,
+          sugerido: respuestaSugerida({
+            porKilo: kilos,
+            textos: [fila.descripcionProveedor, fila.productoBase?.nombre],
+            caja,
+          }),
         };
       })(),
       // ── CON QUÉ RENGLÓN DE LA LISTA SE LO EMPAREJÓ ────────────────────

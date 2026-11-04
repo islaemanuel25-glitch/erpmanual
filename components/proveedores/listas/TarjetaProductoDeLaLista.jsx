@@ -277,6 +277,7 @@ export default function TarjetaProductoDeLaLista({
         <PreguntaQueFalta
           id={`pregunta-${item.productoBaseId}`}
           porKilo={preguntarKilos}
+          cajaDelCatalogo={preguntarKilos ? null : item.cajaDelCatalogo ?? null}
           sugerido={item.respuestaSugerida ?? null}
           trabajando={trabajando}
           onListo={(n) => (preguntarKilos ? onKilos?.(item, n) : onCaja?.(item, n))}

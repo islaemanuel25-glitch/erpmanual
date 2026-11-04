@@ -23,10 +23,13 @@ import { useState } from "react";
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiAccionRapida from "@/components/sunmi/SunmiAccionRapida";
-import { kilosValidos } from "@/lib/proveedores/listas/cajaRecordada";
+import { kilosValidos, packDeLaListaValido } from "@/lib/proveedores/listas/cajaRecordada";
 
 export const TEXTO_PREGUNTA_CAJA = "¿Cuántas trae la caja?";
 export const TEXTO_PREGUNTA_KILOS = "¿Cuántos kilos trae la pieza?";
+// Cuando el catálogo ya sabe la caja (DYSSA, 2026-11-04: caja de 24, la lista
+// cotiza el pack de 6), lo que falta es de cuántas unidades es el precio.
+export const TEXTO_PREGUNTA_PACK_DE_LA_LISTA = "¿De cuántas unidades es el precio de la lista?";
 export const TEXTO_LISTO = "Listo";
 
 /** Lo que se escribió en la pregunta, como número: "2,5" y "2.5" son lo mismo. */
@@ -35,9 +38,14 @@ export function numeroDeLaRespuesta(texto) {
   return t === "" ? NaN : Number(t);
 }
 
-/** ¿Es una respuesta que se puede guardar? Las mismas reglas que la ruta. */
-export function respuestaValida(n, porKilo) {
-  return porKilo ? kilosValidos(n) : Number.isInteger(n) && n >= 2;
+/**
+ * ¿Es una respuesta que se puede guardar? Las mismas reglas que la ruta: con la
+ * caja del catálogo, el pack de la lista tiene que dividirla.
+ */
+export function respuestaValida(n, porKilo, cajaDelCatalogo = null) {
+  if (porKilo) return kilosValidos(n);
+  if (cajaDelCatalogo !== null && cajaDelCatalogo !== undefined) return packDeLaListaValido(n, cajaDelCatalogo);
+  return Number.isInteger(n) && n >= 2;
 }
 
 /** El sugerido, escrito como lo escribiría una persona: 0,5 y no 0.5. */
@@ -52,11 +60,21 @@ function textoDelSugerido(sugerido) {
  * @param sugerido   el valor con que arranca el campo, o null
  * @param trabajando hay un pedido en vuelo
  * @param onListo    `(numero)`, solo al tocar «Listo» con una respuesta válida
+ * @param cajaDelCatalogo  cuántas trae la caja según el catálogo, o null: con
+ *                   ella se pregunta de cuántas unidades es el precio de la lista
  */
-export default function PreguntaQueFalta({ id, porKilo = false, sugerido = null, trabajando = false, onListo }) {
+export default function PreguntaQueFalta({
+  id,
+  porKilo = false,
+  sugerido = null,
+  trabajando = false,
+  onListo,
+  cajaDelCatalogo = null,
+}) {
   const [respuesta, setRespuesta] = useState(() => textoDelSugerido(sugerido));
   const n = numeroDeLaRespuesta(respuesta);
-  const valida = respuestaValida(n, porKilo);
+  const valida = respuestaValida(n, porKilo, cajaDelCatalogo);
+  const conCaja = !porKilo && cajaDelCatalogo !== null && cajaDelCatalogo !== undefined;
   return (
     <form
       className="flex items-center gap-2"
@@ -66,7 +84,7 @@ export default function PreguntaQueFalta({ id, porKilo = false, sugerido = null,
       }}
     >
       <label className="text-sm2 sunmi-text-strong flex-1" htmlFor={id}>
-        {porKilo ? TEXTO_PREGUNTA_KILOS : TEXTO_PREGUNTA_CAJA}
+        {porKilo ? TEXTO_PREGUNTA_KILOS : conCaja ? TEXTO_PREGUNTA_PACK_DE_LA_LISTA : TEXTO_PREGUNTA_CAJA}
       </label>
       {/* Los kilos admiten decimales —una pieza de 2,5 kg—, la caja no. Va
           como texto con teclado decimal: un `type="number"` no muestra "0,5". */}

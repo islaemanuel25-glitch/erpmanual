@@ -774,7 +774,7 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
   });
   for (const fila of filas) {
     if (!fila.productoBase) continue;
-    const { lecturas, confirmable, admiteCaja, admiteKilos, porKilo } = lecturasDeLaFila({
+    const { lecturas, confirmable, admiteCaja, admiteKilos, porKilo, cajaDelCatalogo } = lecturasDeLaFila({
       fila,
       producto: conLoRecordado(fila.productoBase, cajas.get(fila.productoBaseId)),
       cab,
@@ -793,6 +793,9 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
       admiteCaja,
       admiteKilos,
       porKilo,
+      // Con la caja del catálogo, la pregunta es de cuántas unidades es el
+      // precio de la lista, no cuántas trae la caja (DYSSA, 2026-11-04).
+      cajaDelCatalogo,
     });
   }
   return porFila;

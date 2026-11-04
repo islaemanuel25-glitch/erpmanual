@@ -8,7 +8,10 @@
 //                 Dab cotiza la unidad, el producto cuesta la caja, y ni el
 //                 catálogo ni el papel dicen cuántas trae. Con la respuesta se
 //                 arma "$ 800,45 × 24".
-//   { kilos }     "¿Cuántos kilos trae la pieza?" — GRANIX BOCADITO 2KG: el
+//                 Si el catálogo YA dice cuántas trae la caja, el número es
+//                 de cuántas unidades es el precio de la lista (DYSSA,
+//                 2026-11-04: caja de 24, pack de 6 → "$ 12.160,32 × 4").
+//   { kilos }    "¿Cuántos kilos trae la pieza?" — GRANIX BOCADITO 2KG: el
 //                 producto guarda el costo por kilo y la lista cotiza la pieza.
 //                 Con la respuesta se arma "$ 22.105,73 ÷ 2 kg". Admite
 //                 decimales: una pieza puede traer 2,5 kg.
@@ -47,10 +50,14 @@ import { TEXTO_SIN_PROPIEDAD_DEL_COSTO } from "@/lib/proveedores/listas/porQueNo
 import {
   CLAVE_KILOS_POR_PIEZA,
   KILOS_MAX,
+  cajaDelCatalogo,
   cantidadDeCajaValida,
   claveDeLaCaja,
+  claveDelPackDeLaLista,
   kilosValidos,
+  packDeLaListaValido,
 } from "@/lib/proveedores/listas/cajaRecordada";
+import { CAMPOS_PRODUCTO_PARA_LEER } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { CANTIDAD_MAX } from "@/lib/proveedores/listas/confirmarPresentacion";
 
 /** Lo que se devuelve y se restaura: la recordada, con sus cuatro datos. */
@@ -135,9 +142,11 @@ export async function POST(req, context) {
       );
     }
 
+    // Con los campos con que se leen las filas (`CAMPOS_PRODUCTO_PARA_LEER`):
+    // la caja del catálogo decide si el número es la caja o el pack de la lista.
     const producto = await prisma.productoBase.findFirst({
       where: { id: productoBaseId, grupoId },
-      select: { id: true, nombre: true, creadoEnLocalId: true },
+      select: CAMPOS_PRODUCTO_PARA_LEER,
     });
     if (!producto) {
       return NextResponse.json({ ok: false, error: "El producto ya no existe." }, { status: 404 });
@@ -207,6 +216,51 @@ export async function POST(req, context) {
         kilos,
         anterior,
         mensaje: `Listo: la pieza de ${producto.nombre} trae ${String(kilos).replace(".", ",")} kg. Me lo acuerdo para las próximas listas.`,
+      });
+    }
+
+    // ── GUARDAR: EL PRECIO DE LA LISTA ES DE UN PACK DE N ─────────────────
+    //
+    // DYSSA (2026-11-04): si el catálogo ya dice cuántas trae la caja, el
+    // número que contestó la persona no es la caja —esa se sabe— sino de
+    // cuántas unidades es el precio de la lista. Caja de 24 y pack de 6: × 4.
+    // Ver `cajaRecordada.js`.
+    const caja = cajaDelCatalogo(producto);
+    if (caja !== null) {
+      if (!packDeLaListaValido(cantidad, caja)) {
+        const divisores = [];
+        for (let d = 2; d < caja; d++) if (caja % d === 0) divisores.push(d);
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              divisores.length > 0
+                ? `Tu caja trae ${caja}: el pack de la lista tiene que entrar justo en ella (${divisores.join(", ")}).`
+                : `Tu caja trae ${caja} y no se puede partir en packs iguales: revisá la ficha del producto.`,
+          },
+          { status: 400 }
+        );
+      }
+      const datosPack = {
+        clave: claveDelPackDeLaLista(cantidad),
+        multiplicador: caja / cantidad,
+        cantidad,
+        kilosPorPieza: null,
+        confirmadaPorUsuarioId: quien,
+        confirmadaEn: new Date(),
+      };
+      await prisma.lecturaProductoProveedor.upsert({
+        where: donde,
+        create: { grupoId, proveedorId: cab.proveedorId, productoBaseId, ...datosPack },
+        update: datosPack,
+      });
+      return NextResponse.json({
+        ok: true,
+        accion: "PACK_DE_LA_LISTA_GUARDADO",
+        productoBaseId,
+        cantidad,
+        anterior,
+        mensaje: `Listo: la lista cotiza ${producto.nombre} por pack de ${cantidad}, y tu caja de ${caja} son ${caja / cantidad}. Me lo acuerdo para las próximas listas.`,
       });
     }
 

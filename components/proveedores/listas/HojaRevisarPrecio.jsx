@@ -51,6 +51,14 @@ export const TEXTO_FALTA_LA_CAJA =
   "La lista cotiza una unidad y no dice cuántas trae la caja: decímelo y armo la cuenta.";
 
 /**
+ * El porqué cuando la caja se sabe y lo que falta es el pack de la lista
+ * (DYSSA, 2026-11-04: caja de 24, la lista cotiza el pack de 6).
+ */
+export function textoFaltaElPackDeLaLista(caja) {
+  return `Tu caja trae ${caja} y la lista parece cotizar un pack más chico: decime de cuántas unidades es su precio y armo la cuenta.`;
+}
+
+/**
  * Qué acción rechazó el servidor, cuando no fue una lectura.
  *
  * Las lecturas se identifican por su `clave` —`MISMA_PRESENTACION`, `PACK_12`—
@@ -478,12 +486,17 @@ export function DecisionDeLectura({
           {fila.pregunta ? (
             <SunmiCard className="p-3 space-y-2">
               <p className="text-sm2 sunmi-text-warning leading-snug">
-                {fila.pregunta.porKilo ? TEXTO_FALTAN_LOS_KILOS : TEXTO_FALTA_LA_CAJA}
+                {fila.pregunta.porKilo
+                  ? TEXTO_FALTAN_LOS_KILOS
+                  : fila.pregunta.cajaDelCatalogo
+                    ? textoFaltaElPackDeLaLista(fila.pregunta.cajaDelCatalogo)
+                    : TEXTO_FALTA_LA_CAJA}
               </p>
               <PreguntaQueFalta
                 key={`${fila.id}-${fila.pregunta.porKilo ? "kilos" : "caja"}`}
                 id={`hoja-pregunta-${fila.id}`}
                 porKilo={fila.pregunta.porKilo}
+                cajaDelCatalogo={fila.pregunta.cajaDelCatalogo ?? null}
                 sugerido={fila.pregunta.sugerido}
                 trabajando={trabajando}
                 onListo={guardarLoQueFalta}
