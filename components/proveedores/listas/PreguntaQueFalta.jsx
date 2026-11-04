@@ -48,9 +48,18 @@ export function respuestaValida(n, porKilo, cajaDelCatalogo = null) {
   return Number.isInteger(n) && n >= 2;
 }
 
-/** El sugerido, escrito como lo escribiría una persona: 0,5 y no 0.5. */
-function textoDelSugerido(sugerido) {
+/**
+ * Con qué arranca el campo: el sugerido escrito como lo escribiría una persona
+ * (0,5 y no 0.5), SOLO si «Listo» lo aceptaría. Si no, vacío.
+ *
+ * DR LEMON LIMÓN 1L X CAJA (2026-11-04): con la caja de 12, el campo de "¿De
+ * cuántas unidades es el precio de la lista?" vino con 12, que es la opción "la
+ * CAJA entera" y que «Listo» rechaza. Un número que no se puede contestar no se
+ * precarga, venga de donde venga.
+ */
+export function textoInicialDeLaRespuesta(sugerido, porKilo = false, cajaDelCatalogo = null) {
   if (sugerido === null || sugerido === undefined || !Number.isFinite(Number(sugerido))) return "";
+  if (!respuestaValida(Number(sugerido), porKilo, cajaDelCatalogo)) return "";
   return String(Number(sugerido)).replace(".", ",");
 }
 
@@ -71,7 +80,21 @@ export default function PreguntaQueFalta({
   onListo,
   cajaDelCatalogo = null,
 }) {
-  const [respuesta, setRespuesta] = useState(() => textoDelSugerido(sugerido));
+  // ── SI LA PREGUNTA CAMBIA, EL CAMPO ARRANCA DE NUEVO ──────────────────
+  //
+  // El estado se inicializaba una sola vez: si la misma tarjeta pasaba de
+  // "¿Cuántas trae la caja?" a la pregunta del pack —o le llegaba otro
+  // sugerido—, el campo se quedaba con el número de antes. Cuando cambia con
+  // qué arrancaría, se vuelve a arrancar con eso; lo que la persona escribió
+  // sobre la MISMA pregunta no se toca.
+  const inicial = textoInicialDeLaRespuesta(sugerido, porKilo, cajaDelCatalogo);
+  const pregunta = `${porKilo ? "kilos" : "caja"}|${cajaDelCatalogo ?? ""}|${inicial}`;
+  const [respuesta, setRespuesta] = useState(inicial);
+  const [arrancoCon, setArrancoCon] = useState(pregunta);
+  if (arrancoCon !== pregunta) {
+    setArrancoCon(pregunta);
+    setRespuesta(inicial);
+  }
   const n = numeroDeLaRespuesta(respuesta);
   const valida = respuestaValida(n, porKilo, cajaDelCatalogo);
   const conCaja = !porKilo && cajaDelCatalogo !== null && cajaDelCatalogo !== undefined;
