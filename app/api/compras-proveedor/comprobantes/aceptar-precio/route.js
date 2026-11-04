@@ -211,10 +211,6 @@ export async function POST(req) {
           id: true,
           cantidad: true,
           precioCosto: true,
-          // La unidad de la línea: sin ella el costo del pedido no se pone en
-          // la escala del papel (`costoDelPedidoComparable`) y esta ruta
-          // frenaría lo que la tarjeta ofrece aceptar. La pantalla la trae.
-          unidad: true,
           // El NOMBRE del producto del pedido no es decoración acá: la cascada
           // lo usa para machear el texto del papel contra lo que se encargó, y
           // sin él una línea que la pantalla resuelve sola quedaría sin resolver
@@ -314,9 +310,6 @@ export async function POST(req) {
     const comparacion = {
       costoFactura: analisis?.precioAEscribir ?? null,
       costoCatalogo: delPedido.detalle?.precioCosto ?? null,
-      // Para poner ese costo en la escala del papel, como la tarjeta.
-      unidadPedido: delPedido.detalle?.unidad ?? null,
-      factorPack: delPedido.detalle?.factorPack ?? null,
       pedidoDetalleId: delPedido.detalle?.id ?? null,
       // En qué viene lo facturado: sin escala sabida no hay costo que aceptar,
       // igual que en la tarjeta (`escalaSinDeducir`, Pablo #337).
@@ -466,8 +459,6 @@ export async function POST(req) {
       {
         costoFactura: precioAEscribir,
         costoCatalogo: delPedido.detalle?.precioCosto ?? null,
-        unidadPedido: delPedido.detalle?.unidad ?? null,
-        unidad: analisis?.unidad ?? null,
         costoMaestroHoy: costoDelCatalogoEnLaUnidadDelDeposito({ base, costo: base?.precio_costo }),
         factorPack: delPedido.detalle?.factorPack ?? null,
       },
