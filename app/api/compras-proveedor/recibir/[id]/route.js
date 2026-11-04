@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
+import { comoViene, escalaDelCosto } from "@/lib/unidades/reglaDeUnidades";
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo, sueltosParaCongelar, toUnidades } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { fiambreAlCerrar, papelQueNoCierra } from "@/lib/compras-proveedor/cierreDeRecepcion";
@@ -193,7 +194,7 @@ export async function POST(req, { params }) {
                     // Tercer nivel de empaque: cuántos sueltos entran por unidad.
                     sueltos_por_unidad: true,
                     // EL COSTO MAESTRO DE HOY. Lo leen tres defensas del cierre
-                    // —la escala de `costoLineaAMaestro`, el freno por la
+                    // —la escala de la regla única (`escalaDelCosto`), el freno por la
                     // variación del proveedor y la frontera— y faltaba acá:
                     // las tres recibían `undefined`, comparaban contra cero y
                     // no frenaban nunca. Medido contra Postgres el 2026-09-25:
@@ -1074,18 +1075,46 @@ export async function POST(req, { params }) {
         });
         totalFacturaComputed += subtotalEconomico || 0;
 
+        // ── EN QUÉ ESCALA ESTÁ EL COSTO DE LA LÍNEA: LA REGLA ÚNICA ─────────
+        //
+        // Una línea "por unidad" puede traer el costo de la unidad o el del
+        // bulto escrito donde iba el de la unidad (la Hamburguesa Paty del #242).
+        // Lo contesta `escalaDelCosto` contra el costo de hoy, con el mismo
+        // decisor y el mismo 35 % que la recepción —antes era un 50 % propio de
+        // esta ruta—. Un costo aceptado en Corregir no se pregunta: es el
+        // `precioAEscribir` de la recepción, que siempre está por bulto.
+        const aceptadoDelPapel = aceptadoEnElPapel(det.id, costoFinal, base);
+        const escala = aceptadoDelPapel
+          ? { unidad: "BULTO", requiereDecision: false }
+          : escalaDelCosto({ costo: costoFinal, unidad: det.unidad, base, costoActual: base?.precio_costo ?? null });
+
+        // ── Y SI NO SE SABE, SE PREGUNTA: NUNCA SE ESCRIBE UN COSTO SOLO ────
+        //
+        // $21.000 por unidad de un pack de 12 a $38.400 no es la unidad (+556 %)
+        // ni el bulto (−45 %). Hasta el 2026-11-04 se tomaba por el bulto y, con
+        // una aceptación, se escribía. Frena como el freno de variación de abajo
+        // y con la misma salida: una línea que alguien decidió no tocar —dejar
+        // el que tenía, o que llegó sin papel— pasa, porque no escribe nada.
+        if (escala.requiereDecision && !costosExcluidos.has(det.id)) {
+          const { factor } = comoViene(base);
+          throw new ErrorParaLaPersona(
+            `${base?.nombre || "Un producto"}: no se sabe si ${formatearMoneda(costoFinal)} es el costo de la ` +
+              `unidad o del pack de ${factor} — ninguna de las dos se parece a tu costo de ` +
+              `${formatearMoneda(Number(base?.precio_costo ?? 0))}. Abrí Corregir, poné el costo que corresponde ` +
+              `o elegí dejar el tuyo, y volvé a cerrar. No entró nada.`
+          );
+        }
+
         // Reconfirmar el costo real/maestro del producto con el costo recibido (solo costo).
-        const costoMaestro = costoLineaAMaestro({
-          precioCosto: costoFinal,
-          unidad: det.unidad,
-          factorPack: base?.factor_pack,
-          modoCompraProveedor: base?.modoCompraProveedor,
-          unidadMedida: base?.unidad_medida,
-          // Con qué comparar para saber en qué escala está el costo de la
-          // línea. Sin esto, un costo ya guardado POR BULTO en una línea en
-          // escala UNIDAD se vuelve a multiplicar por el factor.
-          costoActual: base?.precio_costo ?? null,
-        });
+        const costoMaestro = escala.requiereDecision
+          ? null
+          : costoLineaAMaestro({
+              precioCosto: costoFinal,
+              unidad: escala.unidad,
+              factorPack: base?.factor_pack,
+              modoCompraProveedor: base?.modoCompraProveedor,
+              unidadMedida: base?.unidad_medida,
+            });
 
         // ── LA FRONTERA ─────────────────────────────────────────────────
         //
@@ -1104,7 +1133,7 @@ export async function POST(req, { params }) {
         });
         // Aceptado en esta recepción: lo que mandó quien llama, o lo que la
         // hoja de Corregir ya dejó guardado para ESTE costo.
-        const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal, base);
+        const aceptada = costosAceptados.has(det.id) || aceptadoDelPapel;
         const decision = decidirEscrituraDeCosto({
           clasificacion,
           excluidaAMano: costosExcluidos.has(det.id),

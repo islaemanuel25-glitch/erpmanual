@@ -311,7 +311,7 @@ const CASOS = [
     archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
     suite: "scripts/pruebas-db/frenoDeCosto.mjs",
     minimo: 20,
-    inyecciones: [{ de: "          costoActual: base?.precio_costo ?? null,", a: "          costoActual: null," }],
+    inyecciones: [{ de: "base, costoActual: base?.precio_costo ?? null })", a: "base, costoActual: null })" }],
     // Sin el costo actual, la línea UNIDAD se multiplica por 30 y el freno la
     // para como error de escala: el cierre legítimo deja de cerrar.
     esperadas: ["F costo del bulto en línea UNIDAD: cierra"],

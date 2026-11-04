@@ -396,6 +396,17 @@ async function correr(f) {
   const f2 = await pedidoCon(f, { nombre: "F2", base: PACK30, catalogo: 61703, linea: { cantidad: 90, unidad: "UNIDAD", precioCosto: 2100 } });
   await cierraYEscribe(f, f2, "F costo unitario en línea UNIDAD", 63000, (id) => ({ fisicas: { [id]: 90 } }));
 
+  seccion("F3. Regla única de unidades: $21.000 por UNIDAD contra el pack de 12 a $38.400");
+  // Ni la unidad (+556 %) ni el bulto (−45 %). Con el 50 % propio del cierre se
+  // tomaba por el bulto; ahora la escala la decide la regla única, y lo que no
+  // sabe lo pregunta — aunque quien llama diga que lo acepta: aceptar un costo
+  // no dice de qué escala es.
+  const f3 = await pedidoCon(f, { nombre: "F3", base: PACK12, catalogo: 38400, linea: { cantidad: 12, unidad: "UNIDAD", precioCosto: 21000 } });
+  const r21 = await frenaSinDejarNada(f, f3, "F3 escala sin saber", (id) => ({ costosAceptados: [id] }));
+  ok("F3: dice qué no se sabe", /no se sabe si .* es el costo de la unidad o del pack de 12/.test(r21.error || ""), r21.error);
+  // Y si alguien decide no tocar el costo, la mercadería entra igual.
+  await cierraYEscribe(f, f3, "F3 dejado sin tocar", 38400, (id) => ({ costosExcluidos: [id] }));
+
   seccion("G. Fiambre por PESO: las dos puntas por kilo");
   const g1 = await pedidoCon(f, { nombre: "G1", base: PESO, catalogo: 5000, linea: { cantidad: 3, unidad: "UNIDAD", precioCosto: 5200 } });
   await cierraYEscribe(f, g1, "G 5.000/kg → 5.200/kg", 5200, (id) => ({ kgRecibidos: { [id]: 1.5 } }));
