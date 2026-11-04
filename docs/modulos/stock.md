@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-11-04 01:04
+**Última actualización:** 2026-11-04 01:29
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-11-04: feat: tercer nivel de empaque, tanda 8 — el suelto como un resultado más del POS
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
 - 2026-11-04: feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
 - 2026-10-29: feat(stock-locales): filtros con la pieza del Control de stock, más En negativo y Stock alto (vista SIN VERIFICAR en pantalla)

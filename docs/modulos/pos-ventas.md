@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-11-04 01:04
+**Última actualización:** 2026-11-04 01:29
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-04: feat: tercer nivel de empaque, tanda 8 — el suelto como un resultado más del POS
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
 - 2026-11-04: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
 - 2026-11-03: feat: la venta descuenta en tres escalas y cobra el suelto en el servidor (camino del suelto por la ruta SIN VERIFICAR)
