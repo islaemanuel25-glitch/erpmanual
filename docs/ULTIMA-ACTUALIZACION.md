@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-04 18:16
+**Fecha:** 2026-11-04 19:40
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango, fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
-- Archivos: 3 modificados (3 total)
+- feat: listas — paquete «Sin producto en tu catálogo»: vincular o crear desde la lista, feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango, fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
+- Archivos: 3 nuevos, 8 modificados (11 total)
 
 ### productos
 - feat: la ficha activa el tercer nivel de empaque ("+ Se vende más chico"), feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados, feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
@@ -30,6 +30,9 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/proveedores/listas/[id]/filas/[filaId]/vincular/route.js
+- app/api/proveedores/listas/[id]/sin-producto/route.js
+- app/modulos/proveedores/listas/[id]/sin-producto/page.jsx
 - components/productos/fichaSeVendeMasChico.test.mjs
 - lib/pos-ventas/posSuelto.test.mjs
 
