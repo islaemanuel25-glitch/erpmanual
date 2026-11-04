@@ -27,6 +27,7 @@ import PreguntaQueFalta, {
   TEXTO_LISTO,
   TEXTO_PREGUNTA_CAJA,
   TEXTO_PREGUNTA_KILOS,
+  TEXTO_PREGUNTA_PACK_DE_LA_LISTA,
   respuestaValida,
 } from "@/components/proveedores/listas/PreguntaQueFalta";
 import { respuestaSugerida, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
@@ -94,17 +95,40 @@ test("GRANIX FRUTILLA SIN KILOS: LO QUE LA HOJA RECIBE DICE QUE FALTAN LOS KILOS
 test("LA RUTA MANDA LA PREGUNTA, Y LA HOJA LA DIBUJA CON LA MISMA PIEZA DE LA TARJETA", () => {
   const r = codigoDe("app/api/proveedores/listas/[id]/revisar/route.js");
   assert.match(r, /pregunta: \(\(\) => \{\s*const falta = queFaltaPreguntar\(\{/);
-  assert.match(r, /sugerido: respuestaSugerida\(\{ porKilo: kilos, textos: \[fila\.descripcionProveedor, fila\.productoBase\?\.nombre\] \}\)/);
+  // El sugerido sale del renglón y del nombre del producto; y con la caja del
+  // catálogo, solo un número que la divida (DYSSA, 2026-11-04).
+  assert.match(
+    r,
+    /sugerido: respuestaSugerida\(\{\s*porKilo: kilos,\s*textos: \[fila\.descripcionProveedor, fila\.productoBase\?\.nombre\],\s*caja,\s*\}\)/
+  );
+  // La caja del catálogo viaja con la pregunta, y sale de `lecturasDeLaFila`.
+  assert.match(r, /const caja = kilos \? null : cajaDelCatalogo;/);
+  assert.match(r, /cajaDelCatalogo: caja,/);
+  assert.match(r, /cajaDelCatalogo \} = lecturasDeLaFila\(\{/);
   assert.match(r, /productoBaseId: fila\.productoBaseId,/);
   const h = codigoDe("components/proveedores/listas/HojaRevisarPrecio.jsx");
   const rama = h.slice(h.indexOf("{fila.pregunta ? ("), h.indexOf("</SunmiCard>", h.indexOf("{fila.pregunta ? (")));
   assert.ok(rama.length > 0, "la hoja no tiene la rama de la pregunta");
-  assert.match(rama, /<PreguntaQueFalta[\s\S]*?porKilo=\{fila\.pregunta\.porKilo\}[\s\S]*?sugerido=\{fila\.pregunta\.sugerido\}[\s\S]*?onListo=\{guardarLoQueFalta\}/);
+  assert.match(rama, /<PreguntaQueFalta[\s\S]*?porKilo=\{fila\.pregunta\.porKilo\}[\s\S]*?cajaDelCatalogo=\{fila\.pregunta\.cajaDelCatalogo \?\? null\}[\s\S]*?sugerido=\{fila\.pregunta\.sugerido\}[\s\S]*?onListo=\{guardarLoQueFalta\}/);
+  assert.match(rama, /textoFaltaElPackDeLaLista\(fila\.pregunta\.cajaDelCatalogo\)/);
   // La tarjeta usa la misma pieza: no hay un segundo formulario escrito al lado.
   const t = codigoDe("components/proveedores/listas/TarjetaProductoDeLaLista.jsx");
   assert.match(t, /<PreguntaQueFalta/);
   assert.ok(!/<form/.test(t), "la tarjeta volvió a tener su propio formulario");
   assert.ok(!/<form/.test(h), "la hoja tiene un formulario propio en vez de la pieza");
+});
+
+test("CON LA CAJA EN EL CATÁLOGO SE PREGUNTA EL PACK DE LA LISTA, Y SOLO SE ACEPTA UNO QUE LA DIVIDA", () => {
+  // DYSSA (2026-11-04): DR LEMON 473 por caja de 24; la lista cotiza el pack de 6.
+  const pack = dibujar({ id: "p", porKilo: false, cajaDelCatalogo: 24, sugerido: 6 });
+  assert.ok(pack.includes(TEXTO_PREGUNTA_PACK_DE_LA_LISTA));
+  assert.ok(!pack.includes(TEXTO_PREGUNTA_CAJA), "con la caja sabida se preguntó la caja");
+  assert.match(pack, /value="6"/);
+  assert.equal(respuestaValida(6, false, 24), true);
+  assert.equal(respuestaValida(5, false, 24), false, "aceptó un pack que no divide la caja");
+  assert.equal(respuestaValida(24, false, 24), false, "aceptó la caja entera como pack");
+  // Sin caja en el catálogo, la pregunta de siempre.
+  assert.ok(dibujar({ id: "c", porKilo: false, sugerido: 24 }).includes(TEXTO_PREGUNTA_CAJA));
 });
 
 test("«2KG» PRECARGA 2, «500G» PRECARGA 0,5, «X 12» PRECARGA 12; UN PESO NO ES UNA CAJA", () => {
