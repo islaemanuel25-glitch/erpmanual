@@ -1,6 +1,7 @@
 // app/api/stock_locales/control/conteos/route.js
 //
-// PUT { productoLocalId, total }: aceptar el TOTAL contado de un producto en el
+// PUT { productoLocalId, total } —o, para un producto con sueltos,
+// { productoLocalId, unidades, sueltos }—: aceptar el TOTAL contado de un producto en el
 // control. Se mide contra el stock vivo de ese instante y el stock pasa a ser lo
 // contado, sea el primer conteo o uno que lo vuelve a contar; `total: null` lo
 // borra, deshace su ajuste y el producto vuelve a "Sin contar". `estaBien: true`
@@ -27,6 +28,9 @@ export async function PUT(req) {
       quien: a.quien,
       productoLocalId: Number(body.productoLocalId || 0),
       total: body.total === null || body.total === undefined || body.total === "" ? null : body.total,
+      // Tercer nivel de empaque: el conteo también puede llegar como
+      // "unidades + sueltos"; `fijarTotal` lo lleva a sueltos por el embudo.
+      carga: body.unidades !== undefined || body.sueltos !== undefined ? { unidades: body.unidades, sueltos: body.sueltos } : null,
       estaBien: body.estaBien === true,
     });
     return NextResponse.json({ ok: true, ...r });

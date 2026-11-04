@@ -11,8 +11,10 @@ import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStoc
 import {
   esConfiguracion,
   interpretarLimite,
+  interpretarLimiteDeUnaCarga,
   valorAGuardar,
 } from "@/lib/stock/limites";
+import { esCargaEnSueltos } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -46,10 +48,10 @@ export async function POST(req) {
     // Tres ramas y no dos: no vino / vino vacío / vino un número. Ver
     // `lib/stock/limites.js` — `Number(null)` y `Number("")` dan 0, y eso
     // convertía "sacá el límite" en "poné cero".
-    const minPedido = interpretarLimite(body.nuevoMin);
-    const maxPedido = interpretarLimite(body.nuevoMax);
-    const nuevoMin = minPedido.valor;
-    const nuevoMax = maxPedido.valor;
+    // Con tercer nivel de empaque, un límite en `{ unidades, sueltos }` se relee
+    // con la ficha a mano, igual que en `ajustar`.
+    let minPedido = interpretarLimite(body.nuevoMin);
+    let maxPedido = interpretarLimite(body.nuevoMax);
 
     // ======================================================
     // 2) RESOLVER localId REAL
@@ -103,7 +105,7 @@ export async function POST(req) {
     // ======================================================
     const prodLocal = await prisma.productoLocal.findUnique({
       where: { id: productoLocalId },
-      select: { id: true, localId: true, base: { select: { es_combo: true } } },
+      select: { id: true, localId: true, base: { select: { es_combo: true, sueltos_por_unidad: true, unidad_medida: true } } },
     });
 
     if (!prodLocal || prodLocal.localId !== localId) {
@@ -112,6 +114,15 @@ export async function POST(req) {
         { status: 404 }
       );
     }
+
+    for (const [campo, asignar] of [["nuevoMin", (v) => (minPedido = v)], ["nuevoMax", (v) => (maxPedido = v)]]) {
+      if (!esCargaEnSueltos(body[campo])) continue;
+      const r = interpretarLimiteDeUnaCarga(body[campo], prodLocal.base);
+      if (r.error) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      asignar(r);
+    }
+    const nuevoMin = minPedido.valor;
+    const nuevoMax = maxPedido.valor;
 
     // Los combos no tienen stock físico: no se les fijan límites.
     if (prodLocal.base?.es_combo) {

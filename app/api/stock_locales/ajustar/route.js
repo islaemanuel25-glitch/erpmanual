@@ -53,9 +53,11 @@ import { getConfigLocalEfectiva } from "@/lib/config/local";
 import {
   esConfiguracion,
   interpretarLimite,
+  interpretarLimiteDeUnaCarga,
   valorAGuardar,
 } from "@/lib/stock/limites";
 import { unidadFisicaDeStock } from "@/lib/stock/escalaFisica";
+import { cantidadDeStockDeUnaCarga, esCargaEnSueltos } from "@/lib/conversiones/stock";
 import {
   ACCION_AUDITORIA_AJUSTE,
   calcularNuevoStock,
@@ -199,8 +201,11 @@ export async function POST(req) {
     // así que "sacá el límite" y "poné el límite en cero" terminaban escritos
     // igual — y desde que el 0 es un valor configurado válido, esa confusión es
     // justo la que hay que cerrar. Ver `lib/stock/limites.js`.
-    const minPedido = interpretarLimite(body.nuevoMin);
-    const maxPedido = interpretarLimite(body.nuevoMax);
+    // Con tercer nivel de empaque un límite puede llegar como `{ unidades,
+    // sueltos }`; ése se relee más abajo, con la ficha a mano. Cualquier otra
+    // forma queda resuelta acá, como siempre.
+    let minPedido = interpretarLimite(body.nuevoMin);
+    let maxPedido = interpretarLimite(body.nuevoMax);
 
     // ======================================================
     // 2) RESOLVER localId REAL SEGÚN PROTOCOLO
@@ -258,6 +263,8 @@ export async function POST(req) {
             pesoReferenciaKg: true,
             modoVentaDeposito: true,
             pesoEsFijo: true,
+            // Tercer nivel de empaque: para aceptar "unidades + sueltos".
+            sueltos_por_unidad: true,
           },
         },
       },
@@ -279,6 +286,14 @@ export async function POST(req) {
       );
     }
 
+    // Los límites cargados en unidades + sueltos, ahora que la ficha está.
+    for (const [campo, asignar] of [["nuevoMin", (v) => (minPedido = v)], ["nuevoMax", (v) => (maxPedido = v)]]) {
+      if (!esCargaEnSueltos(body[campo])) continue;
+      const r = interpretarLimiteDeUnaCarga(body[campo], prodLocal.base);
+      if (r.error) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      asignar(r);
+    }
+
     // EL AJUSTE NO SE MUEVE SIN RASTRO. Ver el criterio al pie del archivo.
     // Se pregunta acá, antes de escribir, en los dos modos.
     if (!grupoId) {
@@ -297,9 +312,20 @@ export async function POST(req) {
       // No se convierte nada: se suma, se resta o se fija tal cual. Una fila
       // contada en PIEZAS —el peso fijo en el depósito— no acepta media pieza;
       // los kilos siguen admitiendo decimales.
+      //
+      // La única conversión es la del tercer nivel de empaque: "9 atados y 15
+      // sueltos" (`unidades` + `sueltos`) se lleva a sueltos por el embudo. Un
+      // producto sin sueltos sigue aceptando solo `cantidad`, tal cual.
+      const carga = cantidadDeStockDeUnaCarga({
+        cantidad: body.cantidad,
+        unidades: body.unidades,
+        sueltos: body.sueltos,
+        base: prodLocal.base,
+      });
+      if (!carga.ok) return NextResponse.json({ ok: false, error: carga.error }, { status: 400 });
       const pedido = validarPedidoDeAjuste({
         tipo: body.tipo,
-        cantidad: body.cantidad,
+        cantidad: carga.cantidad,
         motivoPrincipal: body.motivoPrincipal,
         motivo,
         unidadFisica: unidadFisicaDeStock(prodLocal.base, esDeposito),

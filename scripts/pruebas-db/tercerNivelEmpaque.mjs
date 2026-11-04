@@ -16,6 +16,16 @@
 //      y congela N; confirmar suma 200 al local y limpia el tránsito; cancelar
 //      otra devuelve 200. Una transferencia vieja, sin N congelado, se lee × 1.
 //      Una línea "suelta" no se puede enviar.
+//   C. COMPRA de 1 cartón: recibirla suma 200 al depósito.
+//   D. PEDIDOS SUGERIDOS: faltan 400 sueltos, se sugieren 2 cartones (no 40).
+//   E. AJUSTE y LÍMITES en "unidades + sueltos": fijar 9 atados y 15 sueltos
+//      deja 195; el mínimo y el máximo se guardan en sueltos.
+//   F. CONTEO de un control en "unidades + sueltos": contar 9 atados y 15
+//      sueltos sobre 200 da 5 sueltos de diferencia, valorizados a $60 cada uno
+//      (el costo del suelto), no a $1.200.
+//
+// Las contrapruebas de C a F son un pack igual SIN sueltos: rechaza la forma
+// nueva, acepta la cantidad como hoy, y su diferencia vale $1.200 por unidad.
 //
 // ── POR QUÉ UNA BASE DESCARTABLE Y NO UNA TRANSACCIÓN QUE SE REVIERTE ──────
 //
@@ -285,6 +295,134 @@ try {
   let rechazo = null;
   try { await enviar([{ cantidad: 1, unidadEnviada: "SUELTO" }]); } catch (e) { rechazo = e.code; }
   igual("enviar un suelto se rechaza antes de escribir", rechazo, "UNIDAD_ENVIADA_INVALIDA");
+
+  // ── Un producto SIN sueltos, para las contrapruebas de abajo: el mismo
+  // cartón de 10, sin tercer nivel. Lo que acepta tiene que ser lo de hoy.
+  const baseSin = await c.productoBase.create({
+    data: {
+      grupoId: grupo.id, nombre: "Pack sin sueltos", unidad_medida: "pack", factor_pack: FACTOR,
+      modo_envio: "MIXTO", precio_costo: 12000, precio_venta: 15000, redondeo_100: false, activo: true,
+    },
+  });
+  const plSin = await c.productoLocal.create({ data: { localId: local.id, baseId: baseSin.id, nombre: baseSin.nombre, activo: true } });
+  await c.stockLocal.create({ data: { localId: local.id, productoId: plSin.id, cantidad: 200 } });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("C. Compra a proveedor de 1 cartón (lo que quedó sin verificar en la tanda 5)");
+  // ══════════════════════════════════════════════════════════════════════════
+  const rutaRecibir = await import("../../app/api/compras-proveedor/recibir/[id]/route.js");
+  const proveedor = await c.proveedor.create({ data: { nombre: "Proveedor de prueba" } });
+  const pedidoCompra = await c.pedidoProveedor.create({
+    data: {
+      grupoId: grupo.id, depositoId: deposito.id, creadoEnLocalId: deposito.id, proveedorId: proveedor.id, estado: "ENVIADO",
+      detalles: { create: [{ productoLocalId: plDeposito.id, cantidad: 1, unidad: "BULTO", precioCosto: 12000 }] },
+    },
+    include: { detalles: { select: { id: true } } },
+  });
+  const detCompra = pedidoCompra.detalles[0].id;
+  const [antesCompra] = await stock(deposito.id, plDeposito.id);
+  const rCompra = await leer(await rutaRecibir.POST(
+    new Request(`http://ci/api/compras-proveedor/recibir/${pedidoCompra.id}`, {
+      method: "POST", headers: cabeceras(deposito.id),
+      body: JSON.stringify({
+        recibidos: { [detCompra]: 1 },
+        costosExcluidos: [detCompra],
+        pagoAlProveedor: { estado: "PENDIENTE", totalAPagar: "12000", totalConfirmado: true },
+      }),
+    }),
+    { params: Promise.resolve({ id: String(pedidoCompra.id) }) }
+  ));
+  ok("recibir la compra", rCompra.status === 200 && rCompra.ok === true, `${rCompra.status} ${rCompra.error || ""}`);
+  const [despuesCompra] = await stock(deposito.id, plDeposito.id);
+  igual("recibir 1 cartón suma 200 al depósito", despuesCompra - antesCompra, 200);
+  const congeladoCompra = await c.pedidoProveedorDetalle.findUnique({ where: { id: detCompra }, select: { stockIngresado: true } });
+  igual("y stockIngresado dice lo que sumó", n(congeladoCompra.stockIngresado), 200);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("D. Pedidos sugeridos con sueltos");
+  // ══════════════════════════════════════════════════════════════════════════
+  const rutaSugeridos = await import("../../app/api/pos-transferencias/sugeridos/route.js");
+  // El local tiene 300 sueltos (15 atados) y un máximo de 700 (35 atados):
+  // faltan 400 sueltos, que son 2 cartones de 200. Sin sueltos serían 40.
+  await c.stockLocal.update({ where: { localId_productoId: { localId: local.id, productoId: plLocal.id } }, data: { stockMax: 700 } });
+  igual("el local tiene 300 sueltos", (await stock(local.id, plLocal.id))[0], 300);
+  const sug = await leer(await rutaSugeridos.GET(new Request(`http://ci/api/pos-transferencias/sugeridos?destinoId=${local.id}&posId=999999`, {
+    method: "GET", headers: cabeceras(local.id),
+  })));
+  const itemSug = (sug.items || []).find((i) => i.baseId === base.id);
+  igual("faltan 400 sueltos: sugiere 2 cartones, no 40", [itemSug?.sugeridoCantidad, itemSug?.sugeridoUnidad], [2, "BULTO"]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("E. Ajuste y límites cargados en unidades + sueltos");
+  // ══════════════════════════════════════════════════════════════════════════
+  const rutaAjustar = await import("../../app/api/stock_locales/ajustar/route.js");
+  const { MOTIVO_DIFERENCIA } = await import("../../lib/stock/motivosDeDiferencia.js");
+  const ajustar = async (productoLocalId, cuerpo) =>
+    leer(await rutaAjustar.POST(new Request("http://ci/api/stock_locales/ajustar", {
+      method: "POST", headers: cabeceras(local.id),
+      body: JSON.stringify({ modo: "ajuste", localId: local.id, productoLocalId, ...cuerpo }),
+    })));
+
+  const aj = await ajustar(plLocal.id, { tipo: "fijar", unidades: 9, sueltos: 15, motivoPrincipal: MOTIVO_DIFERENCIA.FALTANTE });
+  ok("ajustar a 9 atados y 15 sueltos", aj.status === 200 && aj.ok === true, `${aj.status} ${aj.error || ""}`);
+  igual("deja 195 sueltos", (await stock(local.id, plLocal.id))[0], 195);
+
+  const lim = await leer(await rutaAjustar.POST(new Request("http://ci/api/stock_locales/ajustar", {
+    method: "POST", headers: cabeceras(local.id),
+    body: JSON.stringify({ modo: "limites", localId: local.id, productoLocalId: plLocal.id, motivo: "prueba", nuevoMin: { unidades: 2, sueltos: 0 }, nuevoMax: { unidades: 30, sueltos: 5 } }),
+  })));
+  ok("fijar límites en unidades + sueltos", lim.status === 200 && lim.ok === true, `${lim.status} ${lim.error || ""}`);
+  const filaLim = await c.stockLocal.findUnique({ where: { localId_productoId: { localId: local.id, productoId: plLocal.id } } });
+  igual("mínimo 2 atados = 40, máximo 30 atados y 5 = 605", [n(filaLim.stockMin), n(filaLim.stockMax)], [40, 605]);
+
+  // Contraprueba: el producto SIN sueltos no acepta la forma nueva, y sigue
+  // aceptando la cantidad como hoy.
+  const ajSin = await ajustar(plSin.id, { tipo: "fijar", unidades: 9, sueltos: 15, motivoPrincipal: MOTIVO_DIFERENCIA.FALTANTE });
+  igual("sin sueltos, \"unidades + sueltos\" se rechaza", ajSin.status, 400);
+  igual("y no tocó el stock", (await stock(local.id, plSin.id))[0], 200);
+  const ajSinHoy = await ajustar(plSin.id, { tipo: "restar", cantidad: 5, motivoPrincipal: MOTIVO_DIFERENCIA.FALTANTE });
+  ok("sin sueltos, la cantidad de siempre se acepta", ajSinHoy.status === 200, `${ajSinHoy.status} ${ajSinHoy.error || ""}`);
+  igual("y resta 5, como siempre", (await stock(local.id, plSin.id))[0], 195);
+  await ajustar(plSin.id, { tipo: "sumar", cantidad: 5, motivoPrincipal: MOTIVO_DIFERENCIA.SOBRANTE });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("F. Conteo en unidades + sueltos, valorizado al costo del suelto");
+  // ══════════════════════════════════════════════════════════════════════════
+  const rutaAbrir = await import("../../app/api/stock_locales/control/abrir/route.js");
+  const rutaConteos = await import("../../app/api/stock_locales/control/conteos/route.js");
+  const rutaDiferencias = await import("../../app/api/stock_locales/control/diferencias/route.js");
+  // Empezar y leer el control lo hace la cuenta sin PIN; contar, con el PIN de
+  // un operador. Es la regla del control, no de esta prueba.
+  const pedirControl = async (ruta, metodo, url, body, { conPin = true } = {}) => {
+    const req = new Request(url, { method: metodo, headers: cabeceras(local.id, conPin ? opLocal : null), ...(body ? { body: JSON.stringify(body) } : {}) });
+    Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
+    return leer(await ruta[metodo](req));
+  };
+  const B = "http://ci/api/stock_locales/control";
+
+  // El sistema dice 200 (10 atados): se suman 5 a los 195.
+  await ajustar(plLocal.id, { tipo: "sumar", cantidad: 5, motivoPrincipal: MOTIVO_DIFERENCIA.SOBRANTE });
+  igual("el sistema dice 200", (await stock(local.id, plLocal.id))[0], 200);
+
+  const abierto = await pedirControl(rutaAbrir, "POST", `${B}/abrir`, undefined, { conPin: false });
+  ok("abrir el control", abierto.status === 200, `${abierto.status} ${abierto.error || ""}`);
+  const conteo = await pedirControl(rutaConteos, "PUT", `${B}/conteos`, { productoLocalId: plLocal.id, unidades: 9, sueltos: 15 });
+  ok("contar 9 atados y 15 sueltos", conteo.status === 200 && conteo.ok === true, `${conteo.status} ${conteo.error || ""}`);
+  igual("el stock pasa a lo contado: 195", (await stock(local.id, plLocal.id))[0], 195);
+
+  // Contraprueba: el mismo pack sin sueltos, contado en 195 sobre 200, vale
+  // 1.200 por unidad. Lo que cambia la plata es el dato, nada más.
+  const conteoSin = await pedirControl(rutaConteos, "PUT", `${B}/conteos`, { productoLocalId: plSin.id, total: 195 });
+  ok("contar el pack sin sueltos con el total de siempre", conteoSin.status === 200, `${conteoSin.status} ${conteoSin.error || ""}`);
+  const conteoSinNuevo = await pedirControl(rutaConteos, "PUT", `${B}/conteos`, { productoLocalId: plSin.id, unidades: 9, sueltos: 15 });
+  igual("y el sin sueltos rechaza la forma nueva", conteoSinNuevo.status, 400);
+
+  const dif = await pedirControl(rutaDiferencias, "GET", `${B}/diferencias`, undefined, { conPin: false });
+  ok("leer las diferencias", dif.status === 200, `${dif.status} ${dif.error || ""}`);
+  const fila = (dif.filas || []).find((f) => f.productoLocalId === plLocal.id);
+  igual("con sueltos: diferencia de 5 sueltos, a $60 cada uno, $300", [fila?.diferencia, fila?.costoUnitario, fila?.importe], [-5, 60, -300]);
+  const filaSin = (dif.filas || []).find((f) => f.productoLocalId === plSin.id);
+  igual("sin sueltos: la misma diferencia vale $1.200 cada una", [filaSin?.diferencia, filaSin?.costoUnitario, filaSin?.importe], [-5, 1200, -6000]);
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);
