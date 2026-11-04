@@ -210,12 +210,67 @@ sus dos bloques `DO`).
   su propio select; en esta tanda hubo que sumar `sueltos_por_unidad` en los
   dos.
 
-### 5 · Las entradas de mercadería — sin migración
+### 5 · Las entradas de mercadería — sin migración — HECHA
 
-Compras (`compras-proveedor/recibir`), transferencias (`crearTransferencia`,
-`confirmar-recepcion`, `cancelar`, con N congelado), `pos-transferencias/enviar`,
-ventas internas (`mapearVentaATransferencia`, `snapshotDePresentacion`), combos
-(`planConsumoVenta`, `ventaConsumo`) y pedidos.
+**Lo que quedó sin verificar en la tanda 4, verificado:** una venta suelta de
+punta a punta por las rutas reales, en `scripts/pruebas-db/tercerNivelEmpaque.mjs`
+(base descartable, que el CI corre): 1 suelto descuenta 1 y cobra el precio del
+servidor, 1 atado descuenta 20, 1 cartón en el depósito descuenta 200, el
+suelto se rechaza en el depósito, y anular las tres vuelve el stock exacto.
+
+**La regla de las transferencias [decisión técnica]:**
+`TransferenciaDetalle.cantidad` sigue contando bultos o UNIDADES (atados): una
+unidad es la misma con cualquier N. Las unidades de stock son esa cantidad ×
+factor (si es bulto) × el N CONGELADO en la línea; vacío = 1, que es lo que vale
+toda transferencia vieja. La tanda 9 no deja cambiar N con transferencias en
+tránsito, así que el N congelado es siempre el de hoy.
+
+- **Envío:** `toUnidades` acepta `sueltosPorUnidad`. `crearTransferencia` lo usa
+  (el del llamador si lo dice, si no el de la ficha) y lo congela en
+  `sueltosPorUnidadCongelado`. `pos-transferencias/enviar` valida el stock con
+  él. Una línea que no sea BULTO o UNIDAD se rechaza antes de escribir: el
+  depósito no manda sueltos (el enum de la columna ya lo impedía).
+- **Recepción y cancelación:** `milesimasFisicas` multiplica el total entero por
+  N. Le llega por `detalleParaValidar` (confirmar, guardar, revisar) y por
+  `fisicasEnviadasDe(d, { sueltosPorUnidad })` (cancelar). Sin la opción,
+  `fisicasEnviadasDe` sigue contando atados, que es lo que muestra la pantalla.
+  La línea agregada en recepción (`linea-recepcion`) congela el N de la ficha.
+- **Venta interna:** viaja en UNIDADES con su N cuando la cantidad física es
+  múltiplo entero de N (lo normal: el depósito vende bultos y unidades); si no
+  —un combo con sueltos sueltos—, en unidades de stock con N vacío. Las dos
+  mueven exactamente lo que la venta descontó. El snapshot de presentación
+  cuenta bultos y unidades y se compara × N. `snapshotDePresentacion` no
+  cambió: no conoce la escala física.
+- **Corrección económica de la venta interna:** recibe factor × N y congela el N
+  en las líneas que reescribe, para que anularlas después convierta bien.
+- **Compra:** lo que entra se cuenta en unidades —la hoja, el papel y el control
+  de escala hablan en unidades— y se multiplica por N recién después de ese
+  control. `stockIngresado` queda en unidades de stock; nada lo revierte.
+- **Combos:** el costo de un componente es el del suelto (`costoDelSuelto`).
+- **Pedidos sugeridos:** el faltante (en unidades de stock) se lleva a bultos o
+  unidades por el embudo.
+
+**Verificado:** la misma comparación de siempre, ahora con `milesimasFisicas`,
+`validarDetalleRecepcion` y el costo de los componentes, da 108.480 casos y cero
+diferencias. El candado de base cubre también la transferencia: 1 cartón suma
+200 al confirmar y devuelve 200 al cancelar, 1 atado son 20, y una línea sin N
+se lee × 1. Sacarle el N a `detalleParaValidar` pone siete afirmaciones en rojo.
+
+**Sin verificar contra la base:** el ingreso de una COMPRA de un producto con
+sueltos (la multiplicación está cubierta por el embudo y la ruta corre igual
+que antes sin sueltos, `recepcionCompras.mjs` en verde) y los pedidos
+sugeridos con sueltos.
+
+**Lo que la tanda 9 tiene que hacer por esto [verificado en código]:**
+
+- `ComboComponente.cantidad` está en unidades de stock: al cargar N, los
+  componentes de ese producto se multiplican por N junto con el stock, o los
+  combos pasarían a llevar 1 cigarrillo donde llevaban 1 atado.
+- `VentaDetalleComponente` no tiene N congelado: anular un combo vendido antes
+  de cargar N devolvería sin convertir. Lleva la columna en la migración de la
+  tanda 9.
+- `PedidoProveedorDetalle.stockIngresado` no tiene N congelado. Hoy nada lo lee
+  para revertir; si algo empieza a hacerlo, necesita la columna.
 
 ### 6 · La carga manual — sin migración
 
