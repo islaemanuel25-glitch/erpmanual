@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-11-04] - Actualización: pos-transferencias, transferencias, productos, pos-ventas
+
+### Modificado
+- **pos-transferencias**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **transferencias**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **productos**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **pos-ventas**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+
+
 ## [2026-11-03] - Actualización: transferencias
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-11-03 14:44
+**Última actualización:** 2026-11-04 00:25
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-11-04: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
 - 2026-11-03: feat: «Cambiar» en preparar pedido — mandar otro producto en lugar del pedido
 - 2026-11-02: feat: descargar en PDF un pedido del local al depósito
 - 2026-10-28: feat(pedidos): preparar un pedido del depósito en la computadora, desde 768 px
