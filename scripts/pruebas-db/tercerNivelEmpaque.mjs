@@ -469,8 +469,8 @@ try {
   const rutaBuscar = await import("../../app/api/pos-ventas/buscar-producto/route.js");
   const { posVentaReducer, ActionTypes, initialState } = await import("../../app/modulos/pos-ventas/reducer/posVentaReducer.js");
   const { itemsCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
-  const buscar = async (localId, q, { conSueltos = true } = {}) => {
-    const url = `http://ci/api/pos-ventas/buscar-producto?localId=${localId}&q=${encodeURIComponent(q)}${conSueltos ? "&conSueltos=1" : ""}`;
+  const buscar = async (localId, q, { conSueltos = true, clienteId = null } = {}) => {
+    const url = `http://ci/api/pos-ventas/buscar-producto?localId=${localId}&q=${encodeURIComponent(q)}${conSueltos ? "&conSueltos=1" : ""}${clienteId ? `&clienteId=${clienteId}` : ""}`;
     return leer(await rutaBuscar.GET(new Request(url, { method: "GET", headers: cabeceras(localId) })));
   };
   const nombres = (r, baseId) => (r.items || []).filter((i) => i.productoBaseId === baseId).map((i) => i.nombre);
@@ -510,6 +510,32 @@ try {
   // pack sin sueltos dan un solo resultado, como hoy.
   igual("sin conSueltos, uno solo", nombres(await buscar(local.id, "Cigarrillos", { conSueltos: false }), base.id), ["Cigarrillos de prueba"]);
   igual("el pack sin sueltos, uno solo", nombres(await buscar(local.id, "Pack sin"), baseSin.id), ["Pack sin sueltos"]);
+
+  // El suelto vendido a un cliente con lista de precios (lo que quedó sin
+  // verificar en la tanda 8). Lista al costo + 25 %: el suelto cuesta $60, así
+  // que el buscador lo muestra y el servidor lo cobra a $75 —ni los $100 de la
+  // ubicación ni el atado ÷ 20—.
+  const lista = await c.listaPrecio.create({ data: { grupoId: grupo.id, nombre: "Costo + 25", tipoBase: "COSTO", margenPorcentaje: 25 } });
+  const cliente = await c.cliente.create({ data: { grupoId: grupo.id, localId: local.id, nombre: "Cliente con lista", listaPrecioId: lista.id } });
+  const conLista = await buscar(local.id, "Cigarrillos", { clienteId: cliente.id });
+  const gemeloConLista = (conLista.items || []).find((i) => i.esSuelto === true);
+  igual("con la lista, el buscador muestra el suelto a $75", gemeloConLista?.precioVenta, 75);
+  const carritoConLista = posVentaReducer(initialState, { type: ActionTypes.ADD_ITEM, payload: { producto: gemeloConLista } }).carrito;
+  const antesConLista = await stock(local.id, plLocal.id);
+  const vLista = await leer(await rutaVenta.POST(new Request("http://ci/api/pos-ventas/crear", {
+    method: "POST",
+    headers: cabeceras(local.id, opLocal),
+    body: JSON.stringify({
+      clientTxnId: `tercer-nivel-pos-${++nVenta}`, localId: local.id, turnoId: turnoLocal.id, clienteId: cliente.id,
+      formaPago: "efectivo", totalPantalla: 75, pagos: [{ medio: "EFECTIVO", monto: 75 }],
+      items: itemsCrearPayload(carritoConLista),
+    }),
+  })));
+  ok("vender el suelto con lista: la venta se registra", vLista.status === 200 && vLista.ok === true, `${vLista.status} ${vLista.error || ""}`);
+  igual("descuenta 1", await stock(local.id, plLocal.id), [antesConLista[0] - 1, 0]);
+  const dLista = await c.ventaDetalle.findFirst({ where: { ventaId: vLista.ventaId }, select: { precio: true, precioCosto: true, listaPrecioId: true } });
+  igual("cobra $75 con la lista, cuesta $60 y queda la lista anotada",
+    [n(dLista?.precio), n(dLista?.precioCosto), dLista?.listaPrecioId], [75, 60, lista.id]);
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);
