@@ -112,6 +112,9 @@ try {
       // ProductoBase.sueltos_por_unidad does not exist"; el control además la
       // lee para valorizar al costo del suelto (tanda 6).
       "20261103230000_tercer_nivel_empaque",
+      // Y el nombre del bulto (tanda 7), por lo mismo: otra columna de
+      // ProductoBase que el cliente pide, y que el control lee para escribir.
+      "20261104120000_nombre_del_bulto",
     ],
   });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });

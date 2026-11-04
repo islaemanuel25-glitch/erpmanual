@@ -690,7 +690,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // del tercer nivel de empaque. Agrega `TransferenciaDetalle.sueltosPorUnidadCongelado`,
   // que nadie escribe ni lee todavía (la recepción la usará en la tanda 5); no cambia
   // cómo se cuenta lo recibido ni el stock que entra.
-  assert.equal(migraciones.length, 105,"aparecio una migracion que nadie declaro aca");
+  // Sube a 106 el 2026-11-04: `20261104120000_nombre_del_bulto`, una columna nula en
+  // `ProductoBase` (cómo se llama el bulto). No toca la recepción.
+  assert.equal(migraciones.length, 106,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

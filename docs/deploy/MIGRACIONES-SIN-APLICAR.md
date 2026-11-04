@@ -17,7 +17,8 @@ Si la lista está vacía, el despliegue es solo de código.
 ## Pendientes
 
 Producción está en **104 migraciones**, la última
-`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **105**; falta una:
+`20261103210000_recargo_fijo_en_cada_unidad`. El árbol tiene **106**; faltan dos,
+en este orden:
 
 - `20261103230000_tercer_nivel_empaque` — **NO ADITIVA para el clasificador.**
 
@@ -55,6 +56,16 @@ Tanda 2 del tercer nivel de empaque (`docs/roadmap/tercer-nivel-empaque.md`).
 - **Para comprobar después de aplicarla, en solo lectura:** que las seis
   columnas existan y tengan cero valores no nulos, y que `pg_get_triggerdef` de
   los dos triggers nombre `sueltos_por_unidad`.
+
+- `20261104120000_nombre_del_bulto` — **aditiva** (clasificador `--dir`, corrido
+  el 2026-11-04: sale con 0).
+
+Tanda 7 del tercer nivel de empaque. Una columna nula, `ProductoBase.nombre_bulto`
+(cómo se llama el bulto: "cartón"), que nadie escribe hasta la tanda 9. No
+cambia nada de lo que se ve ni de ningún número; ningún libro la mira. La
+versión que sigue atendiendo no la lee ni la escribe. Aplicada en desarrollo con
+`migrate dev`, sin deriva. **Para comprobar después de aplicarla, en solo
+lectura:** que la columna exista y tenga cero valores no nulos.
 
 ---
 

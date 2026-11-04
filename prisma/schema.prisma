@@ -643,6 +643,12 @@ model ProductoBase {
   // "unidades". El escalón de abajo se rotula siempre "sueltos". Es solo un
   // rótulo: no cambia ninguna cantidad, así que no reinterpreta nada.
   nombre_unidad      String?
+  // Cómo se llama el BULTO de este producto: "cartón", "pack de 10". NULL = el
+  // rótulo de hoy ("bulto"). En singular: la pantalla arma el plural. Es solo un
+  // rótulo de cómo se escribe el stock (tanda 7 del tercer nivel de empaque); no
+  // cambia ninguna cantidad, así que ningún libro lo mira. La ficha lo carga en
+  // la tanda 9, junto con los sueltos y el nombre de la unidad.
+  nombre_bulto       String?
   modo_pedido       ModoPedido   @default(BULTO)
   modo_envio        ModoEnvio?
   modo_stock        ModoStock    @default(BULTO)
