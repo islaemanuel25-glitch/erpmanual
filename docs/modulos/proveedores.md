@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-11-04 19:40
+**Última actualización:** 2026-11-05 01:17
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-05: feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
 - 2026-11-04: feat: listas — paquete «Sin producto en tu catálogo»: vincular o crear desde la lista
 - 2026-11-04: feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango
 - 2026-11-04: fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
