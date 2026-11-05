@@ -6,6 +6,7 @@ import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
+import { unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -313,9 +314,11 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
       } else if (esBultoConPack) {
         // DB guarda precio/costo del bulto → derivar unitario real (÷ factorPack).
         precioVentaBulto = Number(precioDB.toFixed(2));
-        precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
+        // El precio y el costo de una unidad del bulto, con el conversor de la
+        // pieza única (tanda 14) y el factor de la ficha.
+        precioVentaUnitario = Number(unidadDelBulto({ precio: precioDB, factor: factorPack }).toFixed(2));
         precioCostoBulto = Number(precioCosto.toFixed(2));
-        precioCostoUnitario = Number((precioCosto / factorPack).toFixed(2));
+        precioCostoUnitario = Number(unidadDelBulto({ precio: precioCosto, factor: factorPack }).toFixed(2));
       }
 
       // Misma regla que stock_locales/listar: redondeo a 100 hacia arriba (helper compartido)
@@ -396,8 +399,8 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
       //     la lista (eso distorsiona: daba 1010 cuando la unidad correcta es 1000).
       //     Sin lista → 1000. Con lista PRECIO_VENTA → 1000. Con lista COSTO+margen →
       //     el unitario que define esa lista. Sin redondeo extra de producto.
-      const baseUnitariaVenta = esBultoConPack ? precioDB / factorPack : precioDB;
-      const baseUnitariaCosto = esBultoConPack ? precioCosto / factorPack : precioCosto;
+      const baseUnitariaVenta = esBultoConPack ? unidadDelBulto({ precio: precioDB, factor: factorPack }) : precioDB;
+      const baseUnitariaCosto = esBultoConPack ? unidadDelBulto({ precio: precioCosto, factor: factorPack }) : precioCosto;
 
       let precioVentaUnitarioReal;
       if (fiambreFijo) {
