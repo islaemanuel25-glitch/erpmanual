@@ -177,6 +177,9 @@ export async function GET(req) {
         ),
         unidadMedida: base?.unidad_medida || "unidad",
         factorPack: Number(base?.factor_pack || 1),
+        // Para que la pantalla lea el bulto con la pieza única (tanda 10): sin
+        // él, una ficha de compra por UNIDAD con pack parecería un pack.
+        modoCompraProveedor: base?.modoCompraProveedor ?? null,
         modoEnvio: base?.modo_envio || (base?.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
         modoStock: base?.modo_stock || "BULTO",
 

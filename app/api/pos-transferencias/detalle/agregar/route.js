@@ -239,6 +239,8 @@ export async function POST(req) {
         precioCosto: Number(productoDestino.precio_costo || productoDestino.base.precio_costo || 0),
         unidadMedida: productoDestino.base.unidad_medida,
         factorPack: Number(productoDestino.base.factor_pack || 1),
+        // El bulto lo lee la pantalla con la pieza única (tanda 10).
+        modoCompraProveedor: productoDestino.base.modoCompraProveedor ?? null,
         modoEnvio: productoOrigen.base.modo_envio || defaultModoEnvio(productoOrigen.base.unidad_medida || "unidad"),
         esFiambre,
         modoVentaDeposito: baseOrigen.modoVentaDeposito || "PESO",

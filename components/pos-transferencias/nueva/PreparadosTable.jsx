@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { kgToPiezas, piezasToKg } from "@/lib/conversiones/stock";
-import { fromUnidades, toUnidades } from "@/lib/unidades/reglaDeUnidades";
+import { comoViene, fromUnidades, toUnidades } from "@/lib/unidades/reglaDeUnidades";
 export default function PreparadosTable({
   datos = [],
   onDesmarcar,
@@ -149,7 +149,21 @@ export default function PreparadosTable({
 // Fila preparado — con modo rotura mixto (bultos + uds)
 // ====================================================
 function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
-  const factorPack = Number(p.factorPack || 1);
+  // ── SI HAY BULTO LO DICE LA PIEZA ÚNICA, NO EL FACTOR DE LA LÍNEA (tanda 10) ──
+  //
+  // Decía `Number(p.factorPack || 1)`. El MANI CON CASCARA X2KG (id 1881) trae
+  // `factor_pack` 2 porque la bolsa pesa 2 kg, así que la fila le ofrecía
+  // "Rotura": partía 3 bolsas en 1 bulto y 1 suelta y, al apagarla, mandaba la
+  // cantidad por BULTO, que `enviar` rechaza porque su ficha sale solo por
+  // unidad. `comoViene` lee la ficha de la línea: el kilo o el fiambre con pack
+  // cargado no tienen bulto (factor 1), y un pack común da el mismo factor que
+  // daba la línea. Con factor 1 no hay rotura ni BULTO: se prepara en bolsas
+  // enteras y se manda por unidad.
+  const factorPack = comoViene({
+    factor_pack: p.factorPack,
+    unidad_medida: p.unidadMedida,
+    modoCompraProveedor: p.modoCompraProveedor,
+  }).factor;
   const puedeRotura = factorPack > 1;
   const muestraEnBulto = p.unidadPreparada === "BULTO" && factorPack > 1;
   const esFiambre = !!p.esFiambre && Number(p.pesoReferenciaKg || 0) > 0;

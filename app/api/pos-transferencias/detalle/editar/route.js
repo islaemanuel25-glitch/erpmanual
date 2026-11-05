@@ -334,6 +334,8 @@ export async function POST(req) {
       ),
       unidadMedida: baseItem?.unidad_medida || "unidad",
       factorPack: Number(baseItem?.factor_pack || 1),
+      // El bulto lo lee la pantalla con la pieza única (tanda 10).
+      modoCompraProveedor: baseItem?.modoCompraProveedor ?? null,
       modoEnvio: baseItem?.modo_envio || defaultModoEnvio(baseItem?.unidad_medida || "unidad"),
       esFiambre,
       modoVentaDeposito: baseItem?.modoVentaDeposito || "PESO",

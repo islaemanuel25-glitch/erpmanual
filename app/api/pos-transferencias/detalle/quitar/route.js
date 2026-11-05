@@ -150,6 +150,8 @@ export async function POST(req) {
       ),
       unidadMedida: detalle.producto.base.unidad_medida,
       factorPack: Number(detalle.producto.base.factor_pack || 1),
+      // El bulto lo lee la pantalla con la pieza única (tanda 10).
+      modoCompraProveedor: detalle.producto.base.modoCompraProveedor ?? null,
       modoEnvio: detalle.producto.base.modo_envio || defaultModoEnvio(detalle.producto.base.unidad_medida || "unidad"),
     };
 

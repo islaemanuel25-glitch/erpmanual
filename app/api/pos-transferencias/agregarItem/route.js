@@ -238,6 +238,8 @@ export async function POST(req) {
 
       unidadMedida: productoLocal.base.unidad_medida || "unidad",
       factorPack: Number(productoLocal.base.factor_pack || 1),
+      // El bulto lo lee la pantalla con la pieza única (tanda 10).
+      modoCompraProveedor: productoLocal.base.modoCompraProveedor ?? null,
       precioCosto: Number(
         productoLocal.precio_costo || productoLocal.base.precio_costo || 0
       ),
