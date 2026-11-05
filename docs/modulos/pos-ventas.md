@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-11-04 02:08
+**Última actualización:** 2026-11-05 03:21
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-05: refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
 - 2026-11-04: feat: los componentes de combo congelan su N (migración aditiva)
 - 2026-11-04: feat: tercer nivel de empaque, tanda 8 — el suelto como un resultado más del POS
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados

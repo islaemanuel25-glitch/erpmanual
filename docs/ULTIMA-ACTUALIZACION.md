@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 02:56
+**Fecha:** 2026-11-05 03:21
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
+- Archivos: 2 modificados (2 total)
 
 ### pos-transferencias
 - fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
