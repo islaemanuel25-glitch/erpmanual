@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-11-05] - Actualización: proveedores, productos, pos-ventas, transferencias, stock, pos-transferencias
+
+### Modificado
+- **proveedores**: feat: listas — paquete «Sin producto en tu catálogo»: vincular o crear desde la lista
+- **proveedores**: feat: listas — con la caja cargada, el pack de la lista se pregunta también cuando nada cae en el rango
+- **proveedores**: fix: listas — el precio de un pack de la lista contra la caja del catálogo (SIN VERIFICAR en pantalla)
+- **productos**: feat: la ficha activa el tercer nivel de empaque ("+ Se vende más chico")
+- **productos**: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
+- **productos**: feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
+- **productos**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **pos-ventas**: feat: los componentes de combo congelan su N (migración aditiva)
+- **pos-ventas**: feat: tercer nivel de empaque, tanda 8 — el suelto como un resultado más del POS
+- **pos-ventas**: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
+- **pos-ventas**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **transferencias**: feat: los componentes de combo congelan su N (migración aditiva)
+- **transferencias**: feat: el producto puede nombrar su bulto (columna nula, aditiva)
+- **transferencias**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+- **stock**: feat: tercer nivel de empaque, tanda 8 — el suelto como un resultado más del POS
+- **stock**: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
+- **stock**: feat: el ajuste, los límites y el conteo aceptan unidades + sueltos y el control valoriza al costo del suelto
+- **pos-transferencias**: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
+- **pos-transferencias**: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
+
+
 ## [2026-11-04] - Actualización: pos-transferencias, transferencias, productos, pos-ventas
 
 ### Modificado
