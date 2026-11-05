@@ -95,6 +95,7 @@ import {
   cantidadFueConvertida,
   costoPropioParaDecidir,
   difiereDeLoPedido,
+  enUnidadesDeLaFila,
   estadoDeLinea,
   hayDiferenciaDePrecio,
   motivoSinComparacion,
@@ -672,7 +673,8 @@ export default function HojaCorregirLinea({
     const b = Number(bultos) || 0;
     const s = Number(sueltas) || 0;
     const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
-    return b * factor + s;
+    // Bultos a unidades con la pieza única (tanda 13), con el factor de la fila.
+    return enUnidadesDeLaFila(b, factor) + s;
   }, [bultos, sueltas, vaPorPack, fila?.factorPack]);
 
   // Y lo que entra al stock: kilos si el depósito lo cuenta por peso, y las
@@ -693,7 +695,7 @@ export default function HojaCorregirLinea({
   // ofrecer el número como bueno.
   const escalaOfrecida = useMemo(() => {
     const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
-    const ofrecidas = (Number(cantidadDeLaFactura) || 0) * factor;
+    const ofrecidas = enUnidadesDeLaFila(Number(cantidadDeLaFactura) || 0, factor);
     return laCantidadCuadraConElPrecio({
       subtotal: fila?.subtotal,
       cantidad: fila?.cantidad,

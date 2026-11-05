@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
-import { comoViene, escalaDelCosto } from "@/lib/unidades/reglaDeUnidades";
+import { bultosEnFraccion, comoViene, escalaDelCosto } from "@/lib/unidades/reglaDeUnidades";
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo, sueltosParaCongelar, toUnidades } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { fiambreAlCerrar, papelQueNoCierra } from "@/lib/compras-proveedor/cierreDeRecepcion";
@@ -1061,12 +1061,15 @@ export async function POST(req, { params }) {
         // Con sueltas, lo que se valoriza son las físicas contadas llevadas a la
         // escala del costo: una suelta vale el costo del bulto dividido por su
         // factor. Sin sueltas, o por peso, es la cantidad de siempre.
+        //
+        // Las físicas en bultos, con su fracción, las da la pieza única (tanda
+        // 13): `bultosEnFraccion`, con el mismo `factorPack` de esta línea.
         const cantidadValorizada =
           vaPorPeso || sueltasRecibidas === 0
             ? cantRecibida
             : det.unidad === "UNIDAD"
             ? contadas
-            : contadas / factorPack;
+            : bultosEnFraccion({ unidades: contadas, base: { factor_pack: factorPack } });
         const { subtotal: subtotalEconomico } = subtotalLinea({
           base,
           cantidad: cantidadValorizada,
