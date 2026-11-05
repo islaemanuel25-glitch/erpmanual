@@ -420,7 +420,6 @@ const FALSO = {
         facturaPor: "UNIDAD",
         subtotal: { hayColumna: true, incluyeBonificacion: true },
         variante: { pistas: ["CONSUMIDOR FINAL"] },
-        toleranciaEscalaPct: null,
       },
       enCastellano: ["La cantidad está expresada en unidades sueltas"],
       explicacion: null,
@@ -448,7 +447,6 @@ const FALSO = {
         facturaPor: "UNIDAD",
         subtotal: { hayColumna: true, incluyeBonificacion: true },
         variante: { pistas: ["RESPONSABLE INSCRIPTO"] },
-        toleranciaEscalaPct: null,
       },
       enCastellano: ["La cantidad está expresada en bultos"],
       explicacion: null,
@@ -470,7 +468,6 @@ const FALSO = {
     facturaPor: null,
     subtotal: { hayColumna: true, incluyeBonificacion: null },
     variante: { pistas: [] },
-    toleranciaEscalaPct: null,
   },
   pedido: {
     id: 999001,
@@ -530,7 +527,6 @@ const FALSO = {
     facturaPor: null,
     subtotal: { hayColumna: true, incluyeBonificacion: null },
     variante: { pistas: [] },
-    toleranciaEscalaPct: null,
   },
 };
 

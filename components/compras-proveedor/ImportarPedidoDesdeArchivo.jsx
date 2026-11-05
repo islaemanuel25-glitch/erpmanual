@@ -502,7 +502,6 @@ export default function ImportarPedidoDesdeArchivo() {
             hayColumnaSubtotal:
               (lectura.hayColumnaSubtotal ?? lecturaGuardada.documento.hayColumnaSubtotal) === true,
             cantidadEn: lectura.cantidadEn,
-            toleranciaEscalaPct: lectura.toleranciaEscalaPct,
           }).map((linea) => ({ ...linea, incluida: true }))
         );
         setFiltro("todas");
@@ -557,7 +556,6 @@ export default function ImportarPedidoDesdeArchivo() {
           (lectura.hayColumnaSubtotal ?? data.documento.hayColumnaSubtotal) === true,
         // Los dos escalones que hasta ahora no se pasaban nunca.
         cantidadEn: lectura.cantidadEn,
-        toleranciaEscalaPct: lectura.toleranciaEscalaPct,
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
@@ -689,7 +687,6 @@ export default function ImportarPedidoDesdeArchivo() {
         hayColumnaSubtotal:
           (puedeRemapear ? reinterpretado.hayColumnaSubtotal : params.hayColumnaSubtotal ?? documento.hayColumnaSubtotal) === true,
         cantidadEn: params.cantidadEn,
-        toleranciaEscalaPct: params.toleranciaEscalaPct,
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
