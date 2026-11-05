@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { precioUnitarioDeObtener } from "@/lib/stock/preciosDeStock";
 
 export async function GET(req) {
   try {
@@ -46,18 +47,10 @@ export async function GET(req) {
 
     const s = pl.stock?.[0] ?? { cantidad: 0, stockMin: 0, stockMax: 0 };
 
-    const precioCostoBulto = Number(pl.precio_costo ?? pl.base.precio_costo);
-    const unidadMedida = pl.base.unidad_medida;
-    const factorPack = Number(pl.base.factor_pack ?? 0);
-
-    // ================================================================
-    // 🟨 CALCULO CORRECTO DEL PRECIO UNITARIO
-    // ================================================================
-    let precioUnitario = precioCostoBulto;
-
-    if (unidadMedida !== "unidad" && factorPack > 0) {
-      precioUnitario = precioCostoBulto / factorPack;
-    }
+    // El costo por unidad: la cuenta vive en `lib/stock/preciosDeStock.js` y
+    // divide con la regla única de unidades (tanda 6). Mismo resultado que cuando
+    // estaba escrita acá.
+    const { precioCostoBulto, unidadMedida, factorPack, precioUnitario } = precioUnitarioDeObtener(pl);
 
     const item = {
       id: pl.id,

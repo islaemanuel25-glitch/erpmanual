@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { esFiambreFijo as checkFiambreFijo, sueltosParaCongelar } from "@/lib/conversiones/stock";
+import { sueltosParaCongelar } from "@/lib/conversiones/stock";
 import { resolverLineaSuelta } from "@/lib/pos-ventas/lineaSuelta";
 import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
-import { redondear100 } from "@/lib/precios/redondeo";
+import { preciosDeVentaDeLaBusqueda } from "@/lib/stock/preciosDeStock";
 import {
   rankearLiteral,
   resolverContraCatalogo,
@@ -158,30 +158,13 @@ const calcularModoSalida = modoSalidaDeVenta;
 function mapProductos(lista, esDeposito) {
   return lista.map((pl) => {
     const stock = Number(pl.stock?.[0]?.cantidad || 0);
-    let unidadMedida = pl.base?.unidad_medida || "unidad";
-    const factorPack = Number(pl.base?.factor_pack || 1);
     const modoEnvio = pl.base?.modo_envio || null;
 
-    const fiambreFijo = esDeposito && checkFiambreFijo(pl.base);
-    const pesoReferenciaKg = fiambreFijo ? Number(pl.base.pesoReferenciaKg) : 0;
-
-    const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
-    let precioVentaBulto = precioDB;
-    let precioVentaUnitario = precioDB;
-
-    if (fiambreFijo) {
-      const precioPorPieza = Number((precioDB * pesoReferenciaKg).toFixed(2));
-      precioVentaUnitario = precioPorPieza;
-      precioVentaBulto = precioPorPieza;
-      unidadMedida = "unidad";
-    } else if (factorPack > 1 && unidadMedida !== "unidad" && precioDB > 0) {
-      precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
-      precioVentaBulto = Number(precioDB.toFixed(2));
-    }
-
-    if (pl.base?.redondeo_100 === true && !fiambreFijo) {
-      precioVentaUnitario = redondear100(precioVentaUnitario);
-    }
+    // Los precios por unidad y por bulto, con el fiambre de pieza fija: la
+    // cuenta vive en `lib/stock/preciosDeStock.js` y divide con la regla única
+    // de unidades (tanda 6). Mismo resultado que cuando estaba escrita acá.
+    const { unidadMedida, factorPack, fiambreFijo, pesoReferenciaKg, precioVentaBulto, precioVentaUnitario } =
+      preciosDeVentaDeLaBusqueda(pl, esDeposito);
 
     const modoSalidaDefault = fiambreFijo
       ? "UNIDAD"
