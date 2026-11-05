@@ -37,6 +37,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { ESTADO_IMPORTACION, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+import { MARCA_REGLA_DE_UNIDADES } from "@/lib/unidades/reglaDeUnidades";
 // LA CONFIGURACIÓN SALE DEL PARSER CON EL QUE SE LEYÓ ESTA LISTA, NO DE ARCOR.
 //
 // Acá estaba `CONFIG_ARCOR` fija, de cuando el único lector que existía era el
@@ -252,6 +253,9 @@ export async function GET(req, context) {
 
     return NextResponse.json({
       ok: true,
+      // La versión de la regla única de unidades con que se revalidó: un
+      // literal que permite comprobar en la imagen y en vivo qué código corre.
+      reglaDeUnidades: MARCA_REGLA_DE_UNIDADES,
       cantidad: revision.cuantasAplicables,
       seleccionadas: filas.length,
       // Seleccionadas que la revalidación descartaría. Si es > 0, el usuario
