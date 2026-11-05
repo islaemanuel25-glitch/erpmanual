@@ -66,6 +66,7 @@ import {
   escalaSinDeducir,
   motivoSinComparacion,
   saltoDePrecioAceptable,
+  saltoSinBultoConOpciones,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
@@ -341,14 +342,19 @@ export async function POST(req) {
     // guarda lo rechazaba con el resto de lo que no se puede comparar. Ahora
     // pasa si es lo ÚNICO que frena, preguntado como lo pregunta la hoja; una
     // escala sin saber, un papel corrido o uno que no cierra siguen rechazados.
-    const aceptaUnSalto =
-      filaDeLaHoja != null &&
-      // Con lo que la ruta de la pantalla le agrega a la fila y cambia la respuesta.
-      saltoDePrecioAceptable({
-        ...filaDeLaHoja,
-        corridaSospechada: lineasSospechadasDeCorrimiento(conciliacion).has(linea.id),
-        variacionNormalPct: conciliacion.variacionNormalPct,
-      });
+    // Con lo que la ruta de la pantalla le agrega a la fila y cambia la respuesta.
+    const filaComoLaVeLaHoja =
+      filaDeLaHoja != null
+        ? {
+            ...filaDeLaHoja,
+            corridaSospechada: lineasSospechadasDeCorrimiento(conciliacion).has(linea.id),
+            variacionNormalPct: conciliacion.variacionNormalPct,
+          }
+        : null;
+    const aceptaUnSalto = filaComoLaVeLaHoja != null && saltoDePrecioAceptable(filaComoLaVeLaHoja);
+    // Y si es un producto sin bulto, la baja grande también se acepta: la hoja
+    // la ofrece con su número (Emanuel, 2026-11-05, maní de Prod Nat).
+    const frenoLevantado = filaComoLaVeLaHoja != null && saltoSinBultoConOpciones(filaComoLaVeLaHoja);
     if (sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto) {
       return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
     }
@@ -431,6 +437,7 @@ export async function POST(req) {
       comprobante: linea.comprobante,
       decision: analisis.decision,
       unidad: analisis.unidad,
+      frenoLevantado,
     });
     if (!puede.ok) {
       return NextResponse.json(

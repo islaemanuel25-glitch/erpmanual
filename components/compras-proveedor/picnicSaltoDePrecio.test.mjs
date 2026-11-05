@@ -74,8 +74,10 @@ test("PICNIC es un salto de PRECIO, y es lo único que frena: se puede aceptar",
 
 test("la hoja ofrece aceptarlo, con los dos números de una unidad y sin advertencias", () => {
   const hoja = abrir(picnic());
-  // El título pasó de "El precio no se puede comparar" a "Precio" (2026-10-29).
-  assert.match(hoja, / Precio Tenías /);
+  // El título pasó de "El precio no se puede comparar" a "Precio" (2026-10-29),
+  // y desde el maní de Prod Nat (2026-11-05) dice la diferencia real, como un
+  // cambio normal.
+  assert.match(hoja, / El precio subió 52,6 % Tenías /);
   assert.doesNotMatch(hoja, /El precio no se puede comparar|Fijate si es este producto|El papel cobra/);
   assert.match(hoja, new RegExp(literal(`Tenías ${formatearMoneda(246)} / u −52,6 % · la factura trae ${formatearMoneda(375.35)} / u`)));
   assert.match(hoja, /Aceptar el precio nuevo/);
@@ -103,7 +105,12 @@ test("al guardar con «aceptar» elegido, va por la misma ruta que el caso norma
 test("el servidor deja pasar el salto, preguntando lo mismo sobre la fila de la hoja", () => {
   const ruta = codigoDe("app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
   assert.match(ruta, /if \(sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
-  assert.match(ruta, /saltoDePrecioAceptable\(\{\s*\.\.\.filaDeLaHoja,/);
+  // La fila de la hoja, con lo que la ruta de la pantalla le agrega, y las dos
+  // preguntas sobre ella (la segunda desde el maní de Prod Nat, 2026-11-05).
+  assert.match(ruta, /const filaComoLaVeLaHoja =\s*filaDeLaHoja != null\s*\?\s*\{\s*\.\.\.filaDeLaHoja,/);
+  assert.match(ruta, /const aceptaUnSalto = filaComoLaVeLaHoja != null && saltoDePrecioAceptable\(filaComoLaVeLaHoja\);/);
+  assert.match(ruta, /const frenoLevantado = filaComoLaVeLaHoja != null && saltoSinBultoConOpciones\(filaComoLaVeLaHoja\);/);
+  assert.match(ruta, /unidad: analisis\.unidad,\s*frenoLevantado,\s*\}\);/);
 });
 
 test("lo que no es un precio sigue sin poder aceptarse: un papel corrido, una escala", () => {
@@ -111,7 +118,13 @@ test("lo que no es un precio sigue sin poder aceptarse: un papel corrido, una es
   assert.equal(saltoDePrecioAceptable(corrida), false);
   assert.match(abrir(corrida), /tu costo no se toca/);
   // Chandon de Pablo #337: el papel cobra la mitad de la botella, es escala.
-  const escala = picnic({ producto: { ...PICNIC, precio_costo: 750.7 }, detalle: { ...DETALLE, precioCosto: 750.7 } });
+  // Desde el maní de Prod Nat (2026-11-05) eso vale solo con bulto: sin pack
+  // hay una sola lectura y es un salto de precio. Así que el producto es un
+  // pack de 12 a $9.008,40 —$750,70 la unidad— y el papel cobra $375,35:
+  // ninguna lectura lo explica.
+  const PACK = { ...PICNIC, factor_pack: 12, unidad_medida: "pack", precio_costo: 9008.4 };
+  const escala = picnic({ producto: PACK, detalle: { ...DETALLE, precioCosto: 9008.4, unidad: "BULTO", factorPack: 12 } });
+  assert.equal(escala.unidad.requiereDecision, true, "ninguna lectura explica el precio");
   assert.equal(loQueNoCuadra(escala).que, "ESCALA");
   assert.equal(saltoDePrecioAceptable(escala), false);
   assert.doesNotMatch(abrir(escala), /Aceptar el precio nuevo/);
@@ -158,15 +171,20 @@ test("PICNIC: «Aceptar el precio nuevo» marcado, −52,6 % en rojo y la tarjet
   }
 });
 
-test("PICNIC con el ERP más caro, en el salto: el porcentaje en verde, y la baja sigue sin ofrecerse", () => {
+test("PICNIC con el ERP más caro, en el salto: el porcentaje en verde, y la baja se ofrece con «Dejar» marcado", () => {
   // $150 la unidad contra $246: +39,0 % sobre el ERP, más que lo plausible. Es
-  // una baja, y el umbral de bajas no se tocó: no hay opciones, se deja el tuyo.
+  // una baja que la regla de bajas frena. Hasta el 2026-11-05 no se ofrecía;
+  // desde el maní de Prod Nat, un producto SIN BULTO —PICNIC va por unidad—
+  // muestra la baja con las dos opciones, y viene marcado dejar el tuyo, que
+  // es el precio más alto.
   const f = picnic({ neto: 150 });
   assert.equal(loQueNoCuadra(f).que, "PRECIO");
   const hoja = hojaHtml(f);
   assert.ok(porcentaje(hoja, "+39,0 %", "sunmi-text-success"));
-  assert.doesNotMatch(hoja, /Aceptar el precio nuevo|El papel cobra/);
-  assert.match(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), /tu costo no se toca/);
+  assert.match(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), / El precio bajó 39,0 % /);
+  assert.equal(marcada(hoja, "Aceptar el precio nuevo"), false);
+  assert.equal(marcada(hoja, "Dejar el que tenía"), true);
+  assert.doesNotMatch(hoja, /El papel cobra|tu costo no se toca/);
   assert.ok(porcentaje(tarjetaHtml(f), "+39,0 %", "sunmi-text-success"));
 });
 

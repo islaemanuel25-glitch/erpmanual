@@ -104,6 +104,7 @@ import {
   piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
   saltoDePrecioAceptable,
+  saltoSinBultoConOpciones,
   textoSiAceptaElSalto,
   textoSiNoAceptaElSalto,
   unidadesFisicasEsperadas,
@@ -456,7 +457,11 @@ export default function HojaCorregirLinea({
   // Y lo que ya está decidido por regla tampoco se ofrece: una baja no se
   // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
   // es dejar el propio, que es la única que corresponde.
-  const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision);
+  //
+  // Salvo un salto de un producto sin bulto, aunque sea una baja grande: hay
+  // una sola lectura y la baja se ofrece con su número (Emanuel, 2026-11-05,
+  // maní de Prod Nat). La ruta de aceptar pregunta lo mismo.
+  const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision) && !saltoSinBultoConOpciones(fila);
   // ── UN SALTO DE PRECIO GRANDE SE PUEDE ACEPTAR (Emanuel, 2026-10-29) ───
   //
   // PICNIC 38g: $375,35 contra $246,00, y el aumento era real. Antes la hoja
@@ -912,8 +917,14 @@ export default function HojaCorregirLinea({
   // ── EL TÍTULO DEL BLOQUE DE PRECIO DICE EN CUÁL DE LOS CUATRO CASOS ESTÁ ──
   // Sin comparación el título es solo "Precio": lo que pasa lo dice el cuerpo,
   // sin advertencia en el título (Emanuel, 2026-10-29).
+  // En un salto de precio, el título dice la diferencia real con los precios
+  // de una unidad —"El precio bajó 53,8 %"—, igual que en un cambio normal
+  // (Emanuel, 2026-11-05).
+  const pctDelSalto = esSaltoDePrecio ? ((deUnaUnidad.papel - deUnaUnidad.erp) / deUnaUnidad.erp) * 100 : null;
   const tituloDelPrecio = yaDecidioElFreno
     ? "Ya decidiste este precio"
+    : pctDelSalto !== null && Number.isFinite(pctDelSalto)
+    ? `El precio ${pctDelSalto < 0 ? "bajó" : "subió"} ${Math.abs(pctDelSalto).toFixed(1).replace(".", ",")} %`
     : sinComparacion
     ? "Precio"
     : yaDecidido && !cambiandoPrecio
