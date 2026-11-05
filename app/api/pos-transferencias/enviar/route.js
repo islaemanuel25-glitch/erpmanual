@@ -8,6 +8,7 @@ import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg, sueltosParaCongela
 import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
+import { comoViene } from "@/lib/unidades/reglaDeUnidades";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 import { cantidadQueViaja, estaRevisada } from "@/lib/pedidos/revisionDeLinea";
@@ -224,7 +225,15 @@ export async function POST(req) {
         if (esComboBase(base)) {
           throw new Error("COMBO_NO_TRANSFERIBLE");
         }
-        const factorPack = Number(base?.factor_pack || 1);
+        // ── EL BULTO, CON LA LECTORA DE LA PIEZA (tanda 7) ──────────────────
+        //
+        // Decía `Number(base?.factor_pack || 1)`. El MANI CON CASCARA X2KG
+        // (id 1881) tiene factor 2 porque la bolsa trae 2 kg, pero el depósito lo
+        // cuenta por bolsa: 3 bolsas en BULTO descontaban 6 del depósito y el
+        // local recibía 6 kg por 3 piezas. `comoViene` le da factor 1 al fiambre
+        // y al kilo, y a un pack común el mismo factor de siempre. De acá sale
+        // también lo que se le pasa a `crearTransferencia`.
+        const factorPack = comoViene(base).factor;
 
         const modoEnvio =
           base?.modo_envio ||
