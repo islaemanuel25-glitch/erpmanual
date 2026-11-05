@@ -11,14 +11,10 @@
 //    carga. La diferencia con lo pedido se dice en el renglón "Pediste X · la
 //    factura dice Y", en el color de advertencia del tema, y los campos quedan
 //    con su borde normal.
-// 2. El renglón ERP decía "+12,1 %" en verde sobre un papel 12,1 % más barato:
-//    "cuánto me queda", el ERP contra el papel, como lo fijó Emanuel en
-//    octubre. El 2026-11-04 se dio vuelta a "−12,1 %" y se deshizo el mismo día.
-//    El 2026-11-05, con el maní de Prod Nat, Emanuel lo ordenó de forma
-//    explícita y con las decisiones cerradas: una baja dice el signo menos, con
-//    el color de cualquier baja del sistema, sobre el costo del ERP —(papel −
-//    ERP) ÷ ERP—. Así que ahora dice "−12,1 %" en rojo, en la tarjeta y en la
-//    hoja.
+// 2. El renglón ERP dice "+12,1 %" en verde sobre un papel 12,1 % más barato, y
+//    está bien así: es "cuánto me queda", el ERP contra el papel, como lo fijó
+//    Emanuel en octubre. El 2026-11-04 se dio vuelta a "−12,1 %" por un error de
+//    la orden y se deshizo el mismo día; este candado lo deja escrito.
 //
 // La hoja se MONTA en un DOM (jsdom) y no se dibuja con `renderToStaticMarkup`:
 // los campos se llenan en un efecto al abrir, y sin efectos la cantidad queda
@@ -104,10 +100,10 @@ test("1 · CONTRAPRUEBA: SIN DIFERENCIA EL RENGLÓN QUEDA APAGADO", async () => 
   assert.match(cuantoEntro(html), /class="text-sm3 sunmi-text-muted">Pediste 16/);
 });
 
-test("2 · EL PAPEL 12,1 % MÁS BARATO DICE −12,1 % EN ROJO, EN LA TARJETA Y EN LA HOJA", async () => {
+test("2 · EL PAPEL 12,1 % MÁS BARATO DICE +12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
   const f = liverpool();
   for (const html of [renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f })), await hojaMontada(f)]) {
-    assert.match(html, /sunmi-text-danger">−12,1 %</);
-    assert.doesNotMatch(html, /\+12,1 %/);
+    assert.match(html, /sunmi-text-success">\+12,1 %</);
+    assert.doesNotMatch(html, /−12,1 %/);
   }
 });
