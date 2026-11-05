@@ -34,7 +34,8 @@ import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
 import { renglonesQueFaltan } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
-import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
+import { armarInterpretes, crearDetectorDeOrientacion } from "@/lib/compras-proveedor/comprobante/lector/gemini";
+import { orientarTodas } from "@/lib/compras-proveedor/comprobante/lector/orientacion";
 import { fechaLeidaONull } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { explicacionesConfirmadas } from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -265,7 +266,9 @@ export async function POST(req, { params }) {
       let archivosLeidos;
       try {
         archivosLeidos = await Promise.all(
-          fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden, giroGrados: f.giroGrados ?? 0 }))
+          // `giroGrados` vacío queda vacío: es "nadie miró esta foto", y es lo
+          // que hace que se detecte su orientación (`orientacion.js`).
+          fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden, giroGrados: f.giroGrados ?? null }))
         );
       } catch {
         return NextResponse.json(
@@ -285,8 +288,37 @@ export async function POST(req, { params }) {
       // esto devuelve las fotos intactas y la lectura sigue — un problema de
       // redimensionado no puede convertirse en "no se pudo leer la factura".
       let paraLeer = archivosLeidos;
+      // ── ANTES, ENDEREZAR (Emanuel, 2026-11-05, Terrabusi #509) ───────────
+      //
+      // Una foto que nadie miró todavía —`giroGrados` vacío— se pregunta al
+      // modelo más barato para dónde corre su texto, y el giro se guarda en la
+      // misma columna que escribe «Girar»: el visor la muestra derecha y una
+      // relectura no vuelve a preguntar. Se guarda solo si la columna sigue
+      // vacía, para no pisar un «Girar» que llegó mientras tanto: el giro a
+      // mano manda. Si falla, se lee como está.
+      let llamadasDeOrientacion = [];
       try {
         const { default: sharp } = await import("sharp");
+        try {
+          const detector = crearDetectorDeOrientacion();
+          const orientadas = await orientarTodas(archivosLeidos, { sharp, detectar: (m) => detector.detectar(m) });
+          llamadasDeOrientacion = orientadas.llamadas;
+          for (const { orden, giro } of orientadas.aGuardar) {
+            await prisma.comprobanteArchivo.updateMany({
+              where: { comprobanteId: comprobante.id, orden, giroGrados: null },
+              data: { giroGrados: giro },
+            });
+          }
+          archivosLeidos = orientadas.fotos;
+          if (orientadas.aGuardar.some((g) => g.giro !== 0)) {
+            console.log(
+              `[comprobante ${comprobante.id}] enderezadas: ` +
+                orientadas.aGuardar.filter((g) => g.giro !== 0).map((g) => `hoja ${g.orden} ${g.giro}°`).join(", ")
+            );
+          }
+        } catch (e) {
+          console.error(`[comprobante ${comprobante.id}] no se pudo detectar la orientación:`, e?.message);
+        }
         paraLeer = await achicarTodas(archivosLeidos, sharp);
       } catch {
         paraLeer = archivosLeidos;
@@ -434,6 +466,9 @@ export async function POST(req, { params }) {
           // pasar—, con POR QUÉ se lo llamó. Se cuentan aparte: su modelo dice
           // cuál de los dos respondió y su `escalada`, cuál de los tres casos.
           ...escalada.llamadas,
+          // Y la pregunta de la orientación, una por foto que nadie había
+          // mirado: también gasta, y su `escalada` es "ORIENTACION".
+          ...llamadasDeOrientacion,
         ];
         if (intentos.length) {
           await prisma.llamadaLector.createMany({
