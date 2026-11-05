@@ -1,8 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 21:52
+**Fecha:** 2026-11-05 23:25
 
 ## Módulos modificados recientemente
+
+### proveedores
+- fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla, feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
+- Archivos: 6 modificados (6 total)
+
+### transferencias
+- fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
+- Archivos: 1 modificados (1 total)
 
 ### productos
 - refactor: combos, stock valorizado y cantidad en pedido cuentan con la pieza única (regla de unidades, tanda 15)
@@ -19,10 +27,6 @@
 ### stock
 - feat: regla única de unidades, tanda 6 — stock divide con la pieza y el conversor de cantidades entra a ella
 - Archivos: 2 modificados (2 total)
-
-### proveedores
-- feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
-- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
