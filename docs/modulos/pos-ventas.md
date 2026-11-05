@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-11-05 04:02
+**Última actualización:** 2026-11-05 13:40
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-05: refactor: el buscador y la corrección del POS cuentan con la pieza única (regla de unidades, tanda 14)
 - 2026-11-05: refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9)
 - 2026-11-05: refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
 - 2026-11-04: feat: los componentes de combo congelan su N (migración aditiva)

@@ -1,16 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 13:13
+**Fecha:** 2026-11-05 13:40
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- refactor: el buscador y la corrección del POS cuentan con la pieza única (regla de unidades, tanda 14), refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
+- Archivos: 3 nuevos, 7 modificados (10 total)
 
 ### pos-transferencias
 - fix: preparados lee el bulto con la pieza única; el maní 1881 deja de partirse (regla de unidades, tanda 10), refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
 - Archivos: 3 nuevos, 8 modificados (11 total)
-
-### pos-ventas
-- refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
-- Archivos: 4 modificados (4 total)
 
 ### stock
 - feat: regla única de unidades, tanda 6 — stock divide con la pieza y el conversor de cantidades entra a ella
@@ -22,6 +22,9 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/pos-ventas/buscar-producto/buscarProductoConLaPieza.test.mjs
+- lib/pos-ventas/correccionCompletaServerConLaPieza.test.mjs
+- lib/pos-ventas/motorCorreccionConLaPieza.test.mjs
 - components/pos-transferencias/nueva/PreparadosTable.conLaPieza.test.mjs
 - components/pos-transferencias/nueva/TablaSugeridos.conLaPieza.test.mjs
 - components/pos-transferencias/nueva/ejercerTabla.mjs
