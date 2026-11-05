@@ -123,7 +123,9 @@ export async function POST(req, { params }) {
         // TODAS las fotos, en orden: se leen juntas como el papel que son.
         archivos: {
           orderBy: { orden: "asc" },
-          select: { orden: true, ubicacion: true, mime: true, nombre: true },
+          // `giroGrados`: el giro que eligió la persona en el visor. La foto
+          // viaja enderezada (`achicarParaLeer`).
+          select: { orden: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
         },
         intentosLectura: true,
         lecturaEnCursoDesde: true,
@@ -263,7 +265,7 @@ export async function POST(req, { params }) {
       let archivosLeidos;
       try {
         archivosLeidos = await Promise.all(
-          fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden }))
+          fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden, giroGrados: f.giroGrados ?? 0 }))
         );
       } catch {
         return NextResponse.json(

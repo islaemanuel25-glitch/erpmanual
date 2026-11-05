@@ -100,7 +100,9 @@ async function papelDePrueba({ grupoId, proveedorId, comprobanteId = null }) {
       pedidoId: true,
       tipo: true,
       _count: { select: { lineas: true } },
-      archivos: { orderBy: { orden: "asc" }, select: { ubicacion: true, mime: true, orden: true } },
+      // `giroGrados`: el giro que eligió la persona; la foto viaja enderezada,
+      // igual que en la lectura (`achicarParaLeer`).
+      archivos: { orderBy: { orden: "asc" }, select: { ubicacion: true, mime: true, orden: true, giroGrados: true } },
     },
   });
   return c;
@@ -486,6 +488,7 @@ async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
         bytes: await readFile(a.ubicacion),
         mime: a.mime,
         orden: a.orden,
+        giroGrados: a.giroGrados ?? 0,
       }))
     );
   } catch {
