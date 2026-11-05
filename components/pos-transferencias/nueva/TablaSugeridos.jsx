@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { kgToPiezas, piezasToKg } from "@/lib/conversiones/stock";
+import { fromUnidades, toUnidades } from "@/lib/unidades/reglaDeUnidades";
 
 const DEBUG_FILTROS_SUGERIDOS = false;
 
@@ -228,13 +229,20 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
   const [rotura, setRotura] = useState(false);
   const [inputEnPiezas, setInputEnPiezas] = useState(ventaDepositoPieza);
 
+  // ── LAS CUENTAS DE BULTOS Y UNIDADES, CON LA PIEZA ÚNICA (tanda 9) ──────
+  //
+  // Bultos a unidades y unidades a bultos más sueltas, con el conversor de
+  // `lib/unidades/reglaDeUnidades.js` y el factor que trae la fila.
+  const enUds = (b) => toUnidades({ cantidad: b, unidad: "BULTO", factorPack });
+  const partir = (u) => fromUnidades({ unidades: u, factorPack });
+
   // Estado local: bultos o uds según modo
   // Cuando sugeridoUnidad es BULTO, sugeridoCantidad ya está en bultos
   const [bultos, setBultos] = useState(() => {
     if (!bultoMode) return 0;
     return sugeridoUnidad === "BULTO"
       ? sugeridoCantidad
-      : Math.floor(sugeridoCantidad / factorPack);
+      : partir(sugeridoCantidad).bultos;
   });
   // Fiambre fijo: el backend ya devuelve sugeridoCantidad en PIEZAS → directo.
   const [uds, setUds] = useState(bultoMode ? 0 : sugeridoCantidad);
@@ -253,8 +261,9 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       if (sugeridoUnidad === "BULTO") {
         setBultos(sugeridoCantidad);
       } else {
-        setBultos(Math.floor(sugeridoCantidad / factorPack));
-        if (rotura) setUds(sugeridoCantidad % factorPack);
+        const { bultos: b, sueltas } = partir(sugeridoCantidad);
+        setBultos(b);
+        if (rotura) setUds(sueltas);
       }
     } else {
       // Fiambre fijo: sugeridoCantidad ya está en PIEZAS.
@@ -298,7 +307,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     const nb = Math.max(0, Number(val) || 0);
     setBultos(nb);
     if (rotura) {
-      emitirDebounced(nb * factorPack + uds, "UNIDAD");
+      emitirDebounced(enUds(nb) + uds, "UNIDAD");
     } else {
       emitirDebounced(nb, "BULTO");
     }
@@ -308,7 +317,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     const nu = Math.max(0, Number(val) || 0);
     setUds(nu);
     if (bultoMode && rotura) {
-      emitirDebounced(bultos * factorPack + nu, "UNIDAD");
+      emitirDebounced(enUds(bultos) + nu, "UNIDAD");
     } else if (esFiambre && ventaDepositoPieza) {
       // Depósito opera en PIEZAS. Si el input está en kg, convertir a piezas antes de emitir.
       const piezas = inputEnPiezas ? nu : (pesoRefKg > 0 ? kgToPiezas(nu, pesoRefKg) : nu);
@@ -327,7 +336,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       onEditSugerido(p.productoLocalDestinoId, bultos, "BULTO");
     } else {
       // Activar rotura: convertir a total unidades
-      const totalUnits = bultos * factorPack;
+      const totalUnits = enUds(bultos);
       if (totalUnits > 0) {
         onEditSugerido(p.productoLocalDestinoId, totalUnits, "UNIDAD");
       }
@@ -336,8 +345,8 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
 
   const total = (() => {
     if (!bultoMode) return uds;
-    if (rotura) return bultos * factorPack + uds;
-    return bultos * factorPack;
+    if (rotura) return enUds(bultos) + uds;
+    return enUds(bultos);
   })();
 
   const productoId =

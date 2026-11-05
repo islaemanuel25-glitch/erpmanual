@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { kgToPiezas, piezasToKg } from "@/lib/conversiones/stock";
+import { fromUnidades, toUnidades } from "@/lib/unidades/reglaDeUnidades";
 export default function PreparadosTable({
   datos = [],
   onDesmarcar,
@@ -163,6 +164,14 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
 
   const preparadoVal = Number(p.preparado || 0);
 
+  // ── LAS CUENTAS DE BULTOS Y UNIDADES, CON LA PIEZA ÚNICA (tanda 9) ──────
+  //
+  // Bultos a unidades y unidades a bultos más sueltas, con el conversor de
+  // `lib/unidades/reglaDeUnidades.js` y el factor que trae la línea.
+  const preparadoEnUds = () => toUnidades({ cantidad: preparadoVal, unidad: muestraEnBulto ? "BULTO" : "UNIDAD", factorPack });
+  const bultosMasUds = (b, u) => toUnidades({ cantidad: b, unidad: "BULTO", factorPack }) + u;
+  const partir = (uds) => fromUnidades({ unidades: uds, factorPack });
+
   // --- Estado modo normal (un solo input) ---
   const [inputVal, setInputVal] = useState(preparadoVal);
   const [isEditing, setIsEditing] = useState(false);
@@ -181,9 +190,9 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   useEffect(() => {
     if (isEditing) return;
     if (roturaMode) {
-      const prepUds = muestraEnBulto ? preparadoVal * factorPack : preparadoVal;
-      setMixBultos(Math.floor(prepUds / factorPack));
-      setMixUds(prepUds % factorPack);
+      const { bultos, sueltas } = partir(preparadoEnUds());
+      setMixBultos(bultos);
+      setMixUds(sueltas);
     } else if (esFiambre && ventaDepositoPieza && !inputEnPiezas) {
       // preparadoVal ya está en PIEZAS → en modo kg se muestra la equivalencia.
       setInputVal(piezasToKg(preparadoVal, pesoRefKg));
@@ -237,7 +246,7 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   };
 
   // --- Handlers modo rotura ---
-  const emitMix = (b, u) => emitDebounced(b * factorPack + u, "UNIDAD");
+  const emitMix = (b, u) => emitDebounced(bultosMasUds(b, u), "UNIDAD");
 
   const handleMixBultosInput = (e) => {
     const b = Math.max(0, parseInt(String(e.target.value).replace(/\D/g, ""), 10) || 0);
@@ -262,51 +271,45 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
     emitMix(b, mixUds);
   };
 
-  const handlePlusUds = () => {
-    let b = mixBultos, u = mixUds + 1;
-    if (u >= factorPack) { b += 1; u = 0; }
+  // Una unidad más o menos sobre el total, vuelto a partir: al pasar de
+  // `factorPack - 1` sueltas se completa un bulto, y al bajar de cero se abre uno.
+  const moverUnaUnidad = (delta) => {
+    const { bultos: b, sueltas: u } = partir(Math.max(0, bultosMasUds(mixBultos, mixUds) + delta));
     setMixBultos(b);
     setMixUds(u);
     emitMix(b, u);
   };
-  const handleMinusUds = () => {
-    let b = mixBultos, u = mixUds - 1;
-    if (u < 0) {
-      if (b > 0) { b -= 1; u = factorPack - 1; }
-      else { u = 0; }
-    }
-    setMixBultos(b);
-    setMixUds(u);
-    emitMix(b, u);
-  };
+  const handlePlusUds = () => moverUnaUnidad(1);
+  const handleMinusUds = () => moverUnaUnidad(-1);
 
   // --- Toggle rotura ---
   const toggleRotura = () => {
     if (roturaMode) {
       // Apagar: volver a modo normal, convertir total a bultos
-      const totalNow = mixBultos * factorPack + mixUds;
-      const bultos = Math.floor(totalNow / factorPack);
+      const { bultos } = partir(bultosMasUds(mixBultos, mixUds));
       setInputVal(bultos);
       setRoturaMode(false);
       onEditPreparado(p.detalleId, bultos, "BULTO");
     } else {
       // Encender: convertir preparado actual a bultos+uds
-      const prepUds = muestraEnBulto ? preparadoVal * factorPack : preparadoVal;
-      setMixBultos(Math.floor(prepUds / factorPack));
-      setMixUds(prepUds % factorPack);
+      const { bultos, sueltas } = partir(preparadoEnUds());
+      setMixBultos(bultos);
+      setMixUds(sueltas);
       setRoturaMode(true);
     }
   };
 
   // --- Cálculos para display ---
   const totalUdsDisplay = roturaMode
-    ? mixBultos * factorPack + mixUds
-    : (muestraEnBulto ? inputVal * factorPack : inputVal);
+    ? bultosMasUds(mixBultos, mixUds)
+    : toUnidades({ cantidad: inputVal, unidad: muestraEnBulto ? "BULTO" : "UNIDAD", factorPack });
 
   // Pedido en uds para calcular rotura visual
-  const pedidoUds = (p.unidadSugerida === "BULTO" || p.sugeridoUnidad === "BULTO")
-    ? Number(p.sugerido || 0) * factorPack
-    : Number(p.sugerido || 0);
+  const pedidoUds = toUnidades({
+    cantidad: Number(p.sugerido || 0),
+    unidad: p.unidadSugerida === "BULTO" || p.sugeridoUnidad === "BULTO" ? "BULTO" : "UNIDAD",
+    factorPack,
+  });
   const roturaUds = Math.max(0, pedidoUds - totalUdsDisplay);
 
   // 76 px, no 46. Los 46 estaban escritos desde siempre pero no se aplicaban:
