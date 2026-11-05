@@ -16,20 +16,19 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **107 migraciones**, la última
-`20261104200000_componente_con_sueltos_congelados`. Falta una:
-
-- `20261105220000_lista_machea_por_nombre_vinculado` — **aditiva.** Agrega el
-  valor `ALIAS_CONFIRMADO` al final del enum `TipoCoincidenciaLista`
-  (`ALTER TYPE … ADD VALUE IF NOT EXISTS`). No toca ninguna fila: la imagen
-  anterior no escribe ni lee el valor, y una fila con él solo aparece después de
-  conciliar con la imagen nueva. El clasificador (`--dir`, corrido el
-  2026-11-05) dio "Sin coincidencias" y salió con 0. Aplicada contra una base
-  local vacía con `prisma migrate dev`: la base quedó en sync con el schema.
+Ninguna. Producción está en **108 migraciones**, la última
+`20261105220000_lista_machea_por_nombre_vinculado`.
 
 ---
 
 ## Historial reciente
+
+`20261105220000_lista_machea_por_nombre_vinculado` se aplicó con el despliegue de
+`b17ae400` (2026-11-05 23:30), antes de levantar la imagen. El clasificador
+(`--vps --hasta`) la dio aditiva y salió con 0, sin autorización manual. El
+contenedor informó las **108** del árbol, imprimió "Applying migration" una vez
+y `migrate status` cerró con "Database schema is up to date!". Comprobado contra
+la base, en solo lectura: `TipoCoincidenciaLista` termina en `ALIAS_CONFIRMADO`.
 
 Las tres del tercer nivel de empaque se aplicaron, en orden, con el despliegue de
 `cc828095` (2026-11-04 07:43), antes de levantar la imagen. El clasificador marcó
