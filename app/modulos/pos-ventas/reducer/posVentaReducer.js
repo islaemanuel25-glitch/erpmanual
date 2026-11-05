@@ -1,5 +1,6 @@
 import { combinarSubtotalFijado } from "@/lib/pos-ventas/lineaPorImporte";
 import { MODO_SUELTO, escalaDeLineaDelCarrito, esLaMismaLinea, topeDeLineaDelCarrito } from "@/lib/pos-ventas/lineaSuelta";
+import { unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
 
 // Estado inicial del reducer
 export const initialState = {
@@ -293,18 +294,23 @@ export function posVentaReducer(state, action) {
         // Precio/costo unitario REAL del producto (con la lista del cliente ya
         // aplicada por la API en escala unitaria). FALLBACK LEGACY: si el ítem no
         // trae el campo real (cola offline vieja), recién ahí se divide bulto ÷ factor.
+        //
+        // La división es la de la pieza única (tanda 8): `unidadDelBulto`, con el
+        // factor de la LÍNEA. No se lee con `comoViene` porque la línea no trae
+        // la ficha entera, y con lo que trae, un kilo con pack daría factor 1:
+        // cambiaría el resultado, y la tanda 8 no cambia ninguno.
+        const unidadDeLinea = (precioBulto) =>
+          factorPack > 1
+            ? Math.round(unidadDelBulto({ precio: precioBulto, factor: factorPack }) * 100) / 100
+            : precioBulto;
         const precioUnit =
           item.precioVentaUnitarioReal != null
             ? item.precioVentaUnitarioReal
-            : factorPack > 1
-              ? Math.round(((item.precioVentaFormatoDepositoReal ?? item.precio ?? 0) / factorPack) * 100) / 100
-              : (item.precioVentaFormatoDepositoReal ?? item.precio ?? 0);
+            : unidadDeLinea(item.precioVentaFormatoDepositoReal ?? item.precio ?? 0);
         const costoUnit =
           item.precioCostoUnitarioReal != null
             ? item.precioCostoUnitarioReal
-            : factorPack > 1
-              ? Math.round(((item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0) / factorPack) * 100) / 100
-              : (item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0);
+            : unidadDeLinea(item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0);
         next[idx] = {
           ...item,
           modoVentaLinea: "UNIDAD_REMANENTE",
