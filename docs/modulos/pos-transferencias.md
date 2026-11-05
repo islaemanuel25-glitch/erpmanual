@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-11-05 02:56
+**Última actualización:** 2026-11-05 04:02
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-11-05: refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9)
 - 2026-11-05: fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
 - 2026-11-04: feat: las entradas de mercadería cuentan sueltos y la transferencia congela N (compra con sueltos SIN VERIFICAR contra la base)
