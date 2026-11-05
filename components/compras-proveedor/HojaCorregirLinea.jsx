@@ -94,6 +94,7 @@ import {
   precioDeUnaUnidad,
   cantidadFueConvertida,
   costoPropioParaDecidir,
+  bultoDeLaFila,
   difiereDeLoPedido,
   enUnidadesDeLaFila,
   estadoDeLinea,
@@ -713,9 +714,12 @@ export default function HojaCorregirLinea({
       // posibles— ya estaba; lo que faltaba era que la hoja le pasara el factor.
       // Es la misma función para las dos, que es el punto: una sola respuesta a
       // "¿la escala cuadra?".
-      factorPack: fila?.factorPack,
+      //
+      // El bulto, leído por la pieza (tanda 16): el maní 1881 trae factor 2 y
+      // no tiene bulto, así que 3 bolsas esperan 3, no 6.
+      factorPack: bultoDeLaFila(fila),
     });
-  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.subtotal, fila?.cantidad, fila?.porKilo]);
+  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.esFiambre, fila?.subtotal, fila?.cantidad, fila?.porKilo]);
 
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
 

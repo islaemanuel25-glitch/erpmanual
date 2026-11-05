@@ -15,7 +15,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
-import { unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
+import { precioDeLaUnidadDeStock } from "@/lib/unidades/reglaDeUnidades";
 
 function safeNum(n) {
   const v = Number(n);
@@ -104,19 +104,20 @@ export async function obtenerReporte(req) {
   for (const p of rows) {
     const base = p.base;
     const cantidad = safeNum(p.stock?.[0]?.cantidad);
-    const factor = Math.max(1, safeNum(base.factor_pack) || 1);
 
     // Costo: ProductoLocal override → ProductoBase fallback.
-    // Si factor_pack > 1, el precio en DB es del bulto → dividir.
+    // Si la ficha tiene bulto, el precio en DB es del bulto → dividir.
     const precioCostoBase = safeNum(p.precio_costo ?? base.precio_costo);
-    // La división, con el conversor de la pieza única (tanda 15) y este mismo factor.
-    let precioCostoUnitario =
-      factor > 1 ? unidadDelBulto({ precio: precioCostoBase, factor }) : precioCostoBase;
+    // ── EL PRECIO POR UNIDAD DE STOCK, COMO LAS PANTALLAS DE STOCK (tanda 16) ──
+    //
+    // `precioDeLaUnidadDeStock` lee la ficha con la pieza única, igual que las
+    // pantallas de stock desde la tanda 7: un pack divide por su factor; el maní
+    // 1881 (factor_pack 2, se compra por unidad) no se divide por 2.
+    let precioCostoUnitario = precioDeLaUnidadDeStock({ precio: precioCostoBase, base });
 
     // Venta: idem. Luego aplicar redondeo a 100 si corresponde (igual que stock_locales/listar).
     const precioVentaBase = safeNum(p.precio_venta ?? base.precio_venta);
-    let precioVentaUnitario =
-      factor > 1 ? unidadDelBulto({ precio: precioVentaBase, factor }) : precioVentaBase;
+    let precioVentaUnitario = precioDeLaUnidadDeStock({ precio: precioVentaBase, base });
     if (base.redondeo_100 === true) {
       precioVentaUnitario = redondear100(precioVentaUnitario);
     }

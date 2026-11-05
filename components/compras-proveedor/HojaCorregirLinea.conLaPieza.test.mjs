@@ -37,3 +37,47 @@ test("la hoja cuenta con la función compartida, no a mano, y sigue sin escribir
   assert.ok(!/b \* factor|\) \* factor/.test(fuente), "volvió a multiplicar a mano");
   assert.ok(!/factor_pack:\s/.test(fuente));
 });
+
+// ── TANDA 16: EL AVISO DE CANTIDAD CONTRA PRECIO YA NO PIDE 6 POR 3 BOLSAS ──
+//
+// La hoja le pasaba al control el `factorPack` crudo de la fila, y para el maní
+// 1881 es 2: con 3 bolsas en el papel, el aviso decía "Tendrían que ser 6" —y si
+// se ofrecían 6, cuadraba sin avisar—. Ahora le pasa el bulto leído con la pieza
+// (`bultoDeLaFila`), y el maní no tiene bulto. La fila sale de la ficha real con
+// `aplanarDetalles`, que es como la arma la conciliación; la llamada es la de la
+// hoja, campo por campo, con el maní pedido por unidad (SOLO_UNIDAD).
+
+import { bultoDeLaFila } from "../../lib/compras-proveedor/estadoDeLineaFacturada.js";
+import { aplanarDetalles } from "../../lib/compras-proveedor/comprobante/analisisDeComprobante.js";
+import { laCantidadCuadraConElPrecio, textoDeLaEscalaQueNoCuadra } from "../../lib/compras-proveedor/laCantidadCuadraConElPrecio.js";
+import P from "../../lib/unidades/posVentaConLaPieza.productos.json" with { type: "json" };
+
+const filaDe = (base, extra) => ({ ...aplanarDetalles([{ id: 1, cantidad: 3, precioCosto: base.precio_costo, unidad: "UNIDAD", producto: { baseId: base.id, base } }])[0], ...extra });
+const comoLlamaLaHoja = (fila, ofrecidas) =>
+  laCantidadCuadraConElPrecio({ subtotal: fila?.subtotal, cantidad: fila?.cantidad, fisicas: ofrecidas, porKilo: fila?.porKilo === true, factorPack: bultoDeLaFila(fila) });
+
+test("TANDA 16: 3 bolsas de maní esperan 3, no 6, con su ficha real", () => {
+  const fila = filaDe(P.base_mani1881, { subtotal: 18000 });
+  const corto = comoLlamaLaHoja(fila, 2);
+  assert.equal(corto.cuadra, false);
+  assert.equal(corto.esperado, 3, "antes: 6");
+  assert.match(textoDeLaEscalaQueNoCuadra(corto), /Tendrían que ser 3\./);
+  assert.equal(comoLlamaLaHoja(fila, 3).cuadra, true, "las 3 bolsas del papel cuadran");
+  assert.equal(comoLlamaLaHoja(fila, 6).cuadra, false, "antes, 6 cuadraban sin avisar");
+});
+
+test("TANDA 16, CONTRAPRUEBA: el pack de 12 y el producto por kilo siguen igual", () => {
+  const pack = filaDe(P.base_pack12, { subtotal: 115200 });
+  assert.deepEqual(comoLlamaLaHoja(pack, 36), { aplica: true, cuadra: true, esperado: 36, valuado: 115200, precioUnitario: 3200, subtotal: 115200 });
+  assert.equal(comoLlamaLaHoja(pack, 24).esperado, 36);
+  const kilo = filaDe(P.base_kilo, { subtotal: 24000, porKilo: true });
+  assert.equal(comoLlamaLaHoja(kilo, 3).aplica, false);
+});
+
+test("TANDA 16: la hoja le pasa al control el bulto leído con la pieza", () => {
+  const fuente = fs.readFileSync(new URL("./HojaCorregirLinea.jsx", import.meta.url), "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const i = fuente.indexOf("laCantidadCuadraConElPrecio({");
+  assert.ok(i > 0);
+  assert.match(fuente.slice(i, i + 600), /factorPack: bultoDeLaFila\(fila\),/);
+  assert.match(fuente, /fila\?\.esFiambre, fila\?\.subtotal/, "el memo se recalcula si cambia cómo se compra");
+});
