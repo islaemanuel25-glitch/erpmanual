@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 01:17
+**Fecha:** 2026-11-05 01:48
 
 ## Módulos modificados recientemente
+
+### stock
+- feat: regla única de unidades, tanda 6 — stock divide con la pieza y el conversor de cantidades entra a ella
+- Archivos: 2 modificados (2 total)
 
 ### proveedores
 - feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
