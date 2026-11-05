@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 13:40
+**Fecha:** 2026-11-05 14:00
 
 ## Módulos modificados recientemente
+
+### productos
+- refactor: combos, stock valorizado y cantidad en pedido cuentan con la pieza única (regla de unidades, tanda 15)
+- Archivos: 1 nuevos (1 total)
 
 ### pos-ventas
 - refactor: el buscador y la corrección del POS cuentan con la pieza única (regla de unidades, tanda 14), refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
@@ -22,6 +26,7 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/productos/export/exportConLaPieza.test.mjs
 - app/api/pos-ventas/buscar-producto/buscarProductoConLaPieza.test.mjs
 - lib/pos-ventas/correccionCompletaServerConLaPieza.test.mjs
 - lib/pos-ventas/motorCorreccionConLaPieza.test.mjs
