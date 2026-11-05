@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 04:02
+**Fecha:** 2026-11-05 10:44
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
-- Archivos: 3 nuevos, 3 modificados (6 total)
+- fix: preparados lee el bulto con la pieza única; el maní 1881 deja de partirse (regla de unidades, tanda 10), refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
+- Archivos: 3 nuevos, 8 modificados (11 total)
 
 ### pos-ventas
 - refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9), refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
