@@ -206,7 +206,10 @@ export async function POST(req, context) {
         productoBaseId: { in: [...motorPorId.keys()] },
         activo: true,
       },
-      select: { id: true, productoBaseId: true, codigoInterno: true, activo: true },
+      // Con la descripción: una fila que se encontró por el nombre ya vinculado
+      // (ALIAS_CONFIRMADO) se vuelve a encontrar por ahí, y sin ella caía en
+      // NO_MACHEADO por haber pedido que se recalculara su precio.
+      select: { id: true, productoBaseId: true, codigoInterno: true, descripcionProveedor: true, activo: true },
     });
     const indice = indexarCodigosProveedor(vinculos);
     const indiceBarra = indexarCodigosBarra([]);

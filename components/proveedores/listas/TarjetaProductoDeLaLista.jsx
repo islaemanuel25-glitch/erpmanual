@@ -20,11 +20,14 @@
 //
 // Qué botón va en cada esquina según el estado. QUÉ hace cada botón lo decide el
 // servidor —`item.usar`, de `tusProductos.js`— y QUÉ es cada estado también. La
-// pieza no llama a ninguna ruta: avisa con `onUsar`, `onVincular`, `onNoViene` y
-// `onCorregir`, y la pantalla hace el resto.
+// pieza no llama a ninguna ruta: avisa con `onUsar` y `onCorregir`, y la
+// pantalla hace el resto.
 //
-//   Sin vincular   «Vincular» arriba, «No viene» abajo.
-//   No viene       «Vincular» arriba: cambiar de idea es vincularlo.
+// Toda tarjeta tiene renglón (Emanuel, 2026-11-05): tus productos que la lista
+// no trae no se dibujan ni piden «Vincular» ni «No viene»; se cuentan aparte en
+// la cabecera. Un renglón que es tuyo con otro nombre se resuelve desde "Sin
+// producto en tu catálogo" con «Corregir».
+//
 //   Para revisar   «✓ Usar» arriba si hay una lectura que aceptar, «Corregir» abajo.
 //   Cambia         el mismo «✓ Usar», relleno: tocarlo lo desmarca.
 //   Mismo precio,  «Corregir» abajo: una tarjeta con renglón vinculado nunca
@@ -33,13 +36,9 @@
 //
 // Sin la lista abierta no hay ningún botón: el servidor los rechazaría. En una
 // lista de control no hay «Usar»: controlar no escribe ningún costo. Desde una
-// ubicación que no administra los costos, solo «Vincular» y «No viene».
+// ubicación que no administra los costos, ni «Usar» ni «Corregir».
 //
-// ── DOS PREGUNTAS EN LA TARJETA (Emanuel, 2026-10-24) ─────────────────────
-//
-//   Sin vincular con un renglón parecido (`item.sugerencia`): "¿Es 101 ·
-//   BIZCOCHITOS CAMPEON 300G?" con su precio, «✓ Sí» arriba, «Otro» y «No
-//   viene» abajo. «Otro» abre la hoja de vincular. Nunca vincula sola.
+// ── LAS PREGUNTAS DE LA TARJETA (Emanuel, 2026-10-24) ─────────────────────
 //
 //   Para revisar sin ninguna lectura porque no se sabe cuántas trae la caja
 //   (`item.preguntarCaja`): "¿Cuántas trae la caja?", un número y «Listo».
@@ -69,11 +68,8 @@ import { cuentaPorKilo } from "@/lib/proveedores/listas/explicarLectura";
 import { presentacionDelRenglon } from "@/lib/proveedores/listas/presentacion";
 
 export const TEXTO_USAR = "✓ Usar";
-export const TEXTO_VINCULAR = "Vincular";
-export const TEXTO_NO_VIENE = "No viene";
 export const TEXTO_CORREGIR = "Corregir";
 export const ROTULO_EN_LA_LISTA = "En la lista:";
-export const TEXTO_NO_ESTA = "no está";
 export const MARCA_VINCULADO = "✓";
 export const TEXTO_SI = "✓ Sí";
 export const TEXTO_OTRO = "Otro";
@@ -127,11 +123,8 @@ export default function TarjetaProductoDeLaLista({
   trabajando = false,
   error = "",
   onUsar,
-  onVincular,
-  onNoViene,
   onCorregir,
-  // «✓ Sí» sobre el renglón sugerido, y «Listo» con cuántas trae la caja.
-  onSi,
+  // «Listo» con cuántas trae la caja.
   onCaja,
   // «Listo» con los kilos de la pieza, para un producto por kilo.
   onKilos,
@@ -140,10 +133,8 @@ export default function TarjetaProductoDeLaLista({
   proveedor = "",
 }) {
   const { estado } = item;
-  const sinRenglon = estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR || estado === ESTADO_TU_PRODUCTO.NO_VIENE;
   const revisar = estado === ESTADO_TU_PRODUCTO.REVISAR;
   const cambia = estado === ESTADO_TU_PRODUCTO.CAMBIA;
-  const sugerencia = abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR ? item.sugerencia ?? null : null;
   const preguntarCaja = abierta && !controlando && puedeCambiarCostos && item.preguntarCaja === true;
   const preguntarKilos = abierta && !controlando && puedeCambiarCostos && item.preguntarKilos === true;
 
@@ -153,79 +144,36 @@ export default function TarjetaProductoDeLaLista({
       {/* Un confirmado del paquete 2 dice de dónde vino en vez del rótulo:
           "Sumado a Dab · antes de Arcor". */}
       <p className="text-xs sunmi-text-muted">{item.sumadoA ?? ROTULO_EN_LA_LISTA}</p>
-      {sugerencia ? (
-        <>
-          <p className="text-sm2 sunmi-text-strong break-words">{preguntaDeLaSugerencia(sugerencia)}</p>
-          <p className="text-xs sunmi-text-muted tabular-nums break-words">
-            {/* Con la presentación leída al lado del precio ("6 × 750 ml"), si la hay. */}
-            {`${money(sugerencia.precio)}${
-              presentacionDelRenglon(sugerencia) ? ` · ${presentacionDelRenglon(sugerencia)}` : ""
-            } · hoy ${money(item.costoHoy)}`}
-          </p>
-        </>
-      ) : item.renglon ? (
-        // El ✓ dice que el vínculo está hecho: sin él, una tarjeta vinculada y
-        // sin costo nuevo no se distinguía de una colgada (ALFAJOR FULBITO,
-        // 2026-10-24).
+      {/* Toda tarjeta tiene renglón desde el 2026-11-05: los tuyos que la lista
+          no trae no se dibujan (`tusProductosDeLaLista`). El ✓ dice que el
+          vínculo está hecho: sin él, una tarjeta vinculada y sin costo nuevo no
+          se distinguía de una colgada (ALFAJOR FULBITO, 2026-10-24). */}
+      {item.renglon && (
         <p className="text-sm2 sunmi-text-strong break-words">
           <span className="sunmi-text-success" aria-label="vinculado">
             {MARCA_VINCULADO}
           </span>{" "}
           {[item.renglon.codigo, item.renglon.descripcion].filter(Boolean).join(" · ")}
         </p>
-      ) : (
-        <p className="text-sm2 sunmi-text-warning">{TEXTO_NO_ESTA}</p>
       )}
-      {!sugerencia && (
-        <p className="text-xs sunmi-text-muted tabular-nums break-words">
-          {/* La presentación del renglón vinculado ("6 × 750 ml"), adelante de
-              la cuenta que empieza con su precio. Sin presentación, nada. */}
-          {item.renglon && presentacionDelRenglon(item.renglon) ? `${presentacionDelRenglon(item.renglon)} · ` : null}
-          {cuentaDe(item)}
-        </p>
-      )}
+      <p className="text-xs sunmi-text-muted tabular-nums break-words">
+        {/* La presentación del renglón vinculado ("6 × 750 ml"), adelante de
+            la cuenta que empieza con su precio. Sin presentación, nada. */}
+        {item.renglon && presentacionDelRenglon(item.renglon) ? `${presentacionDelRenglon(item.renglon)} · ` : null}
+        {cuentaDe(item)}
+      </p>
     </>
   );
 
   // ── ARRIBA A LA DERECHA: EL CASO FELIZ ───────────────────────────────────
   let accionArriba = null;
-  if (sugerencia) {
-    accionArriba = (
-      <SunmiAccionRapida onClick={() => onSi?.(item)} disabled={trabajando}>
-        {TEXTO_SI}
-      </SunmiAccionRapida>
-    );
-  } else if (abierta && sinRenglon) {
-    accionArriba = (
-      <SunmiAccionRapida onClick={() => onVincular?.(item)} disabled={trabajando}>
-        {TEXTO_VINCULAR}
-      </SunmiAccionRapida>
-    );
-  } else if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
+  if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
     accionArriba = <BotonUsar enUso={cambia} trabajando={trabajando} onClick={() => onUsar?.(item)} />;
   }
 
   // ── ABAJO A LA IZQUIERDA: LO DEMÁS ──────────────────────────────────────
   let accionAbajo = null;
-  if (sugerencia) {
-    // «Otro» es la hoja de vincular de siempre, con todos los renglones.
-    accionAbajo = (
-      <span className="flex flex-wrap gap-2">
-        <SunmiButton onClick={() => onVincular?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
-          {TEXTO_OTRO}
-        </SunmiButton>
-        <SunmiButton onClick={() => onNoViene?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
-          {TEXTO_NO_VIENE}
-        </SunmiButton>
-      </span>
-    );
-  } else if (abierta && estado === ESTADO_TU_PRODUCTO.SIN_VINCULAR) {
-    accionAbajo = (
-      <SunmiButton onClick={() => onNoViene?.(item)} disabled={trabajando} className={`shrink-0 ${CLASE_ACCION_CORREGIR}`}>
-        {TEXTO_NO_VIENE}
-      </SunmiButton>
-    );
-  } else if (abierta && puedeCambiarCostos && item.filaId && estado !== ESTADO_TU_PRODUCTO.ACTUALIZADO) {
+  if (abierta && puedeCambiarCostos && item.filaId && estado !== ESTADO_TU_PRODUCTO.ACTUALIZADO) {
     // Toda vinculada tiene «Corregir», también «Mismo precio» y «No lo cambio»:
     // una tarjeta con renglón nunca queda sin acción. La aplicada no: su costo
     // ya está escrito, y eso se deshace desde la lista.

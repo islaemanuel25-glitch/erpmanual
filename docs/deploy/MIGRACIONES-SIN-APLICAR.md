@@ -16,8 +16,16 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **107 migraciones**, la última
-`20261104200000_componente_con_sueltos_congelados`.
+Producción está en **107 migraciones**, la última
+`20261104200000_componente_con_sueltos_congelados`. Falta una:
+
+- `20261105220000_lista_machea_por_nombre_vinculado` — **aditiva.** Agrega el
+  valor `ALIAS_CONFIRMADO` al final del enum `TipoCoincidenciaLista`
+  (`ALTER TYPE … ADD VALUE IF NOT EXISTS`). No toca ninguna fila: la imagen
+  anterior no escribe ni lee el valor, y una fila con él solo aparece después de
+  conciliar con la imagen nueva. El clasificador (`--dir`, corrido el
+  2026-11-05) dio "Sin coincidencias" y salió con 0. Aplicada contra una base
+  local vacía con `prisma migrate dev`: la base quedó en sync con el schema.
 
 ---
 

@@ -20,12 +20,7 @@ import TarjetaProductoDeLaLista, {
   CLASE_TARJETA_FUERA_DE_RANGO,
   ROTULO_EN_LA_LISTA,
   TEXTO_CORREGIR,
-  TEXTO_NO_ESTA,
-  TEXTO_NO_VIENE,
-  TEXTO_OTRO,
-  TEXTO_SI,
   TEXTO_USAR,
-  TEXTO_VINCULAR,
   MARCA_VINCULADO,
   cuentaDe,
 } from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
@@ -36,9 +31,8 @@ import {
   TEXTO_PREGUNTA_KILOS,
   numeroDeLaRespuesta,
 } from "@/components/proveedores/listas/PreguntaQueFalta";
-import { sugerenciaDeRenglon } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
-import { CLASE_ACCION_CORREGIR, CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
+import { CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
 import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
 import { lecturaElegida, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
@@ -97,17 +91,14 @@ function botones(html) {
   }));
 }
 
-test("SIN VINCULAR: «Vincular» arriba en la clase rápida, «No viene» abajo, y «no está» en ámbar", () => {
-  const html = dibujar({ item: itemDe(), abierta: true });
-  const b = botones(html);
-  assert.deepEqual(b.map((x) => x.texto), [TEXTO_VINCULAR, TEXTO_NO_VIENE]);
-  assert.ok(b[0].atributos.includes(CLASE_ACCION_RAPIDA), "«Vincular» no tiene la forma del «✓ Coincide»");
-  assert.ok(b[1].atributos.includes(CLASE_ACCION_CORREGIR), "«No viene» no tiene la forma del «Corregir»");
+// Sin renglón no hay tarjeta (Emanuel, 2026-11-05): tus productos que la lista
+// no trae se cuentan aparte, sin «Vincular» ni «No viene». La tarjeta ya no
+// tiene esa rama, y el `item` no existe para dibujarla.
+test("SIN RENGLÓN NO HAY TARJETA: la lista no trae el producto y no se pide nada", () => {
+  assert.equal(itemDe(), undefined);
+  const html = dibujar({ item: itemDe({ filas: [fila()] }), abierta: true });
   assert.ok(html.includes(ROTULO_EN_LA_LISTA));
-  assert.match(html, new RegExp(`sunmi-text-warning">${TEXTO_NO_ESTA}<`));
-  assert.ok(html.includes("Hoy cuesta"), "sin renglón la cuenta dice lo que cuesta hoy");
-  // Sin costo nuevo, una raya.
-  assert.match(html, />—</);
+  assert.ok(!html.includes("Vincular") && !html.includes("No viene") && !html.includes("no está"));
 });
 
 test("PARA REVISAR CON LECTURA: «✓ Usar» arriba y «Corregir» abajo, el renglón y la cuenta", () => {
@@ -172,7 +163,7 @@ test("UNA LISTA CERRADA NO TIENE BOTONES, Y UN CONTROL NO TIENE «USAR»", () =>
   assert.deepEqual(botones(control).map((x) => x.texto), [TEXTO_CORREGIR]);
 });
 
-test("DESDE UN LOCAL SIN PROPIEDAD DEL COSTO NO SE OFRECE «USAR» NI «CORREGIR», PERO SÍ VINCULAR", () => {
+test("DESDE UN LOCAL SIN PROPIEDAD DEL COSTO NO SE OFRECE «USAR» NI «CORREGIR»", () => {
   // El `item` sale de `tusProductosDeLaLista` con `puedeCambiarCostos: false`,
   // que es como lo manda la ruta desde "Local: mini el 7". La contraprueba es
   // el mismo producto desde el depósito, en el test de «CAMBIA» de arriba.
@@ -184,12 +175,6 @@ test("DESDE UN LOCAL SIN PROPIEDAD DEL COSTO NO SE OFRECE «USAR» NI «CORREGIR
   // Aunque el servidor mandara un `usar`, la tarjeta tampoco lo dibuja.
   const conUsar = itemDe({ filas: [fila()] });
   assert.ok(!dibujar({ item: conUsar, abierta: true, puedeCambiarCostos: false }).includes(TEXTO_USAR));
-  // Vincular sí: el vínculo es del proveedor, no de la ubicación.
-  const sinVincular = tusProductosDeLaLista({ productos: productos([]), rango: RANGO, puedeCambiarCostos: false }).items[0];
-  assert.deepEqual(botones(dibujar({ item: sinVincular, abierta: true, puedeCambiarCostos: false })).map((x) => x.texto), [
-    TEXTO_VINCULAR,
-    TEXTO_NO_VIENE,
-  ]);
 });
 
 test("UNA VINCULADA DICE QUE EL VÍNCULO ESTÁ HECHO, Y NUNCA QUEDA SIN ACCIÓN", () => {
@@ -241,78 +226,21 @@ test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en rojo y fuer
   assert.ok(!html.includes(">—<"), "volvió el costo nuevo en raya");
 });
 
-// ── «¿ES ESTE?» EN LA TARJETA SIN VINCULAR (Emanuel, 2026-10-24) ─────────
+// ── «¿ES ESTE?» EN LA TARJETA SIN VINCULAR: SE FUE (2026-11-05) ──────────
 //
-// Los renglones tienen los campos que la ruta del resultado le pide a la base
-// para sugerir (`sugerenciasParaLosSinVincular`), y la sugerencia sale de
-// `sugerenciaDeRenglon`, no se escribe a mano.
-function renglonLibre(cambios = {}) {
-  return {
-    id: proximoId++,
-    codigoCrudo: "101",
-    descripcionProveedor: "BIZCOCHITOS CAMPEON 300G",
-    unidadProveedor: "",
-    unidadesPorBulto: null,
-    precioConIva: 1250.5,
-    productoBaseId: null,
-    ...cambios,
-  };
-}
-
-function sinVincularConSugerencia(renglones, { abierta = true } = {}) {
-  const nombre = "Bizcochitos Campeón 300 g";
-  const s = sugerenciaDeRenglon({ filas: renglones, nombreDelProducto: nombre, productoBaseId: 7 });
-  return tusProductosDeLaLista({
-    productos: [{ id: 7, nombre, precio_costo: 1200, filas: [] }],
-    rango: RANGO,
-    abierta,
-    sugerencias: s ? new Map([[7, s]]) : new Map(),
-  }).items[0];
-}
-
-test("SIN VINCULAR CON UN RENGLÓN PARECIDO: pregunta «¿Es 101 · …?» con su precio, «✓ Sí» arriba y «Otro» y «No viene» abajo", () => {
-  const item = sinVincularConSugerencia([renglonLibre(), renglonLibre({ codigoCrudo: "900", descripcionProveedor: "YERBA AGUANTADORA 1KG" })]);
-  assert.equal(item.sugerencia?.codigo, "101");
-  const html = dibujar({ item, abierta: true });
-  assert.ok(html.includes("¿Es 101 · BIZCOCHITOS CAMPEON 300G?"), "falta la pregunta");
-  assert.ok(conEspacios(html).includes("$ 1.250,50"), "falta el precio del renglón");
-  const b = botones(html);
-  assert.deepEqual(b.map((x) => x.texto), [TEXTO_SI, TEXTO_OTRO, TEXTO_NO_VIENE]);
-  assert.ok(b[0].atributos.includes(CLASE_ACCION_RAPIDA));
-});
-
-test("«✓ SÍ» AVISA CON EL ITEM DE LA SUGERENCIA, Y LA PANTALLA VINCULA CON ESE RENGLÓN", () => {
-  // La pieza no llama rutas: el botón dispara `onSi(item)`. La pantalla manda
-  // `filaElegidaId: item.sugerencia.id` a la misma ruta que la hoja.
-  const item = sinVincularConSugerencia([renglonLibre({ id: 4242 })]);
-  assert.equal(item.sugerencia.id, 4242);
+// Era la pregunta de la tarjeta de un producto tuyo sin renglón. Esas tarjetas
+// ya no se dibujan, así que la tarjeta no tiene más «✓ Sí», «Otro» ni «No
+// viene», y la pantalla no tiene el `si` que vinculaba con el renglón sugerido.
+test("LA TARJETA YA NO PREGUNTA «¿ES …?» NI LA PANTALLA VINCULA DESDE ELLA", () => {
   const fuente = readFileSync(new URL("../../../app/modulos/proveedores/listas/[id]/page.jsx", import.meta.url), "utf8").replace(
     /\/\/[^\n]*/g,
     ""
   );
-  const si = fuente.match(/const si = async \(item\) => \{[\s\S]*?\n {2}\};/)?.[0] ?? "";
-  assert.ok(si, "no está el «✓ Sí» de la pantalla");
-  assert.match(si, /\/en-la-lista`/);
-  assert.match(si, /\{ filaElegidaId: s\.id \}/);
-  assert.match(si, /const s = item\.sugerencia;/);
-  // Y sigue el camino de la hoja: la única en rango se toma sola.
-  assert.match(si, /tomarLaUnica: true/);
-  assert.match(fuente, /onSi=\{si\}/);
-});
-
-test("SIN CANDIDATO PARECIDO, LA TARJETA QUEDA COMO ANTES; Y NUNCA SE VINCULA SOLA", () => {
-  const item = sinVincularConSugerencia([renglonLibre({ descripcionProveedor: "YERBA AGUANTADORA 1KG", codigoCrudo: "900" })]);
-  assert.equal(item.sugerencia, null);
-  assert.deepEqual(botones(dibujar({ item, abierta: true })).map((x) => x.texto), [TEXTO_VINCULAR, TEXTO_NO_VIENE]);
-  // Un renglón que ya es de otro producto no se sugiere.
-  const tomado = sinVincularConSugerencia([renglonLibre({ productoBaseId: 99 })]);
-  assert.equal(tomado.sugerencia, null);
-  // Con la lista cerrada, tampoco.
-  assert.equal(sinVincularConSugerencia([renglonLibre()], { abierta: false }).sugerencia, null);
-  // La sugerencia no vincula: el producto sigue sin renglón.
-  const sugerido = sinVincularConSugerencia([renglonLibre()]);
-  assert.equal(sugerido.renglones, 0);
-  assert.equal(sugerido.filaId, null);
+  assert.ok(!/const si = async/.test(fuente), "volvió el «✓ Sí» de la tarjeta");
+  assert.ok(!/onSi=\{si\}/.test(fuente));
+  const tarjeta = readFileSync(new URL("./TarjetaProductoDeLaLista.jsx", import.meta.url), "utf8").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/item\.sugerencia/.test(tarjeta), "la tarjeta volvió a leer la sugerencia");
+  assert.ok(!/onVincular|onNoViene/.test(tarjeta), "la tarjeta volvió a ofrecer vincular o «No viene»");
 });
 
 // ── «¿CUÁNTAS TRAE LA CAJA?» (ALICANTE PIMENTÓN 25G, Emanuel, 2026-10-24) ──
@@ -441,7 +369,7 @@ test("GRANIX CON LA PIEZA DE 2 KG: LA CUENTA EN KILOS CONTRA $ 6.405 EL KILO, Y 
 const LARGO = "SOL PAMPEANO FIDEO MOSTACHOL RAYADO SEMOLA DE TRIGO CANDEAL 500G X 12 PAQUETES";
 const NOMBRE_LARGO = "Sol Pampeano fideo mostachol rayado sémola de trigo candeal 500 g, paquete por doce";
 
-test("UN RENGLÓN CON NOMBRE LARGO SE DIBUJA ENTERO, SIN «…», EN «EN LA LISTA:» Y EN «¿ES …?»", () => {
+test("UN RENGLÓN CON NOMBRE LARGO SE DIBUJA ENTERO, SIN «…», EN «EN LA LISTA:»", () => {
   // Vinculado: el renglón debajo del nombre.
   const f = fila({ descripcionProveedor: LARGO, codigoCrudo: "6962" });
   const vinculado = tusProductosDeLaLista({
@@ -451,25 +379,9 @@ test("UN RENGLÓN CON NOMBRE LARGO SE DIBUJA ENTERO, SIN «…», EN «EN LA LIS
   const html = dibujar({ item: vinculado, abierta: true });
   assert.ok(html.includes(`6962 · ${LARGO}`), "el renglón no salió entero");
   assert.ok(html.includes(NOMBRE_LARGO), "el nombre del producto no salió entero");
-  // Sin vincular, con la sugerencia "¿Es …?".
-  const s = sugerenciaDeRenglon({
-    filas: [renglonLibre({ codigoCrudo: "5228", descripcionProveedor: LARGO })],
-    nombreDelProducto: NOMBRE_LARGO,
-    productoBaseId: 7,
-  });
-  assert.ok(s, "el caso no ejerce la sugerencia");
-  const sinVincular = tusProductosDeLaLista({
-    productos: [{ id: 7, nombre: NOMBRE_LARGO, precio_costo: 1300, filas: [] }],
-    rango: RANGO,
-    sugerencias: new Map([[7, s]]),
-  }).items[0];
-  const h2 = dibujar({ item: sinVincular, abierta: true });
-  assert.ok(h2.includes(`¿Es 5228 · ${LARGO}?`), "la sugerencia no salió entera");
-  // Ningún "…" y ninguna clase que corte, en ninguna de las dos.
-  for (const h of [html, h2]) {
-    assert.ok(!h.includes("…"), "apareció un «…»");
-    assert.ok(!/\b(truncate|line-clamp-\d|text-ellipsis)\b/.test(h), "una clase corta el texto");
-  }
+  // Ningún "…" y ninguna clase que corte.
+  assert.ok(!html.includes("…"), "apareció un «…»");
+  assert.ok(!/\b(truncate|line-clamp-\d|text-ellipsis)\b/.test(html), "una clase corta el texto");
 });
 
 test("NINGUNA PIEZA DE LA REVISIÓN DE UNA LISTA CORTA UN NOMBRE", () => {

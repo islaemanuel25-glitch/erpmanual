@@ -78,6 +78,7 @@ import {
   resumenDeLaCerrada,
   seVe,
   textoMarcadosSinAplicarEnUnaCerrada,
+  textoNoVienenEnLaLista,
   textoSinMarcarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
@@ -512,29 +513,6 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   };
 
   /**
-   * «✓ SÍ»: VINCULA CON EL RENGLÓN QUE LA TARJETA SUGIERE (Emanuel, 2026-10-24).
-   *
-   * El mismo pedido que la hoja de vincular hace al elegir un renglón, y el mismo
-   * paso después: si hay una sola lectura en rango se toma sola, si no se abre
-   * la decisión (`tomarLaUnica`). Desde una ubicación sin los costos, solo
-   * vincula, como la hoja.
-   */
-  const si = async (item) => {
-    const s = item.sugerencia;
-    if (!s) return;
-    const j = await pedirDesdeLaTarjeta(
-      item,
-      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
-      { filaElegidaId: s.id },
-      "El servidor no pudo vincularlo y no dijo por qué.",
-      (r) => deshacerVinculo(r?.filaId ?? s.id)
-    );
-    if (j?.filaId && puedeCambiarCostosAhora()) {
-      setRevisando({ filaId: j.filaId, productoBaseId: item.productoBaseId, tomarLaUnica: true });
-    }
-  };
-
-  /**
    * «LISTO» CON CUÁNTAS TRAE LA CAJA, O CON CUÁNTOS KILOS TRAE LA PIEZA: se
    * guarda como lectura recordada de este producto con este proveedor —no en
    * la ficha— y la tarjeta se relee con su cuenta. Deshacer vuelve a poner la
@@ -555,9 +533,6 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       { kilos: kilosDeLaPieza },
       "El servidor no pudo guardar cuántos kilos trae la pieza y no dijo por qué."
     );
-
-  /** El mismo criterio que el resto de la pantalla (`costos.puedeCambiar`). */
-  const puedeCambiarCostosAhora = () => (datos?.cabecera?.costos?.puedeCambiar ?? true) !== false;
 
   /**
    * «Ir a Depósito: depo»: cambia la ubicación activa y vuelve a ESTA lista.
@@ -614,16 +589,6 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       `/api/proveedores/listas/${id}/posibles`,
       { deshacer: true, productoBaseId: item.productoBaseId },
       "El servidor no pudo deshacerlo y no dijo por qué."
-    );
-
-  /** «No viene»: lo mismo que el botón de la hoja de vincular, sin abrirla. */
-  const noViene = (item) =>
-    pedirDesdeLaTarjeta(
-      item,
-      `/api/proveedores/listas/${id}/productos/${item.productoBaseId}/en-la-lista`,
-      { noViene: true },
-      "El servidor no pudo guardarlo y no dijo por qué.",
-      deshacerNoViene(item.productoBaseId)
     );
 
   /**
@@ -1033,7 +998,9 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // en vez de romper la pantalla.
   const tusProductos = datos.tusProductos ?? { items: [], conteo: { total: 0, traeLaLista: 0, porEstado: {} } };
   const nombreProveedor = cabecera.proveedor?.nombre ?? "este proveedor";
-  const sinVincular = tusProductos.conteo.porEstado?.SIN_VINCULAR ?? 0;
+  // Los tuyos que la lista no trae: contados, sin tarjeta y sin pedir nada
+  // (Emanuel, 2026-11-05). Ver `tusProductosDeLaLista`.
+  const noVienenEnLaLista = tusProductos.conteo.noVienenEnLaLista ?? 0;
   // Sin «Todos»: si todavía no se eligió, el mismo con el que arranca. Y con
   // texto en el buscador, `seVe` busca en todos sin mirar el chip.
   // Cerrada, un chip vacío no se queda puesto: arranca en el primero que tenga
@@ -1500,17 +1467,13 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
               {cabecera.archivoNombre} · subida {fechaHora(cabecera.subidaEn ?? cabecera.leidaEn)}
               {controlando ? " · control: no cambia ningún precio" : ""}
             </p>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm2 sunmi-text-muted">
-                <span className="tabular-nums sunmi-text-strong font-semibold">
-                  {tusProductos.conteo.traeLaLista} / {tusProductos.conteo.total}
-                </span>{" "}
-                en la lista
-              </span>
-              <span className={`text-sm2 ${sinVincular > 0 ? "sunmi-text-accent" : "sunmi-text-success"}`}>
-                {sinVincular > 0 ? `${sinVincular} sin vincular` : "Nada sin vincular"}
-              </span>
-            </div>
+            <span className="text-sm2 sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong font-semibold">{tusProductos.conteo.total}</span>{" "}
+              en la lista
+            </span>
+            {noVienenEnLaLista > 0 && (
+              <p className="text-sm2 sunmi-text-muted">{textoNoVienenEnLaLista(noVienenEnLaLista, nombreProveedor)}</p>
+            )}
             {/* ── 2 · CUÁNTO FALTA, COMO "0 / 14 REVISADOS" ──────────────
                 Listo es lo que no está ni en «Sin vincular» ni en «Para
                 revisar». Avanza a medida que las tarjetas se resuelven. */}
@@ -1585,10 +1548,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                 trabajando={tocando === item.productoBaseId}
                 error={errores.get(item.productoBaseId) ?? ""}
                 onUsar={(it) => usar(it)}
-                onNoViene={noViene}
-                onVincular={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre })}
                 onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
-                onSi={si}
                 onCaja={caja}
                 onKilos={kilos}
               />

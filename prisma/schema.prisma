@@ -4873,6 +4873,8 @@ enum TipoCoincidenciaLista {
   SUFIJO_4
   /// Último camino que machea, dentro del universo del proveedor.
   CODIGO_BARRA
+  /// La descripción ya vinculada para este proveedor, en cualquier módulo.
+  ALIAS_CONFIRMADO
   AMBIGUA
   NINGUNA
 }

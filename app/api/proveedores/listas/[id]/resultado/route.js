@@ -66,10 +66,10 @@ import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/list
 import {
   proveedoresDeAntes,
   renglonDeLaHoja,
-  sugerenciasDeRenglones,
   textoDeProveedoresDeHoy,
 } from "@/lib/proveedores/listas/vincularConUnaFila";
 import { asegurarPuedenSer, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
+import { alcanzarLoYaVinculadoPorNombre } from "@/lib/proveedores/listas/loYaVinculadoPorNombre";
 import { nombreDeLaColumnaDeLaLista } from "@/lib/proveedores/listas/nombreDeLaColumna";
 import {
   CAMPOS_PRODUCTO_PARA_LEER,
@@ -197,6 +197,14 @@ export async function GET(req, context) {
     if (!cab) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
     }
+    // Lo que ya se vinculó por su nombre —en otra lista o en un comprobante— y
+    // esta lista no vio porque se concilió antes. Solo renglones libres, sin
+    // escribir ningún costo. Ver `loYaVinculadoPorNombre.js`.
+    await alcanzarLoYaVinculadoPorNombre(prisma, {
+      importacionId: id,
+      grupoId,
+      depositoLocalId: await getDepositoIdDeGrupo(grupoId),
+    });
     await asegurarPuedenSer(prisma, { ...cab, grupoId });
 
     // ── Los contadores, sobre TODAS las filas ────────────────────────────
@@ -363,12 +371,9 @@ export async function GET(req, context) {
       puedeCambiarCostos,
       // Para el cartel: "Dab suele aumentar entre 0 % y 12 %".
       proveedor: cab.proveedor?.nombre ?? null,
-      sugerencias: await sugerenciasParaLosSinVincular({
-        importacionId: id,
-        productos: delPaquete1,
-        noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
-        abierta: esImportacionAbierta(cab.estado),
-      }),
+      // Sin `sugerencias` desde el 2026-11-05: el "¿Es …?" era para la tarjeta
+      // de un producto sin renglón, y esas tarjetas ya no se dibujan
+      // (`tusProductosDeLaLista`).
     };
     const tusProductos = tusProductosDeLaLista({
       ...comunes,
@@ -799,58 +804,6 @@ async function lecturasDeTusFilas({ importacionId, grupoId, productos, cab, rang
     });
   }
   return porFila;
-}
-
-/**
- * EL RENGLÓN QUE SE LE SUGIERE A CADA PRODUCTO SIN VINCULAR (2026-10-24).
- *
- * Con los mismos renglones y la misma cuenta que la hoja de vincular
- * (`sugerenciaDeRenglon` sobre `candidatasConPuntaje`), así que "¿Es …?" en la
- * tarjeta es el renglón que la hoja pondría primero. Solo los renglones sin
- * dueño: uno tomado por otro producto no se sugiere.
- *
- * Una sola consulta para todos: son los renglones libres del archivo, no uno
- * por producto. Y una sola pasada (`sugerenciasDeRenglones`), que compara cada
- * producto solo con los renglones que comparten alguna palabra.
- *
- * @returns Map productoBaseId → candidato
- */
-async function sugerenciasParaLosSinVincular({ importacionId, productos, noVienen, abierta }) {
-  const sugerencias = new Map();
-  if (!abierta) return sugerencias;
-  const sinRenglon = productos.filter((p) => p.filasImportacionLista.length === 0 && !noVienen.has(p.id));
-  if (sinRenglon.length === 0) return sugerencias;
-  const libres = await prisma.importacionListaFila.findMany({
-    where: { importacionId, productoBaseId: null },
-    select: {
-      id: true,
-      codigoCrudo: true,
-      descripcionProveedor: true,
-      unidadProveedor: true,
-      unidadesPorBulto: true,
-      contenidoMl: true,
-      precioConIva: true,
-      productoBaseId: true,
-    },
-    orderBy: { filaExcel: "asc" },
-  });
-  const todas = sugerenciasDeRenglones({ filas: libres, productos: sinRenglon });
-  // ── UN RENGLÓN QUE "PUEDEN SER DE…" LE DIO A OTRO, NO SE PREGUNTA ACÁ ────
-  //
-  // `calcularPuedenSer` deja que un producto del resto del catálogo se lleve un
-  // renglón reservado para un "¿Es …?" si se le parece más (Carozo, #23). Si
-  // esa propuesta sigue por confirmar, ganó ella: preguntar también acá pondría
-  // dos tarjetas a pelear por el mismo renglón.
-  const propuestos = new Set(
-    (
-      await prisma.productoQuePuedeSerDeLaLista.findMany({
-        where: { importacionId, fila: { productoBaseId: null, aplicada: false } },
-        select: { filaId: true },
-      })
-    ).map((p) => p.filaId)
-  );
-  for (const [productoBaseId, s] of todas) if (!propuestos.has(s.id)) sugerencias.set(productoBaseId, s);
-  return sugerencias;
 }
 
 /**

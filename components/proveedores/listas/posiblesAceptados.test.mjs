@@ -71,10 +71,11 @@ test("UN CONFIRMADO DEL PAQUETE 2 NO APARECE EN EL PAQUETE 1, AUNQUE YA TENGA A 
   assert.doesNotMatch(p1, /productosDelProveedor|confirmadosDelPaquete2|sumados/);
   // La anotación es de ESTA lista: en la próxima ya es del paquete 1.
   assert.match(ruta, /productoSumadoALaLista\.findMany\(\{\s*where: \{ importacionId: id, grupoId \}/);
-  // El listado cuenta el paquete 1 con la misma resta.
+  // El listado cuenta el paquete 1 con la misma resta —y desde el 2026-11-05,
+  // solo los que la lista trae, que son las tarjetas de adentro—.
   assert.match(
     codigoDe("app/api/proveedores/listas/route.js"),
-    /where: \{ AND: \[universoWhere, \{ sumadoEnListas: \{ none: \{ importacionId: i\.id \} \} \}\] \}/
+    /AND: \[\s*universoWhere,\s*\{ sumadoEnListas: \{ none: \{ importacionId: i\.id \} \} \},\s*\{ filasImportacionLista: \{ some: \{ importacionId: i\.id \} \} \},\s*\]/
   );
 });
 

@@ -1,0 +1,21 @@
+-- LA LISTA DE PRECIOS MACHEA TAMBIÉN POR EL NOMBRE YA VINCULADO.
+--
+-- Emanuel, 2026-11-05: "el motor de macheo proveedor-producto es UNO SOLO". Lo
+-- vinculado en una factura, boleta o remito vale para la lista de precios del
+-- mismo proveedor. La lista de Mauro, un PDF sin columna de código, no
+-- encontraba ninguno de los productos que la recepción ya había vinculado por su
+-- nombre: la conciliación de listas solo buscaba por código.
+--
+-- Una forma nueva de encontrar el producto de una fila, con el mismo nombre que
+-- el motivo del motor de identidad (`motorCandidatos.js`):
+--
+--   ALIAS_CONFIRMADO  la descripción del renglón es la que alguien ya vinculó a
+--                     ese producto para este proveedor, en cualquier módulo.
+--
+-- ── ESTRICTAMENTE ADITIVA ─────────────────────────────────────────────────
+--
+-- Un valor de enum al final, sin tocar ninguna fila. La versión anterior no lo
+-- escribe ni lo lee: una fila con él solo existe después de conciliar con la
+-- imagen nueva. Ningún código ordena ni compara por rango sobre
+-- `ImportacionListaFila.tipoCoincidencia` (ver la nota del squash).
+ALTER TYPE "TipoCoincidenciaLista" ADD VALUE IF NOT EXISTS 'ALIAS_CONFIRMADO';

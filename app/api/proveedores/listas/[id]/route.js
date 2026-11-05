@@ -81,6 +81,7 @@ const VISTAS = {
   sufijo4: { tipoCoincidencia: "SUFIJO_4" },
   manuales: { vinculadoPorUsuarioId: { not: null } },
   codigoBarra: { tipoCoincidencia: "CODIGO_BARRA" },
+  aliasConfirmado: { tipoCoincidencia: "ALIAS_CONFIRMADO" },
   factorDudoso: { estado: "FACTOR_DUDOSO" },
   sinVincular: { estado: "NO_MACHEADO" },
   ambiguas: { estado: "CODIGO_DUPLICADO" },

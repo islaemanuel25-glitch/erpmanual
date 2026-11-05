@@ -694,7 +694,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // `ProductoBase` (cómo se llama el bulto). No toca la recepción.
   // Sube a 107 el 2026-11-04: `20261104200000_componente_con_sueltos_congelados`,
   // una columna nula en `VentaDetalleComponente` (tanda 9). No toca la recepción.
-  assert.equal(migraciones.length, 107,"aparecio una migracion que nadie declaro aca");
+  // Sube a 108 el 2026-11-05: `20261105220000_lista_machea_por_nombre_vinculado`,
+  // un valor al final del enum `TipoCoincidenciaLista` (listas de precios). No
+  // toca la recepción.
+  assert.equal(migraciones.length, 108,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

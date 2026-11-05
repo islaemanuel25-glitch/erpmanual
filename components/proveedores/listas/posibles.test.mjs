@@ -190,15 +190,16 @@ test("SI EMPATAN EN PARECIDO, DESEMPATA EL TAMAÑO; SI SIGUEN EMPATADOS, NINGUNO
   assert.equal(renglonQueGana([...lista, { puntaje: 0.75, tamano: "1125ml", id: 3 }], "1125ml"), null);
 });
 
-test("EL CÁLCULO PASA LOS RESERVADOS CON SU PARECIDO, Y EL «¿ES …?» CEDE EL RENGLÓN QUE QUEDÓ PROPUESTO", () => {
+test("EL CÁLCULO PASA LOS RESERVADOS CON SU PARECIDO", () => {
   const calculo = codigoDe(CALCULO);
   assert.match(calculo, /reservados = new Map\(\s*\[\.\.\.sugerenciasDeRenglones\([^)]*\)\.values\(\)\]\.map\(\(s\) => \[s\.id, s\.puntaje\]\)/);
   assert.match(calculo, /posiblesDelProveedor\(\{[\s\S]*?\breservados,?\s*\}\)/);
   assert.doesNotMatch(calculo, /sugeridos\.has/, "volvió a sacar los reservados sin compararlos");
+  // El «¿Es …?» de la tarjeta, que cedía el renglón propuesto, se fue el
+  // 2026-11-05 con las tarjetas de los tuyos sin renglón: la ruta del resultado
+  // ya no sugiere nada.
   const resultado = codigoDe("app/api/proveedores/listas/[id]/resultado/route.js");
-  const funcion = resultado.slice(resultado.indexOf("async function sugerenciasParaLosSinVincular"));
-  assert.match(funcion, /productoQuePuedeSerDeLaLista\.findMany/);
-  assert.match(funcion, /if \(!propuestos\.has\(s\.id\)\) sugerencias\.set/);
+  assert.ok(!resultado.includes("sugerenciasParaLosSinVincular"), "volvió la sugerencia de la tarjeta sin renglón");
 });
 
 test("UN RENGLÓN RESERVADO PARA UN «¿ES …?» SE LO LLEVA SOLO QUIEN SE PARECE MÁS", () => {

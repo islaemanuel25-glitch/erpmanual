@@ -8,7 +8,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
+import { alcanzarLoYaVinculadoPorNombre } from "@/lib/proveedores/listas/loYaVinculadoPorNombre";
 import { esImportacionAbierta, paginacion } from "@/lib/proveedores/listas/persistencia";
 import { asegurarPuedenSer, filasSinProductoWhere, porConfirmarWhere } from "@/lib/proveedores/listas/puedenSer";
 import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
@@ -135,6 +136,7 @@ export async function GET(req) {
     // Se cuenta con `whereDelGrupo`, el mismo predicado que arma los grupos del
     // catálogo, así que la tapa y el detalle no pueden separarse: si cambia la
     // regla, cambian los dos.
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const conteos = await Promise.all(
       items.map(async (i) => {
         const universoWhere = alcanceDeLaListaWhere({
@@ -153,12 +155,25 @@ export async function GET(req) {
         // (`porConfirmarWhere`, el mismo `where` de la pantalla) más lo
         // confirmado. Una lista de antes que nunca lo calculó, lo calcula acá.
         if (!esImportacionAbierta(i.estado)) return { id: i.id, listos, actualizados, paquetes: null };
+        // Lo ya vinculado por nombre que la lista no vio al conciliarse
+        // (`loYaVinculadoPorNombre.js`): antes de contar, así el número del
+        // botón es el que la pantalla de adentro va a mostrar.
+        await alcanzarLoYaVinculadoPorNombre(prisma, { importacionId: i.id, grupoId, depositoLocalId });
         await asegurarPuedenSer(prisma, { ...i, grupoId });
         // El 3 (2026-11-04): los renglones sin producto, con el `where` de su
         // pantalla (`filasSinProductoWhere`).
         const [tusProductos, porConfirmar, confirmados, sinProducto] = await Promise.all([
+          // Solo los que la lista TRAE (Emanuel, 2026-11-05): son las tarjetas
+          // de adentro (`tusProductosDeLaLista`). Los que no vienen se cuentan
+          // allá, aparte, y no son trabajo.
           prisma.productoBase.count({
-            where: { AND: [universoWhere, { sumadoEnListas: { none: { importacionId: i.id } } }] },
+            where: {
+              AND: [
+                universoWhere,
+                { sumadoEnListas: { none: { importacionId: i.id } } },
+                { filasImportacionLista: { some: { importacionId: i.id } } },
+              ],
+            },
           }),
           prisma.productoQuePuedeSerDeLaLista.count({
             where: porConfirmarWhere({ importacionId: i.id, proveedorId: i.proveedor?.id }),
