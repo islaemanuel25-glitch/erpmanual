@@ -4,6 +4,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { Trash2, X, Pencil, TriangleAlert } from "lucide-react";
 import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
+import { bultoDeLaFicha, cantidadEnUnidades } from "@/lib/unidades/reglaDeUnidades";
 import {
   compararCostoLinea,
   contarLineasConAviso,
@@ -100,7 +101,9 @@ export default function CarritoPedido({
     const disp = unidadDisplay(base, i.unidadPedido);
     const unidadTxt = disp === "PIEZA / por kg" ? "pieza" : disp.toLowerCase();
     const esPack = naturalezaLinea(base) === "PACK";
-    const factor = Math.max(1, Number(i.factorPack) || 1);
+    // El bulto y su equivalencia, con la pieza única (tanda 11): solo un pack
+    // tiene bulto, y lo dice la ficha de la línea.
+    const factor = esPack ? bultoDeLaFicha(base) : 1;
     const qtyNum = Number(i.cantidad) || 0;
     return (
       <div key={i.productoLocalId} className="px-2.5 py-2">
@@ -222,7 +225,7 @@ export default function CarritoPedido({
           <div className="text-[10px] sunmi-text-muted mt-1">
             1 pack = {factor} un
             {disp === "BULTO" && qtyNum > 0 && (
-              <span className="sunmi-text-accent"> · equivale a {qtyNum * factor} un</span>
+              <span className="sunmi-text-accent"> · equivale a {cantidadEnUnidades({ cantidad: qtyNum, unidad: "BULTO", base })} un</span>
             )}
           </div>
         )}
