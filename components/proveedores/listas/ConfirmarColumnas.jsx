@@ -378,6 +378,43 @@ export function comparacionDeColumnas(opciones = [], titulos = []) {
   };
 }
 
+/**
+ * LAS COLUMNAS QUE OFRECE EL «CAMBIAR» DE UN DATO, EN EL ORDEN EN QUE SE MUESTRAN.
+ *
+ * ── NUNCA VACÍA ────────────────────────────────────────────────────────────
+ *
+ * Si el sistema no encontró ninguna candidata —`soloEstas` llega como `[]`—, se
+ * ofrecen TODAS las columnas del archivo. Es la única salida que tiene quien
+ * confirma cuando el lector se equivocó: con la lista vacía, "Está bien,
+ * seguir" quedaba bloqueado para siempre y no había nada que tocar (Mauro,
+ * 2026-11-05: el precio quedó pegado al nombre en «PRODUCTO PRECIO ($)», no hubo
+ * candidatas, y la hoja se abría sin una sola opción).
+ *
+ * ── LA MEJOR ARRIBA, Y "MEJOR" ES LA QUE EXPLICA MÁS ────────────────────
+ *
+ * El orden que llega en `soloEstas` es el de las candidatas por lo que su
+ * TÍTULO parece, y ese orden no dice nada sobre cuál es el precio que hay que
+ * costear: "S/IVA" se parece a un precio tanto como "C/IVA". Poner primera a
+ * la que explica más productos es poner primera a la que tiene evidencia.
+ *
+ * No es cosmético: la primera opción de una lista es la que se toca sin
+ * pensar, y acá lo que se toca decide todos los costos de la lista.
+ *
+ * Sin respaldo —la pantalla de la primera lectura todavía no lo tiene— se
+ * respeta el orden que vino, que es lo único que hay.
+ */
+export function columnasParaElegir(soloEstas, titulos = [], respaldo = null) {
+  const base = Array.isArray(soloEstas) && soloEstas.length > 0 ? soloEstas : titulos.map((_, i) => i);
+  return [...base].sort((a, b) => {
+    const ra = respaldo?.get(a);
+    const rb = respaldo?.get(b);
+    if (!ra && !rb) return 0;
+    if (!ra) return 1;
+    if (!rb) return -1;
+    return (rb.explicadas ?? 0) - (ra.explicadas ?? 0);
+  });
+}
+
 function valor(ejemplo, indice) {
   if (indice === null || indice === undefined) return "";
   return String(ejemplo?.valores?.[indice] ?? "").trim();
@@ -403,26 +440,7 @@ function Dato({
   onAbrir,
   onElegir,
 }) {
-  // ── LA MEJOR ARRIBA, Y "MEJOR" ES LA QUE EXPLICA MÁS ────────────────────
-  //
-  // El orden que llega en `soloEstas` es el de las candidatas por lo que su
-  // TÍTULO parece, y ese orden no dice nada sobre cuál es el precio que hay que
-  // costear: "S/IVA" se parece a un precio tanto como "C/IVA". Poner primera a
-  // la que explica más productos es poner primera a la que tiene evidencia.
-  //
-  // No es cosmético: la primera opción de una lista es la que se toca sin
-  // pensar, y acá lo que se toca decide todos los costos de la lista.
-  //
-  // Sin respaldo —la pantalla de la primera lectura todavía no lo tiene— se
-  // respeta el orden que vino, que es lo único que hay.
-  const indices = [...(soloEstas ?? titulos.map((_, i) => i))].sort((a, b) => {
-    const ra = respaldo?.get(a);
-    const rb = respaldo?.get(b);
-    if (!ra && !rb) return 0;
-    if (!ra) return 1;
-    if (!rb) return -1;
-    return (rb.explicadas ?? 0) - (ra.explicadas ?? 0);
-  });
+  const indices = columnasParaElegir(soloEstas, titulos, respaldo);
   return (
     <div className="p-3 border-b sunmi-border last:border-b-0">
       <div className="flex items-center gap-2">
