@@ -102,6 +102,9 @@ export async function GET(req, { params }) {
                     sku: true,
                     unidad_medida: true,
                     factor_pack: true,
+                    // Con él, un producto por kilo que se compra por pieza
+                    // se pide en piezas y no en kilos (tanda 12).
+                    modoCompraProveedor: true,
                   },
                 },
               },
@@ -270,6 +273,7 @@ export async function GET(req, { params }) {
             unidad,
             unidadMedida: d.producto?.base?.unidad_medida || null,
             factorPack: Number(d.producto?.base?.factor_pack) || 0,
+            modoCompraProveedor: d.producto?.base?.modoCompraProveedor ?? null,
           }),
           col.cant,
           y
