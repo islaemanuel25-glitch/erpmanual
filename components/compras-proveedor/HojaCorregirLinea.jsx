@@ -718,8 +718,12 @@ export default function HojaCorregirLinea({
       // El bulto, leído por la pieza (tanda 16): el maní 1881 trae factor 2 y
       // no tiene bulto, así que 3 bolsas esperan 3, no 6.
       factorPack: bultoDeLaFila(fila),
+      // Lo que trae lo facturado según la lectura del precio: el bulto de 40
+      // del sachet de Super Mario, que el ERP cuenta por unidad. Solo si la
+      // lectura quedó decidida.
+      unidadesPorFacturada: fila?.unidad?.requiereDecision ? null : fila?.unidad?.unidadesPorFacturada ?? null,
     });
-  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.esFiambre, fila?.subtotal, fila?.cantidad, fila?.porKilo]);
+  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.esFiambre, fila?.subtotal, fila?.cantidad, fila?.porKilo, fila?.unidad]);
 
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
 

@@ -18,6 +18,7 @@ import { esComboBase } from "@/lib/combos/guards";
 import { unidadFisicaDelIngreso } from "@/lib/compras-proveedor/stockIngresado";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { unidadesQueDiceElRenglon, unidadesQueDiceLaDescripcion } from "@/lib/compras-proveedor/contenidoDelBulto";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
@@ -603,6 +604,11 @@ export async function POST(req, { params }) {
         pesoKg: true,
         subtotalImpreso: true,
         subtotalCorregido: true,
+        // Lo que el renglón imprime de cuántas trae lo facturado —el UxB de
+        // Super Mario se guarda como "bulto de 40"— y su descripción: el
+        // control de escala no acusa una proporción que el papel mismo dice.
+        enQueViene: true,
+        textoCrudo: true,
         // El precio que alguien ACEPTÓ para este renglón. Lo escribe
         // `aceptar-precio` y solo cuando la respuesta es "aceptar el precio
         // nuevo" —"dejar el que tenía" no lo toca—, y `vincular` lo borra si el
@@ -955,6 +961,12 @@ export async function POST(req, { params }) {
               // POR BULTO —el Queso Rallado del 242 dice 6 y entran 120— se
               // acusa como error de escala siendo perfecto.
               factorPack,
+              // Y las proporciones que imprime el renglón: 5 bultos de 40
+              // sachets son 200, aunque el ERP los tenga por unidad.
+              unidadesPorFacturada: [
+                unidadesQueDiceElRenglon(delPapel.enQueViene),
+                ...unidadesQueDiceLaDescripcion(delPapel.textoCrudo),
+              ],
             });
             if (r.aplica && !r.cuadra) {
               throw new ErrorParaLaPersona(
