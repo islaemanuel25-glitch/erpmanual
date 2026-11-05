@@ -15,6 +15,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
+import { unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
 
 function safeNum(n) {
   const v = Number(n);
@@ -108,13 +109,14 @@ export async function obtenerReporte(req) {
     // Costo: ProductoLocal override → ProductoBase fallback.
     // Si factor_pack > 1, el precio en DB es del bulto → dividir.
     const precioCostoBase = safeNum(p.precio_costo ?? base.precio_costo);
+    // La división, con el conversor de la pieza única (tanda 15) y este mismo factor.
     let precioCostoUnitario =
-      factor > 1 ? precioCostoBase / factor : precioCostoBase;
+      factor > 1 ? unidadDelBulto({ precio: precioCostoBase, factor }) : precioCostoBase;
 
     // Venta: idem. Luego aplicar redondeo a 100 si corresponde (igual que stock_locales/listar).
     const precioVentaBase = safeNum(p.precio_venta ?? base.precio_venta);
     let precioVentaUnitario =
-      factor > 1 ? precioVentaBase / factor : precioVentaBase;
+      factor > 1 ? unidadDelBulto({ precio: precioVentaBase, factor }) : precioVentaBase;
     if (base.redondeo_100 === true) {
       precioVentaUnitario = redondear100(precioVentaUnitario);
     }
