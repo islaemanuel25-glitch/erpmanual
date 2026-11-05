@@ -79,7 +79,8 @@ test("la hoja ofrece aceptarlo, con los dos números de una unidad y sin adverte
   // cambio normal.
   assert.match(hoja, / El precio subió 52,6 % Tenías /);
   assert.doesNotMatch(hoja, /El precio no se puede comparar|Fijate si es este producto|El papel cobra/);
-  assert.match(hoja, new RegExp(literal(`Tenías ${formatearMoneda(246)} / u −52,6 % · la factura trae ${formatearMoneda(375.35)} / u`)));
+  // El papel sube 52,6 % sobre el ERP: "+" desde el 2026-11-05.
+  assert.match(hoja, new RegExp(literal(`Tenías ${formatearMoneda(246)} / u +52,6 % · la factura trae ${formatearMoneda(375.35)} / u`)));
   assert.match(hoja, /Aceptar el precio nuevo/);
   assert.match(hoja, new RegExp(literal(`Pasa a ser tu costo: ${formatearMoneda(375.35)}. El margen se recalcula.`)));
   assert.match(hoja, /Dejar el que tenía/);
@@ -157,22 +158,24 @@ const tarjetaHtml = (fila) => renderToStaticMarkup(React.createElement(TarjetaLi
 /** El porcentaje del renglón ERP y su tono, como lo dibuja la pieza. */
 const porcentaje = (html, texto, tono) => new RegExp(`${tono}">${literal(texto)}<`).test(html);
 
-test("PICNIC: «Aceptar el precio nuevo» marcado, −52,6 % en rojo y la tarjeta en alerta, sin frases", () => {
+test("PICNIC sube 52,6 %: ninguna opción marcada, +52,6 % en verde y la tarjeta en alerta, sin frases", () => {
+  // Hasta el 2026-11-05 venía marcado aceptar, por ser el más alto. Desde
+  // entonces una suba de más del 35 % no viene marcada: hay que tocar una.
   const f = picnic();
   const hoja = hojaHtml(f);
-  assert.equal(marcada(hoja, "Aceptar el precio nuevo"), true, "el papel es el más alto");
+  assert.equal(marcada(hoja, "Aceptar el precio nuevo"), false, "sube más del 35 %");
   assert.equal(marcada(hoja, "Dejar el que tenía"), false);
-  assert.ok(porcentaje(hoja, "−52,6 %", "sunmi-text-danger"), "el ERP está más barato: negativo y en rojo");
+  assert.ok(porcentaje(hoja, "+52,6 %", "sunmi-text-success"), "el papel sube: positivo y en verde");
   const tarjeta = tarjetaHtml(f);
-  assert.ok(porcentaje(tarjeta, "−52,6 %", "sunmi-text-danger"), "la tarjeta dice el mismo porcentaje");
+  assert.ok(porcentaje(tarjeta, "+52,6 %", "sunmi-text-success"), "la tarjeta dice el mismo porcentaje");
   assert.match(tarjeta, /sunmi-state-warning/, "+53 % es más que la variación normal del 10 %");
   for (const html of [hoja, tarjeta]) {
     assert.doesNotMatch(html, /Fijate si es este producto|El precio no se puede comparar/);
   }
 });
 
-test("PICNIC con el ERP más caro, en el salto: el porcentaje en verde, y la baja se ofrece con «Dejar» marcado", () => {
-  // $150 la unidad contra $246: +39,0 % sobre el ERP, más que lo plausible. Es
+test("PICNIC con el ERP más caro, en el salto: −39,0 % en rojo, y la baja se ofrece con «Dejar» marcado", () => {
+  // $150 la unidad contra $246: −39,0 % sobre el ERP, más que lo plausible. Es
   // una baja que la regla de bajas frena. Hasta el 2026-11-05 no se ofrecía;
   // desde el maní de Prod Nat, un producto SIN BULTO —PICNIC va por unidad—
   // muestra la baja con las dos opciones, y viene marcado dejar el tuyo, que
@@ -180,29 +183,29 @@ test("PICNIC con el ERP más caro, en el salto: el porcentaje en verde, y la baj
   const f = picnic({ neto: 150 });
   assert.equal(loQueNoCuadra(f).que, "PRECIO");
   const hoja = hojaHtml(f);
-  assert.ok(porcentaje(hoja, "+39,0 %", "sunmi-text-success"));
+  assert.ok(porcentaje(hoja, "−39,0 %", "sunmi-text-danger"));
   assert.match(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), / El precio bajó 39,0 % /);
   assert.equal(marcada(hoja, "Aceptar el precio nuevo"), false);
   assert.equal(marcada(hoja, "Dejar el que tenía"), true);
   assert.doesNotMatch(hoja, /El papel cobra|tu costo no se toca/);
-  assert.ok(porcentaje(tarjetaHtml(f), "+39,0 %", "sunmi-text-success"));
+  assert.ok(porcentaje(tarjetaHtml(f), "−39,0 %", "sunmi-text-danger"));
 });
 
-test("fuera de la variación sin ser un salto, el ERP más caro: «Dejar» marcado, verde, alerta sin frase", () => {
-  // $220 contra $246: +10,6 % sobre el ERP, apenas fuera del 10 %.
+test("fuera de la variación sin ser un salto, el ERP más caro: «Dejar» marcado, rojo, alerta sin frase", () => {
+  // $220 contra $246: −10,6 % sobre el ERP, apenas fuera del 10 %.
   const f = picnic({ neto: 220 });
   assert.equal(loQueNoCuadra(f), null, "no es un salto: la hoja compara normal");
   const hoja = hojaHtml(f);
   assert.equal(marcada(hoja, "Dejar el que tenía"), true, "fuera de la variación también viene marcado el más alto");
-  assert.ok(porcentaje(hoja, "+10,6 %", "sunmi-text-success"));
+  assert.ok(porcentaje(hoja, "−10,6 %", "sunmi-text-danger"));
   assert.doesNotMatch(hoja, /no es normal para|Revisá la cantidad y el producto/, "sin frase de advertencia");
   const tarjeta = tarjetaHtml(f);
   assert.match(tarjeta, /sunmi-state-warning/);
-  assert.ok(porcentaje(tarjeta, "+10,6 %", "sunmi-text-success"));
+  assert.ok(porcentaje(tarjeta, "−10,6 %", "sunmi-text-danger"));
 });
 
-test("fuera de la variación, el papel más caro: «Aceptar» marcado, rojo, alerta sin frase", () => {
-  // $275 contra $246: −11,8 % sobre el ERP. Una suba —la baja de arriba ya la
+test("fuera de la variación, el papel más caro: «Aceptar» marcado, verde, alerta sin frase", () => {
+  // $275 contra $246: +11,8 % sobre el ERP. Una suba —la baja de arriba ya la
   // marca la regla de bajas—, así que este es el caso que ejerce la regla 1
   // fuera de la variación: hasta el 2026-10-29 no venía marcado nada.
   const f = picnic({ neto: 275 });
@@ -210,18 +213,18 @@ test("fuera de la variación, el papel más caro: «Aceptar» marcado, rojo, ale
   const hoja = hojaHtml(f);
   assert.equal(marcada(hoja, "Aceptar el precio nuevo"), true);
   assert.equal(marcada(hoja, "Dejar el que tenía"), false);
-  assert.ok(porcentaje(hoja, "−11,8 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(hoja, "+11,8 %", "sunmi-text-success"));
   assert.doesNotMatch(hoja, /no es normal para|Revisá la cantidad y el producto/);
   assert.match(tarjetaHtml(f), /sunmi-state-warning/);
 });
 
 test("dentro de la variación normal no se pinta de alerta, y viene marcado el más alto", () => {
-  // $250 contra $246: −1,6 % sobre el ERP. Hay que decidirlo, pero es normal.
+  // $250 contra $246: +1,6 % sobre el ERP. Hay que decidirlo, pero es normal.
   const f = picnic({ neto: 250 });
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.PRECIO_DISTINTO, "no es «Coincide»: se decide en la hoja");
   const tarjeta = tarjetaHtml(f);
   assert.doesNotMatch(tarjeta, /sunmi-state-warning/);
-  assert.ok(porcentaje(tarjeta, "−1,6 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(tarjeta, "+1,6 %", "sunmi-text-success"));
   assert.equal(marcada(hojaHtml(f), "Aceptar el precio nuevo"), true, "el papel es el más alto");
 });
 

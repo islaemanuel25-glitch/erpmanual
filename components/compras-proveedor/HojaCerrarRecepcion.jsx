@@ -36,6 +36,7 @@ import {
   llegaronSinPapel,
   recibidosDelCierre,
   resumenDelCierre,
+  loQueNoDejaCerrar,
   textoDeLoQueQueda,
 } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import {
@@ -174,11 +175,13 @@ export default function HojaCerrarRecepcion({
     [filas, sinComprobante, llegadas, contados]
   );
   const loQueQueda = textoDeLoQueQueda(resumen, { sinPapel });
+  // Una suba de más del 35 % sin elegir no deja cerrar (Emanuel, 2026-11-05).
+  const noDejaCerrar = loQueNoDejaCerrar(resumen);
 
   if (!abierta) return null;
 
   const confirmar = ({ dejandoSaldo = false } = {}) => {
-    if (!enPantalla.listo) return;
+    if (!enPantalla.listo || noDejaCerrar) return;
     if (saldo?.pideConfirmacion && !dejandoSaldo) {
       setAvisoDelSaldo(saldo.saldoCentavos);
       return;
@@ -227,6 +230,11 @@ export default function HojaCerrarRecepcion({
           {!enPantalla.listo && enPantalla.error && (
             <p className="text-sm3 sunmi-text-muted break-words">{enPantalla.error}</p>
           )}
+          {noDejaCerrar && (
+            <p className="text-sm3 sunmi-text-danger break-words" role="alert">
+              {noDejaCerrar}
+            </p>
+          )}
           {avisando ? (
             <>
               <p className="text-sm3 font-semibold sunmi-text-danger break-words" role="alert">
@@ -255,7 +263,7 @@ export default function HojaCerrarRecepcion({
             <SunmiButton
               color="primary"
               type="button"
-              disabled={guardando || !enPantalla.listo}
+              disabled={guardando || !enPantalla.listo || Boolean(noDejaCerrar)}
               onClick={() => confirmar()}
               className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
             >

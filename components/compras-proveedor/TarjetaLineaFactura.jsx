@@ -78,8 +78,9 @@ export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 
 /**
- * CÓMO ESTÁ EL ERP CONTRA EL PAPEL, AL LADO DEL RENGLÓN ERP: "+0,5 %" en verde
- * cuando el ERP está más caro, "−52,6 %" en rojo cuando está más barato.
+ * CUÁNTO SUBIÓ O BAJÓ EL PAPEL CONTRA EL ERP, AL LADO DEL RENGLÓN ERP:
+ * (papel − ERP) ÷ ERP. "−53,8 %" en rojo si baja, "+52,6 %" en verde si sube,
+ * como cualquier porcentaje del sistema (Emanuel, 2026-11-05).
  *
  * Es el renglón ERP de esta tarjeta, sacado tal cual para que la hoja de
  * Corregir lo muestre con la misma pieza (Emanuel, 2026-10-29). Recibe el `erp`
@@ -361,10 +362,9 @@ export default function TarjetaLineaFactura({
               )}
 
               {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
-                  El precio interno y cuánto está contra el papel: "+" y verde
-                  cuando el ERP está más caro —el depósito gana—, "−" y rojo
-                  cuando está más barato, gris si es el mismo
-                  (`gananciaDelRenglonPct` y `tonoDelPorcentaje`). El signo y el
+                  El precio interno y cuánto subió o bajó el papel contra él:
+                  "+" y verde si sube, "−" y rojo si baja, gris si es el mismo
+                  (`variacionDelPapelPct` y `tonoDelPorcentaje`). El signo y el
                   color dicen lo mismo a propósito: un color solo no se lee.
 
                   No se dibuja si no hay con qué comparar —renglón sin vincular,

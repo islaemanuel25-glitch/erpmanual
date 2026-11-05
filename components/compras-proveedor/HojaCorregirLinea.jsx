@@ -105,6 +105,8 @@ import {
   porcentajeDelPrecio,
   saltoDePrecioAceptable,
   saltoSinBultoConOpciones,
+  subeMasQueLoPlausible,
+  TEXTO_ELEGI_EL_PRECIO,
   textoSiAceptaElSalto,
   textoSiNoAceptaElSalto,
   unidadesFisicasEsperadas,
@@ -204,7 +206,9 @@ export function opcionAlAbrir({ fila, sugerida, saltoAceptable, deUnaUnidad }) {
   if (aceptarEstaBloqueado(fila?.precio?.decision)) return false;
   const decidida = decisionVigente(fila);
   if (decidida) return decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA;
-  if (saltoAceptable && deUnaUnidad) return deUnaUnidad.papel > deUnaUnidad.erp;
+  // Una suba de más del 35 % no viene marcada: Emanuel tiene que tocar una
+  // (2026-11-05, el sachet de Super Mario sin UxB, 40 veces el ERP).
+  if (saltoAceptable && deUnaUnidad) return subeMasQueLoPlausible(deUnaUnidad) ? null : deUnaUnidad.papel > deUnaUnidad.erp;
   if (sugerida?.marcado === MARCA.ACEPTA) return true;
   if (sugerida?.marcado === MARCA.DEJA) return false;
   return null;
@@ -852,6 +856,11 @@ export default function HojaCorregirLinea({
     // de la variación viene marcado el más alto y esto no molesta a nadie.
     if (cambio && sugerida.exigeElegir && aceptaPrecio === null) {
       setError(avisoDeLaDiferencia || "Elegí qué precio queda antes de seguir.");
+      return;
+    }
+    // Y un salto que sube más del 35 %, que viene sin marcar a propósito.
+    if (saltoAceptable && aceptaPrecio === null) {
+      setError(TEXTO_ELEGI_EL_PRECIO);
       return;
     }
     // El precio primero: si falla, no se guarda un conteo que la persona iba a

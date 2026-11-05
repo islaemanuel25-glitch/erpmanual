@@ -112,11 +112,18 @@ test("LA HOJA: «El precio bajó 53,8 %» con las dos opciones de siempre, y vie
   assert.equal(marcada(html, "Dejar el que tenía"), true, "el ERP es el más alto");
 });
 
-test("LA TARJETA: sin el cartel de escala, con la diferencia en el renglón del ERP", () => {
+test("LA TARJETA Y LA HOJA: −53,8 % en rojo, la misma cuenta (papel − ERP) ÷ ERP y el color de cualquier baja", () => {
+  // Emanuel, 2026-11-05: es una baja, tiene que decir −53,8 %. La tarjeta
+  // decía "+53,8 %" en verde, porque medía el ERP contra el papel.
   const html = tarjeta(mani());
   assert.doesNotMatch(aLaVistaHtml(html), new RegExp(literal(AVISO_ESCALA)));
-  assert.match(html, /sunmi-text-success">\+53,8 %</, "el ERP está más caro que el papel");
+  assert.match(html, /sunmi-text-danger">−53,8 %</);
+  assert.doesNotMatch(html, /\+53,8 %/);
   assert.match(html, /sunmi-state-warning/);
+  const hoja = hojaHtml(mani());
+  assert.match(hoja, /sunmi-text-danger">−53,8 %</, "la hoja, con la misma pieza y el mismo signo");
+  assert.doesNotMatch(hoja, /\+53,8 %/);
+  assert.match(aLaVistaHtml(hoja), / El precio bajó 53,8 % /, "y el título dice lo mismo que el porcentaje");
 });
 
 test("EL SERVIDOR acepta el precio del papel con el freno levantado, y sin levantarlo sigue rechazando", () => {
