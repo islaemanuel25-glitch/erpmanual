@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-11-06] - Actualización: proveedores, transferencias, productos, pos-ventas, pos-transferencias, stock
+
+### Modificado
+- **proveedores**: fix: una lista sin columna de código se lee con producto, cantidad y precio separados, y nunca toma el precio como código — SIN VERIFICAR en pantalla
+- **proveedores**: fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
+- **proveedores**: feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
+- **transferencias**: fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
+- **productos**: refactor: combos, stock valorizado y cantidad en pedido cuentan con la pieza única (regla de unidades, tanda 15)
+- **pos-ventas**: refactor: el buscador y la corrección del POS cuentan con la pieza única (regla de unidades, tanda 14)
+- **pos-ventas**: refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9)
+- **pos-ventas**: refactor: el POS de venta divide con la pieza única (regla de unidades, tanda 8)
+- **pos-transferencias**: fix: preparados lee el bulto con la pieza única; el maní 1881 deja de partirse (regla de unidades, tanda 10)
+- **pos-transferencias**: refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9)
+- **pos-transferencias**: fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
+- **stock**: feat: regla única de unidades, tanda 6 — stock divide con la pieza y el conversor de cantidades entra a ella
+
+
 ## [2026-11-05] - Actualización: proveedores, productos, pos-ventas, transferencias, stock, pos-transferencias
 
 ### Modificado

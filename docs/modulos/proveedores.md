@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-11-05 23:25
+**Última actualización:** 2026-11-06 00:19
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-06: fix: una lista sin columna de código se lee con producto, cantidad y precio separados, y nunca toma el precio como código — SIN VERIFICAR en pantalla
 - 2026-11-05: fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
 - 2026-11-05: feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
 - 2026-11-04: feat: listas — paquete «Sin producto en tu catálogo»: vincular o crear desde la lista

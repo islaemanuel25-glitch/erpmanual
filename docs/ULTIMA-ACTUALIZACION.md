@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-05 23:25
+**Fecha:** 2026-11-06 00:19
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla, feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
-- Archivos: 6 modificados (6 total)
+- fix: una lista sin columna de código se lee con producto, cantidad y precio separados, y nunca toma el precio como código — SIN VERIFICAR en pantalla, fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla, feat: regla única de unidades, tanda 5 — aplicar, confirmar la presentación y Arcor usan la pieza
+- Archivos: 7 modificados (7 total)
 
 ### transferencias
 - fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
