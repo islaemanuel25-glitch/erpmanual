@@ -29,6 +29,7 @@
 
 import { useMemo, useState } from "react";
 
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { formatearMoneda } from "@/lib/moneda";
@@ -220,11 +221,6 @@ export default function HojaCerrarRecepcion({
       espacioCuerpo="gap-renglon"
       footer={
         <div className="w-full flex flex-col gap-renglon">
-          {motivoDelFallo && (
-            <p className="text-sm3 sunmi-text-danger break-words" aria-live="polite">
-              {motivoDelFallo}
-            </p>
-          )}
           {/* Lo que falta para poder confirmar, dicho: un botón apagado sin
               motivo se lee como que la aplicación se trabó. */}
           {!enPantalla.listo && enPantalla.error && (
@@ -342,6 +338,17 @@ export default function HojaCerrarRecepcion({
             : "Entra al stock lo contado y lo que declara el papel, el pedido queda RECIBIDO y no se puede seguir controlando, y nace la deuda con el proveedor con el pago que elegiste. Todo junto: si algo falla, no queda nada a medias."}
         </span>
       </Bloque>
+
+      {/* ── POR QUÉ NO ENTRÓ EL CIERRE, ADENTRO DE LO QUE SE DESPLAZA ──────
+          Iba en el pie fijo, arriba del botón, y un motivo largo tapaba la
+          mitad del "Medio de pago" (Mauro, 2026-11-06: "Transferencia" quedaba
+          cortado). Acá, al final del contenido, queda justo arriba del botón
+          al bajar y no se monta sobre ningún campo. */}
+      {motivoDelFallo && (
+        <div aria-live="polite">
+          <SunmiAviso tono="danger">{motivoDelFallo}</SunmiAviso>
+        </div>
+      )}
     </SunmiModalLayout>
   );
 }

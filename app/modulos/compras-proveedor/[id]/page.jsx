@@ -527,6 +527,17 @@ export default function DetallePedidoProveedorPage({ params }) {
   // la Hamburguesa del pedido 242 los tres no coincidían.
   const [fisicas, setFisicas] = useState({});
   const [motivos, setMotivos] = useState({});
+  // ── UN MOTIVO VIEJO NO QUEDA A LA VISTA (Mauro, 2026-11-06) ─────────────
+  //
+  // El cierre frenó por la cantidad de un renglón, Emanuel lo corrigió, y el
+  // aviso seguía diciendo lo mismo hasta volver a tocar "Confirmar". Era el
+  // motivo de un intento sobre datos que ya no existen. Cualquier cambio de un
+  // renglón —lo contado, las sueltas, lo que entra, los kilos, el motivo o la
+  // conciliación que vuelve de la base— lo borra; el próximo intento dirá el
+  // que corresponda.
+  useEffect(() => {
+    setMotivoDelFallo(null);
+  }, [conciliacion, recibidos, sueltas, fisicas, kgRecibidos, motivos]);
   // ── QUÉ LÍNEAS CONTROLÓ LA PERSONA ──────────────────────────────────────
   //
   // No se deduce de que la cantidad coincida: eso es lo que el sistema calcula,

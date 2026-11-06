@@ -89,7 +89,7 @@ import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/co
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
-  contadoEnLaEscala,
+  cuantoEntroAlAbrir,
   frenoYaDecidido,
   precioDeUnaUnidad,
   cantidadFueConvertida,
@@ -614,27 +614,23 @@ export default function HojaCorregirLinea({
     // Lo ya contado, rearmado desde las unidades físicas en la escala de HOY:
     // si el producto cambió de bultos a unidades, 5 bultos de 6 son 30, no 5
     // (Pablo #337, `contadoEnLaEscala`).
-    const contado = contadoEnLaEscala(fila);
+    //
+    // ── Y SI NADIE CONTÓ ESTE RENGLÓN, LO QUE DICE EL PAPEL ──────────────
+    //
+    // Lo pedido nunca: arrancaba con "Bultos de 10: 6" sobre un renglón que
+    // decía 10 unidades (Mauro, 2026-11-06). La regla vive en
+    // `cuantoEntroAlAbrir`; sin certeza, arranca vacío.
+    const alAbrir = fila.cantidadEnKilos === true ? null : cuantoEntroAlAbrir(fila);
     setBultos(
       fila.cantidadEnKilos === true
         ? contadasDelFiambre != null
           ? String(contadasDelFiambre)
           : ""
-        : contado
-          ? String(contado.completos)
-          : fila.cantidadRecibida != null
-            ? String(fila.cantidadRecibida)
-            : String(cantidadEnEscalaDelPedido(fila) ?? "")
-    );
-    setSueltas(
-      contado
-        ? contado.sueltas > 0
-          ? String(contado.sueltas)
-          : ""
-        : fila.unidadesSueltas != null
-          ? String(fila.unidadesSueltas)
+        : alAbrir
+          ? String(alAbrir.completos)
           : ""
     );
+    setSueltas(alAbrir && alAbrir.sueltas > 0 ? String(alAbrir.sueltas) : "");
     // Lo pesado antes si lo hubo; si no, LO QUE DICE EL PAPEL. Nunca el peso de
     // referencia del producto: ése es una estimación y el papel es un dato.
     setKilos(
@@ -731,6 +727,9 @@ export default function HojaCorregirLinea({
       // del sachet de Super Mario, que el ERP cuenta por unidad. Solo si la
       // lectura quedó decidida.
       unidadesPorFacturada: fila?.unidad?.requiereDecision ? null : fila?.unidad?.unidadesPorFacturada ?? null,
+      // Lo esperado en la unidad en que el papel cuenta, según la misma
+      // deducción que dice "la factura dice 1" (Mauro, 2026-11-06).
+      papelEnUnidades: fila?.unidad?.requiereDecision ? false : fila?.unidad?.unidad === "POR_UNIDAD",
     });
   }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.esFiambre, fila?.subtotal, fila?.cantidad, fila?.porKilo, fila?.unidad]);
 

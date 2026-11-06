@@ -17,7 +17,7 @@ import {
 import { esComboBase } from "@/lib/combos/guards";
 import { unidadFisicaDelIngreso } from "@/lib/compras-proveedor/stockIngresado";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
-import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { elPapelCuentaUnidades, laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { unidadesQueDiceElRenglon, unidadesQueDiceLaDescripcion } from "@/lib/compras-proveedor/contenidoDelBulto";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -967,6 +967,17 @@ export async function POST(req, { params }) {
                 unidadesQueDiceElRenglon(delPapel.enQueViene),
                 ...unidadesQueDiceLaDescripcion(delPapel.textoCrudo),
               ],
+              // Lo que el aviso dice que factura el papel, en la unidad en que el
+              // papel lo cuenta: la misma deducción que dice "la factura dice 1"
+              // en la pantalla (Mauro, 2026-11-06). Ver `papelEnUnidades`.
+              papelEnUnidades: elPapelCuentaUnidades({
+                subtotal: delPapel.subtotalCorregido ?? delPapel.subtotalImpreso,
+                cantidad: delPapel.cantidad,
+                costoDelProducto: base?.precio_costo,
+                factorPack,
+                enQueViene: delPapel.enQueViene,
+                descripcion: delPapel.textoCrudo,
+              }),
             });
             if (r.aplica && !r.cuadra) {
               throw new ErrorParaLaPersona(

@@ -28,6 +28,7 @@ import { formatearMoneda } from "@/lib/moneda";
 import {
   AVISO_ESCALA,
   contadoEnLaEscala,
+  cuantoEntroAlAbrir,
   frenoYaDecidido,
   loQueNoCuadra,
   motivoSinComparacion,
@@ -77,9 +78,13 @@ test("1 · 5 BULTOS DE 6 QUE PASAN A UNIDADES SON 30, NO 5", () => {
   assert.deepEqual(contadoEnLaEscala({ ...enBultos, unidadesFisicas: 32 }), { completos: 5, sueltas: 2 });
   // Sin unidades físicas guardadas no se inventa nada: se usa lo de siempre.
   assert.equal(contadoEnLaEscala({ ...enUnidades, unidadesFisicas: null }), null);
-  // La hoja arranca con esto, no con `cantidadRecibida` a secas.
+  // La hoja arranca con esto, no con `cantidadRecibida` a secas, cuando el
+  // renglón lo revisó una persona (`cuantoEntroAlAbrir`, 2026-11-06: si nadie
+  // lo revisó arranca con lo que dice el papel).
+  assert.deepEqual(cuantoEntroAlAbrir({ ...enUnidades, revisada: true }), { completos: 30, sueltas: 0 });
+  assert.deepEqual(cuantoEntroAlAbrir({ ...enBultos, revisada: true }), { completos: 5, sueltas: 0 });
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
-  assert.match(hoja, /const contado = contadoEnLaEscala\(fila\);[\s\S]*?: contado\s*\? String\(contado\.completos\)/);
+  assert.match(hoja, /cuantoEntroAlAbrir\(fila\);[\s\S]*?: alAbrir\s*\? String\(alAbrir\.completos\)/);
 });
 
 test("2 · SANTA JULIA: LA CANTIDAD CIERRA CON EL IMPORTE, ASÍ QUE LO QUE NO CUADRA ES EL PRECIO", () => {
