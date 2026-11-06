@@ -24,9 +24,11 @@ import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDe
 import { precioFinalDelRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import {
   codigoDelProveedorParaElAlta,
+  costoDelAltaDesdeElPapel,
   costoDelRenglonParaElAlta,
   precargaDelAlta,
 } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import { PRECIO_ES } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const codigoDe = (rel) =>
@@ -73,12 +75,16 @@ test("cada precargado sale de donde corresponde", () => {
   const p = precargaDelAlta({ fila: f, proveedorId: MYF });
   assert.equal(p.nombre, "HELLMANNS MAY LIVIANA DP 24X237G", "el nombre es lo que dice el papel");
   assert.equal(p.proveedor_id, MYF, "el proveedor es el del comprobante");
-  // Con bulto la ficha es la del pack: "Pack", el factor del papel y el costo
-  // del bulto = el de la unidad que calcula la recepción × el factor.
+  // Con bulto la ficha es la del pack: "Pack" y el factor del papel. El costo
+  // ya no se supone "por unidad" (DAS Mayorista, 2026-11-06): queda vacío y se
+  // pregunta, como en Listas. Acá el papel cuenta frascos —48 a $ 1.207,72—,
+  // así que lo correcto es "Por unidad", que da los 28.985,28 de antes.
   assert.equal(p.unidad_medida, "pack");
   assert.equal(p.factor_pack, 24, "el bulto, porque el papel lo imprime");
   assert.equal(precioFinalDelRenglon({ costoFinalRenglon: 57970.55, divisor: 48 }), 1207.72);
-  assert.equal(p.precio_costo, 28985.28, "1.207,72 × 24, no el costo de un frasco");
+  assert.equal("precio_costo" in p, false, "el costo espera la respuesta");
+  assert.equal(costoDelAltaDesdeElPapel({ fila: f, precioEs: PRECIO_ES.UNIDAD }), 28985.28, "1.207,72 × 24");
+  assert.equal(costoDelAltaDesdeElPapel({ fila: f, precioEs: PRECIO_ES.CAJA }), 1207.72);
   // Lo que el alta no asigna sola no se inventa.
   assert.equal("sku" in p, false, "el alta no asigna código interno: no se inventa uno del papel");
   assert.equal("precio_venta" in p, false, "sin margen cargado el alta no calcula la venta");
@@ -122,14 +128,14 @@ const dibujarAlta = (initialData, codigoProveedorAlCrear = null) =>
   );
 const AVISO_CODIGO = "Se guarda como código interno al crear";
 
-test("el formulario de alta se dibuja con lo precargado: pack, costo por bulto y unitario de referencia", () => {
+test("el formulario de alta se dibuja con lo precargado: pack y factor, y el costo vacío hasta elegir", () => {
   const f = HELLMANNS();
   const html = dibujarAlta(precargaDelAlta({ fila: f, proveedorId: MYF }), codigoDelProveedorParaElAlta(f));
   assert.match(html, /value="HELLMANNS MAY LIVIANA DP 24X237G"/);
   assert.match(html, />Pack</, "el tipo de venta viene en Pack");
-  assert.match(html, /Costo \*[^<]*por bulto/);
-  assert.match(html, /value="28985.28"/);
-  assert.match(html, /value="1207.72"/, "el costo unitario de referencia es el de un frasco");
+  const campoCosto = html.slice(html.indexOf("Costo *")).match(/<input[^>]*>/)?.[0] ?? "";
+  assert.match(campoCosto, /value=""/, "el costo arranca vacío (2026-11-06)");
+  assert.doesNotMatch(html, /value="28985.28"|value="1207.72"/);
   assert.match(html, /value="24"/);
   assert.match(html, />Myf</, "el proveedor viene elegido");
   assert.match(html, /Crear producto/);
@@ -168,7 +174,7 @@ test("al crear, se vincula por el camino de siempre; cancelar no crea ni vincula
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   assert.match(hoja, /onCrearProducto=\{puedeCrearProducto \? \(\) => setCreando\(true\) : null\}/);
   assert.match(hoja, /onCancelar=\{\(\) => setCreando\(false\)\}/);
-  assert.match(hoja, /setCreando\(false\);\s*await elegir\(producto\.id\);/);
+  assert.match(hoja, /setCreando\(false\);\s*await elegir\(producto\.id, extra\);/);
   const alta = codigoDe("components/compras-proveedor/AltaDesdeElPapel.jsx");
   assert.match(alta, /fetch\(`\/api\/productos\/crear\?localId=\$\{localId\}`/);
   // El único fetch que escribe vive en `crear`, que solo corre al guardar.

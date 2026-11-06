@@ -34,6 +34,7 @@ import {
   yaEsDelProveedor,
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
 import {
   parDelTextoRechazado,
   parRechazado,
@@ -58,6 +59,9 @@ async function lineaQueSePuedeVincular({ grupoId, lineaId, body }) {
     textoCrudo: body?.textoCrudo,
     select: {
       id: true, textoCrudo: true, codigoProveedor: true,
+      // El UxB del renglón: con el texto, dice cuántas trae la caja cuando el
+      // alta preguntó si el precio era por caja o por unidad.
+      enQueViene: true,
       // Lo que colgaba del vínculo ANTERIOR. Si el producto cambia, esto hay
       // que deshacerlo: si no, queda un costo aceptado escrito sobre la línea
       // de pedido equivocada y nadie se entera.
@@ -219,7 +223,36 @@ export async function POST(req) {
       linea.pedidoDetalleId != null && linea.pedidoDetalleId !== detalleDelPedido;
     const habiaPrecioAceptado = linea.costoFinalUnitario != null;
 
+    // ── LO QUE EL ALTA PREGUNTÓ: POR LA CAJA O POR UNIDAD (2026-11-06) ────
+    //
+    // Si el producto se acaba de crear desde este renglón, el alta preguntó de
+    // qué era el precio. Se recuerda para el producto con este proveedor, igual
+    // que lo recuerda el alta de Listas (`filas/[filaId]/vincular`): la misma
+    // función, la misma tabla, en la misma transacción que el vínculo. La
+    // cantidad por caja la vuelve a leer el servidor del renglón, no la manda
+    // el cliente.
+    const lecturaDelAlta = lecturaRecordadaDelAltaDesdeElPapel({ fila: linea, precioEs: body?.precioEs ?? null });
+    const proveedorDelPapel = linea.comprobante.proveedorId;
+    const usuarioId = Number(session?.id ?? session?.userId) || null;
+
     const resultado = await prisma.$transaction(async (tx) => {
+      if (lecturaDelAlta && proveedorDelPapel) {
+        await tx.lecturaProductoProveedor.upsert({
+          where: {
+            lectura_unica_por_producto_y_proveedor: { grupoId, proveedorId: proveedorDelPapel, productoBaseId },
+          },
+          create: {
+            grupoId,
+            proveedorId: proveedorDelPapel,
+            productoBaseId,
+            ...lecturaDelAlta,
+            confirmadaPorUsuarioId: usuarioId,
+            confirmadaEn: new Date(),
+          },
+          update: { ...lecturaDelAlta, confirmadaPorUsuarioId: usuarioId, confirmadaEn: new Date() },
+        });
+      }
+
       if (cambiaDeDetalle && habiaPrecioAceptado && linea.precioPedidoPrevio != null) {
         await tx.pedidoProveedorDetalle.update({
           where: { id: linea.pedidoDetalleId },

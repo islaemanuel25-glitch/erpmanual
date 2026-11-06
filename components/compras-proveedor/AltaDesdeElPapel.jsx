@@ -16,17 +16,36 @@
 import { useEffect, useMemo, useState } from "react";
 
 import ModalProducto from "@/components/productos/ModalProductoFinal";
+import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { codigoDelProveedorParaElAlta, precargaDelAlta } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import {
+  codigoDelProveedorParaElAlta,
+  costoDelAltaDesdeElPapel,
+  precargaDelAlta,
+  preguntaDelAltaDesdeElPapel,
+} from "@/lib/compras-proveedor/altaDesdeElPapel";
 
+/**
+ * @param onCreado  `(producto, { precioEs })`: lo que eligió la persona viaja
+ *                  al vínculo, que lo recuerda para el proveedor.
+ */
 export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancelar }) {
   const { contexto } = useContextoActivo();
   const localId = contexto?.localId || 0;
   const [catalogos, setCatalogos] = useState({ CATEGORIAS: [], PROVEEDORES: [], AREAS: [] });
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  // Memorizada: el formulario se reinicia cada vez que cambia su `initialData`.
+  // ── POR LA CAJA O POR UNIDAD (DAS Mayorista, 2026-11-06) ───────────────
+  // Lo mismo que `AltaDesdeLaLista`, copiado tal cual: arranca SIN elegir y,
+  // hasta que la persona conteste, el costo queda vacío.
+  const [precioEs, setPrecioEs] = useState(null);
+  // Memorizada y SIN la respuesta: el formulario se reinicia cada vez que
+  // cambia su `initialData`, y contestar no puede borrar lo que ya se cargó. El
+  // costo de la respuesta entra aparte, por `costoSugerido`.
   const precarga = useMemo(() => precargaDelAlta({ fila, proveedorId }), [fila, proveedorId]);
+  // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
+  const pregunta = useMemo(() => preguntaDelAltaDesdeElPapel(fila), [fila]);
+  const costoSugerido = pregunta ? costoDelAltaDesdeElPapel({ fila, precioEs }) : null;
 
   useEffect(() => {
     let vivo = true;
@@ -64,7 +83,7 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
         alert(data?.error || "No se pudo crear el producto.");
         return;
       }
-      await onCreado?.(data.item);
+      await onCreado?.(data.item, { precioEs });
     } catch (e) {
       alert("No se pudo crear el producto: se cortó la conexión.");
     }
@@ -81,6 +100,40 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
         catalogos={catalogos}
         initialData={precarga}
         codigoProveedorAlCrear={codigoDelProveedorParaElAlta(fila)}
+        antesDelCosto={
+          // ── DISEÑO DE EMANUEL (2026-11-06), EL MISMO DE LISTAS ────────────
+          // El título a todo el ancho, lo que dice la factura en gris, y las dos
+          // opciones una abajo de la otra, cada una con su cuenta. La pieza es
+          // `SunmiOpcionElegible` del kit; no envía el formulario.
+          pregunta ? (
+            <div role="radiogroup" aria-label={pregunta.titulo} className="flex flex-col gap-renglon">
+              <p className="text-sm3 font-semibold sunmi-text-strong break-words">{pregunta.titulo}</p>
+              <p className="text-xs2 sunmi-text-muted tabular-nums break-words">{pregunta.detalle}</p>
+              {pregunta.opciones.map((o) => (
+                <SunmiOpcionElegible
+                  key={o.valor}
+                  titulo={o.texto}
+                  subtitulo={o.cuenta}
+                  elegida={precioEs === o.valor}
+                  onElegir={() => setPrecioEs(o.valor)}
+                />
+              ))}
+            </div>
+          ) : null
+        }
+        // Los rótulos de los dos campos de costo, SOLO en este circuito: la
+        // pregunta habla de "caja" y "unidad", y los campos también.
+        textosDelCosto={
+          pregunta
+            ? {
+                costo: "Costo * (por caja)",
+                ayudaCosto: precioEs ? null : "Elegí arriba si el precio es por caja o por unidad y se carga solo.",
+                unitario: "Costo por unidad",
+                ayudaUnitario: `Sale solo: costo de la caja ÷ ${pregunta.cantidad}.`,
+              }
+            : null
+        }
+        costoSugerido={costoSugerido}
       />
     </>
   );

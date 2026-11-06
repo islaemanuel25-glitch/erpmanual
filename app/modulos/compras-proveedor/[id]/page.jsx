@@ -897,7 +897,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // de esto la línea queda con su `pedidoDetalleId` y recién ahí se le puede
   // aceptar el precio. Se vuelve a pedir la conciliación porque cambian el
   // vínculo, la comparación y el análisis de precio de esa fila.
-  const vincularLinea = useCallback(async (fila, productoBaseId) => {
+  // `extra.precioEs`: lo que preguntó el alta desde la recepción —por la caja o
+  // por unidad—, que el vínculo recuerda para el producto con el proveedor.
+  const vincularLinea = useCallback(async (fila, productoBaseId, extra) => {
     try {
       const r = await fetch("/api/compras-proveedor/comprobantes/vincular", {
         method: "POST",
@@ -909,6 +911,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           textoCrudo: fila?.textoCrudo ?? null,
           productoBaseId,
           codigoProveedor: fila?.codigoProveedor ?? null,
+          ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}),
         }),
       });
       const d = await r.json().catch(() => null);

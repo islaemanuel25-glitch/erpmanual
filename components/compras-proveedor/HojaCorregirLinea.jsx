@@ -278,9 +278,10 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   const deTodoElErp = fila?.origen === ORIGEN_VINCULO.ERP_COMPLETO;
   const candidatos = deTodoElErp ? [] : fila?.candidatos ?? [];
 
-  const elegir = async (productoBaseId) => {
+  // `extra`: lo que preguntó el alta —`{ precioEs }`—, que el vínculo recuerda.
+  const elegir = async (productoBaseId, extra) => {
     setError("");
-    const r = await onVincular?.(fila, productoBaseId);
+    const r = await onVincular?.(fila, productoBaseId, extra);
     if (r && r.ok === false) setError(r.error || "No se pudo vincular.");
   };
 
@@ -343,11 +344,11 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
           fila={fila}
           proveedorId={proveedorId}
           onCancelar={() => setCreando(false)}
-          onCreado={async (producto) => {
+          onCreado={async (producto, extra) => {
             // El producto ya existe: el alta se cierra pase lo que pase con el
             // vínculo, y si el vínculo falla lo dice esta hoja.
             setCreando(false);
-            await elegir(producto.id);
+            await elegir(producto.id, extra);
           }}
         />
       )}
