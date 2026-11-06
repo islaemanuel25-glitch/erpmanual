@@ -125,7 +125,9 @@ test("2 · CON «DEJO MI PRECIO» YA DECIDIDO, EL FRENO NO ES UN AVISO NI BLOQUE
   assert.match(ruta, /const dejaElMioBajoFreno = decisionPedida === DECISION_DE_PRECIO\.DEJA_EL_MIO && escalaSinDeducir\(comparacion\);/);
   // Desde el 2026-10-29 la guarda deja pasar también un salto de precio que se
   // acepta (`picnicSaltoDePrecio.test.mjs`); "dejo mi precio" sigue pasando.
-  assert.match(ruta, /if \(sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
+  // Desde el 2026-11-06 la guarda pregunta sobre la fila de la hoja cuando la
+  // tiene (Mortadela Paladini), y "dejo mi precio" sigue pasando igual.
+  assert.match(ruta, /if \(motivoQueFrena && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
   // CONTRAPRUEBA: sin la decisión, la tarjeta sí avisa, con el tono.
   const sinDecidir = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: santaJulia30() }));
   assert.match(sinDecidir, /sunmi-state-warning/);

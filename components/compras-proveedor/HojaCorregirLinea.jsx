@@ -131,10 +131,8 @@ import {
 } from "@/lib/stock/motivosDeDiferencia";
 import {
   DECISION_DE_PRECIO,
-  decisionVencida,
   decisionVigente,
   textoDeDecision,
-  textoDeLoQueCambio,
 } from "@/lib/compras-proveedor/decisionDePrecio";
 
 /** Los MISMOS motivos que la recepción de una transferencia, con sus valores
@@ -435,11 +433,9 @@ export default function HojaCorregirLinea({
   const cambio = hayDiferenciaDePrecio(fila);
   const tuPrecio = costoPropioParaDecidir(fila);
   const porcentaje = porcentajeDelPrecio(fila);
-  // Lo que ya se contestó sobre estos dos precios, y lo que se había contestado
-  // cuando eran otros. La segunda no decide nada: se muestra, para que volver a
-  // preguntar no se lea como que el sistema se olvidó.
+  // Lo que ya se contestó sobre estos dos precios. Lo contestado cuando eran
+  // otros no se muestra (Emanuel, 2026-11-06): se pregunta de nuevo.
   const yaDecidido = decisionVigente(fila);
-  const decisionVieja = decisionVencida(fila);
   // ── LO QUE NO SE PUEDE COMPARAR NO SE PREGUNTA ─────────────────────────
   //
   // Si falta uno de los dos precios no hay nada que decidir, y la hoja lo dice
@@ -928,7 +924,17 @@ export default function HojaCorregirLinea({
   // En un salto de precio, el título dice la diferencia real con los precios
   // de una unidad —"El precio bajó 53,8 %"—, igual que en un cambio normal
   // (Emanuel, 2026-11-05).
-  const pctDelSalto = esSaltoDePrecio ? ((deUnaUnidad.papel - deUnaUnidad.erp) / deUnaUnidad.erp) * 100 : null;
+  //
+  // ── EL NÚMERO DEL TÍTULO ES EL DE LA TARJETA (Emanuel, 2026-11-06) ──────
+  //
+  // Un solo cálculo para el título, el "Tenías…" y la tarjeta: el `pct` del
+  // renglón ERP de la tarjeta (`variacionDelPrecioPct`). Sin él —la tarjeta no
+  // compara—, lo de antes.
+  const pctDeLaTarjeta = Number.isFinite(erpDeLaTarjeta?.pct) ? erpDeLaTarjeta.pct : null;
+  const pctDelSalto = esSaltoDePrecio
+    ? pctDeLaTarjeta ?? ((deUnaUnidad.papel - deUnaUnidad.erp) / deUnaUnidad.erp) * 100
+    : null;
+  const pctDelCambio = pctDeLaTarjeta ?? porcentaje;
   const tituloDelPrecio = yaDecidioElFreno
     ? "Ya decidiste este precio"
     : pctDelSalto !== null && Number.isFinite(pctDelSalto)
@@ -938,8 +944,8 @@ export default function HojaCorregirLinea({
     : yaDecidido && !cambiandoPrecio
       ? "Ya decidiste este precio"
       : cambio
-        ? `El precio ${porcentaje != null && porcentaje < 0 ? "bajó" : "subió"} ${
-            porcentaje != null ? `${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %` : ""
+        ? `El precio ${pctDelCambio != null && pctDelCambio < 0 ? "bajó" : "subió"} ${
+            pctDelCambio != null ? `${Math.abs(pctDelCambio).toFixed(1).replace(".", ",")} %` : ""
           }`.trim()
         : "El precio es el mismo";
 
@@ -1413,17 +1419,13 @@ export default function HojaCorregirLinea({
               <>
                 {losDosPreciosDeSiempre}
 
-                {/* ── LO QUE SE HABÍA DECIDIDO, CUANDO YA NO APLICA ───────
-                    Preguntar de cero sobre algo que ya se contestó una vez se
-                    lee como que el sistema se olvidó. Se dice qué se había
-                    decidido, sobre qué números, y cuál de los dos se movió. */}
-                {decisionVieja && (
-                  <span className="text-sm3 sunmi-text-muted break-words">
-                    Antes decidiste: {textoDeDecision(decisionVieja.decision).toLowerCase()}, cuando
-                    la factura traía {formatearMoneda(decisionVieja.precioFacturado)} contra tu{" "}
-                    {formatearMoneda(decisionVieja.precioPropio)}. {textoDeLoQueCambio(fila)}
-                  </span>
-                )}
+                {/* ── UNA DECISIÓN VENCIDA NO SE CUENTA (Emanuel, 2026-11-06) ──
+                    Decía "Antes decidiste: dejás tu precio, cuando la factura
+                    traía $39.741,57 contra tu $8.888,89. Cambiaron los dos
+                    precios…": números de otra comparación, uno de ellos en
+                    otra unidad, al lado de los de ahora. Con otros precios se
+                    pregunta de nuevo, sin texto extra; una decisión que sigue
+                    valiendo se dice como "Ya decidiste este precio". */}
 
                 {/* Lo que ya está decidido por regla no se ofrece: el servidor
                     rechaza una baja y un salto brusco, así que el botón sería

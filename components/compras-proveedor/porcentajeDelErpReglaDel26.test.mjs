@@ -1,21 +1,24 @@
-// EL PORCENTAJE DE LA TARJETA DICE CÓMO ESTÁ EL ERP CONTRA EL PAPEL.
+// EL PORCENTAJE DE LA TARJETA DICE CUÁNTO VARIÓ EL PRECIO, CON EL MISMO
+// NÚMERO Y SIGNO QUE EL TÍTULO DE CORREGIR.
 //
 //   node --import ./scripts/alias-loader.mjs --test components/compras-proveedor/porcentajeDelErpReglaDel26.test.mjs
 //
-// ── LA REGLA DE EMANUEL, VIGENTE DESDE EL 2026-10-26 ─────────────────────
+// ── LA REGLA VIGENTE, DESDE EL 2026-11-06 ────────────────────────────────
 //
-// El porcentaje va al lado del renglón ERP y dice cómo está el ERP contra el
-// papel, sobre el ERP —`gananciaDelRenglonPct`, (ERP − papel) ÷ ERP—:
-// POSITIVO y verde cuando el ERP está más caro, NEGATIVO y rojo cuando está
-// más barato.
+// (papel − ERP) ÷ ERP, `variacionDelPrecioPct`: si el precio sube, "+"; si
+// baja, "−". Un solo cálculo para la tarjeta, el "Tenías…" de la hoja y su
+// título. La pidió Emanuel con la Mortadela Paladini: subió 3,3 % y la tarjeta
+// decía "−3,3 %" en rojo debajo de "El precio subió 3,3 %".
 //
-// Ya se dio vuelta TRES veces y las tres se deshizo: 7a50f0e5 (2026-10-26), el
-// Liverpool del 2026-11-04 y el 2026-11-05 con el maní de Prod Nat, por una
-// orden que estaba mal (10c5695d). Emanuel se quejó cuando se lo cambiaron.
-// Este candado lo deja fijo con los tres casos que lo vieron.
+// ── LA HISTORIA, PARA QUE NO SE DÉ VUELTA POR ACCIDENTE ───────────────────
 //
-// La HOJA es otra cosa y no se toca: su título describe el papel contra tu
-// costo —"El precio bajó 53,8 %", "El precio subió 2,3 %"—.
+// Del 2026-10-26 al 2026-11-05 la regla fue la contraria —el ERP contra el
+// papel, (ERP − papel) ÷ ERP, positivo cuando el ERP está más caro— y se dio
+// vuelta tres veces sin querer (7a50f0e5, el Liverpool del 2026-11-04, el maní
+// de Prod Nat con 10c5695d), y las tres se deshizo porque Emanuel la quería
+// así. Esta vez el cambio es una orden explícita de Emanuel. Los tres casos que
+// la vieron quedan acá con el signo nuevo: el número es el mismo, y el signo y
+// el color se dan vuelta.
 //
 // Las filas salen por el camino de la conciliación —`analizarPrecioDeLinea` y
 // `filasDeConciliacion`—, con los renglones de `maniProdNatSinBulto`,
@@ -75,11 +78,11 @@ const hoja = (fila) =>
     .replace(/\s+/g, " ");
 
 for (const [nombre, fila, texto, tono, porque] of [
-  ["EL MANÍ DE PROD NAT", MANI, "+53,8 %", "sunmi-text-success", "el ERP ($5.000) está más caro que el papel ($2.312,50)"],
-  ["EL LIVERPOOL DEL PEDIDO 25", LIVERPOOL, "+12,1 %", "sunmi-text-success", "el ERP ($13.200) está más caro que el papel ($11.600)"],
-  ["EL DURAZNO DEL PEDIDO 491", DURAZNO, "−2,3 %", "sunmi-text-danger", "el ERP ($38.400) está más barato que el papel ($39.271,16)"],
+  ["EL MANÍ DE PROD NAT", MANI, "−53,8 %", "sunmi-text-danger", "el precio bajó: el papel ($2.312,50) cobra menos que el ERP ($5.000)"],
+  ["EL LIVERPOOL DEL PEDIDO 25", LIVERPOOL, "−12,1 %", "sunmi-text-danger", "el precio bajó: el papel ($11.600) cobra menos que el ERP ($13.200)"],
+  ["EL DURAZNO DEL PEDIDO 491", DURAZNO, "+2,3 %", "sunmi-text-success", "el precio subió: el papel ($39.271,16) cobra más que el ERP ($38.400)"],
 ]) {
-  test(`${nombre}: la tarjeta dice ${texto}, ${tono === "sunmi-text-success" ? "en verde" : "en rojo"}`, () => {
+  test(`${nombre}: la tarjeta dice ${texto}, ${tono === "sunmi-text-success" ? "con el color de suba" : "con el color de baja"}`, () => {
     const r = renglonesDeLaTarjeta(fila);
     assert.equal(r.erp.texto, texto, porque);
     const html = tarjeta(fila);
@@ -87,7 +90,9 @@ for (const [nombre, fila, texto, tono, porque] of [
   });
 }
 
-test("LA HOJA SIGUE DICIENDO EL PAPEL CONTRA TU COSTO, que es la otra pregunta", () => {
+test("LA HOJA DICE LO MISMO QUE LA TARJETA: el título y el «Tenías…», con el mismo número y signo", () => {
   assert.match(hoja(MANI), / El precio bajó 53,8 % /);
+  assert.match(hoja(MANI), /−53,8 %/);
   assert.match(hoja(DURAZNO), / El precio subió 2,3 % /);
+  assert.match(hoja(DURAZNO), /\+2,3 %/);
 });

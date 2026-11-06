@@ -41,6 +41,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import {
+  DETALLE_SELECT,
   cargarConciliacion,
   lineasSospechadasDeCorrimiento,
 } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
@@ -208,16 +209,13 @@ export async function POST(req) {
     const detallesDelPedido = aplanarDetalles(
       await prisma.pedidoProveedorDetalle.findMany({
         where: { pedidoId: linea.comprobante.pedidoId },
-        select: {
-          id: true,
-          cantidad: true,
-          precioCosto: true,
-          // El NOMBRE del producto del pedido no es decoración acá: la cascada
-          // lo usa para machear el texto del papel contra lo que se encargó, y
-          // sin él una línea que la pantalla resuelve sola quedaría sin resolver
-          // de este lado. Es el mismo select que hace la ruta de la pantalla.
-          producto: { select: { baseId: true, base: { select: { id: true, nombre: true, factor_pack: true } } } },
-        },
+        // EL MISMO SELECT DE LA PANTALLA, importado y no copiado (2026-11-06).
+        // Decía serlo y no lo era: le faltaban `unidad_medida` y
+        // `pesoReferenciaKg`, y sin ellos `aplanarDetalles` no pasa a la pieza el
+        // costo por kilo de un fiambre. La Mortadela Paladini comparaba $41.330,09
+        // la pieza contra $8.888,89 el kilo y frenaba con "No se puede saber en
+        // qué viene". Lo de antes —el nombre para la cascada— sigue adentro.
+        select: DETALLE_SELECT,
       })
     );
     const contexto = await cargarContexto(prisma, {
@@ -355,8 +353,17 @@ export async function POST(req) {
     // Y si es un producto sin bulto, la baja grande también se acepta: la hoja
     // la ofrece con su número (Emanuel, 2026-11-05, maní de Prod Nat).
     const frenoLevantado = filaComoLaVeLaHoja != null && saltoSinBultoConOpciones(filaComoLaVeLaHoja);
-    if (sinComparacion && !dejaElMioBajoFreno && !aceptaUnSalto) {
-      return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
+    // ── CON LA FILA DE LA HOJA, SE PREGUNTA SOBRE ELLA (2026-11-06) ───────
+    //
+    // `comparacion` no trae cantidad ni importe, y sin ellos `loQueNoCuadra`
+    // contesta "escala" a cualquier freno: la Mortadela Paladini quedaba sin
+    // poder guardarse con "No se puede saber en qué viene" mientras la hoja le
+    // ofrecía Aceptar / Dejar. Si está la fila como la ve la hoja, la respuesta
+    // es la de la hoja —la misma función sobre los mismos datos—; si no (dejar
+    // el propio no carga la conciliación), la de siempre.
+    const motivoQueFrena = filaComoLaVeLaHoja != null ? motivoSinComparacion(filaComoLaVeLaHoja) : sinComparacion;
+    if (motivoQueFrena && !dejaElMioBajoFreno && !aceptaUnSalto) {
+      return NextResponse.json({ ok: false, error: motivoQueFrena, queHacer: motivoQueFrena }, { status: 409 });
     }
 
     // ── EL CATÁLOGO QUE SE MIRÓ AL DECIDIR ──────────────────────────────

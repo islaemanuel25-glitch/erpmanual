@@ -78,8 +78,9 @@ export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 
 /**
- * CÓMO ESTÁ EL ERP CONTRA EL PAPEL, AL LADO DEL RENGLÓN ERP: "+0,5 %" en verde
- * cuando el ERP está más caro, "−52,6 %" en rojo cuando está más barato.
+ * CUÁNTO VARIÓ EL PRECIO, AL LADO DEL RENGLÓN ERP: "+3,3 %" con el color de
+ * suba cuando el papel cobra más, "−2,9 %" con el de baja cuando cobra menos
+ * (`variacionDelPrecioPct`, Emanuel, 2026-11-06: el mismo número del título).
  *
  * Es el renglón ERP de esta tarjeta, sacado tal cual para que la hoja de
  * Corregir lo muestre con la misma pieza (Emanuel, 2026-10-29). Recibe el `erp`
