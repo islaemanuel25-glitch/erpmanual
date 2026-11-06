@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-05 14:00
+**Última actualización:** 2026-11-06 01:53
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-06: feat: el alta desde la lista trae el costo y pregunta si el precio es por la caja o por unidad — SIN VERIFICAR en pantalla
 - 2026-11-05: refactor: combos, stock valorizado y cantidad en pedido cuentan con la pieza única (regla de unidades, tanda 15)
 - 2026-11-04: feat: la ficha activa el tercer nivel de empaque ("+ Se vende más chico")
 - 2026-11-04: feat: el stock con sueltos se escribe en sus tres niveles, nunca en sueltos pelados
