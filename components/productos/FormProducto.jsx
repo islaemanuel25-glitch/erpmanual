@@ -121,6 +121,14 @@ export default function FormProducto({
   // El código del proveedor del renglón, en el alta que se abre desde la
   // recepción: se muestra fijo. Null en el alta de Productos, que no cambia.
   codigoProveedorAlCrear = null,
+  // Solo en el alta que se abre desde un renglón de una lista de precios
+  // (`AltaDesdeLaLista`): lo que se dibuja arriba del costo —la pregunta "El
+  // precio de la lista es… por la caja / por unidad"— y el costo que sale de la
+  // respuesta. Se pone en el campo como si se tipeara, sin reiniciar el
+  // formulario: lo demás que ya se cargó no se pierde. Null en el alta de
+  // Productos, que no cambia.
+  antesDelCosto = null,
+  costoSugerido = null,
 }) {
   // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
   const soloLocal = !puedeEditarBase;
@@ -312,6 +320,14 @@ export default function FormProducto({
       return { ...p, precio_costo: pc, precio_venta: round2(r.precioFinal) };
     });
   };
+
+  // El costo que trae la respuesta de la pregunta, cada vez que cambia. Queda
+  // editable: es lo mismo que tipearlo.
+  useEffect(() => {
+    if (costoSugerido === null || costoSugerido === undefined) return;
+    onChangeCosto(costoSugerido);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costoSugerido]);
 
   const onChangeMargen = (val) => {
     if (val === "") return setForm((p) => ({ ...p, margen: "" }));
@@ -1317,6 +1333,8 @@ export default function FormProducto({
         {/* PRECIOS — orden lógico: costo → margen → venta */}
         <Section title="Precios">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Arriba del costo, lo que mande el alta desde una lista. */}
+            {antesDelCosto && <div className="md:col-span-2">{antesDelCosto}</div>}
             {/* Fila 1: Costo (+ costo unitario ref. en pack/cajón) */}
             <Field label={`Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
               {puedeEditarCosto ? (

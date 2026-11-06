@@ -17,6 +17,10 @@ export default function ModalProducto({
   // Solo el alta que se abre desde la recepción: el código del proveedor del
   // renglón, que el formulario muestra fijo. Ver `FormProducto`.
   codigoProveedorAlCrear = null,
+  // Solo el alta desde una lista de precios: la pregunta de arriba del costo y
+  // el costo que sale de la respuesta. Ver `FormProducto`.
+  antesDelCosto = null,
+  costoSugerido = null,
 }) {
   return (
     <SunmiModalLayout
@@ -68,6 +72,8 @@ export default function ModalProducto({
           puedeEditarCosto={puedeEditarCosto}
           puedeEditarBase={puedeEditarBase}
           codigoProveedorAlCrear={codigoProveedorAlCrear}
+          antesDelCosto={antesDelCosto}
+          costoSugerido={costoSugerido}
         />
       )}
     </SunmiModalLayout>

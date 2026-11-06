@@ -39,6 +39,8 @@ export default function HojaQueProductoEsDeLaLista({
   proveedorNombre = null,
   /** Con el permiso de crear productos, "todo el catálogo" ofrece «Crear producto». */
   puedeCrearProducto = false,
+  /** `{ recargoPct, impuestoAdicionalPct }` de la importación, para el costo del alta. */
+  cuentaDeLaLista = null,
 }) {
   const [buscando, setBuscando] = useState(true);
   const [creando, setCreando] = useState(false);
@@ -46,9 +48,10 @@ export default function HojaQueProductoEsDeLaLista({
 
   if (!fila) return null;
 
-  const elegir = async (productoBaseId) => {
+  // `extra`: lo que el alta eligió (`{ precioEs }`), que el vínculo recuerda.
+  const elegir = async (productoBaseId, extra = null) => {
     setError("");
-    const r = await onVincular?.(fila, productoBaseId);
+    const r = await onVincular?.(fila, productoBaseId, extra);
     if (r && r.ok === false) setError(r.error || "No se pudo vincular.");
   };
 
@@ -97,12 +100,13 @@ export default function HojaQueProductoEsDeLaLista({
           <AltaDesdeLaLista
             fila={fila}
             proveedorId={proveedorId}
+            cuentaDeLaLista={cuentaDeLaLista}
             onCancelar={() => setCreando(false)}
-            onCreado={async (producto) => {
+            onCreado={async (producto, eleccion) => {
               // El producto ya existe: el alta se cierra pase lo que pase con
               // el vínculo, y si el vínculo falla lo dice esta hoja.
               setCreando(false);
-              await elegir(producto.id);
+              await elegir(producto.id, eleccion);
             }}
           />
         )}

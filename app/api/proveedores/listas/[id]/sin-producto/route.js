@@ -37,7 +37,14 @@ export async function GET(req, context) {
 
     const cab = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(localId, acceso.session.esAdmin) },
-      select: { id: true, estado: true, archivoNombre: true, proveedor: { select: { id: true, nombre: true } } },
+      select: {
+        id: true,
+        estado: true,
+        archivoNombre: true,
+        recargoPct: true,
+        impuestoAdicionalPct: true,
+        proveedor: { select: { id: true, nombre: true } },
+      },
     });
     if (!cab) return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
 
@@ -55,6 +62,12 @@ export async function GET(req, context) {
         abierta: esImportacionAbierta(cab.estado),
         archivoNombre: cab.archivoNombre,
         proveedor: cab.proveedor,
+        // La cuenta de aplicar sobre el precio del renglón, para el costo del
+        // alta (`costoDelAltaDesdeLaLista`). Los Decimal van como número.
+        cuentaDeLaLista: {
+          recargoPct: cab.recargoPct === null ? 0 : Number(cab.recargoPct),
+          impuestoAdicionalPct: cab.impuestoAdicionalPct === null ? null : Number(cab.impuestoAdicionalPct),
+        },
       },
       total: filas.length,
       items: filas.map(filaSinProductoParaLaPantalla),

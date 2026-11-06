@@ -18,20 +18,53 @@
 import { useEffect, useMemo, useState } from "react";
 
 import ModalProducto from "@/components/productos/ModalProductoFinal";
+import SunmiSelectorUnidad from "@/components/sunmi/SunmiSelectorUnidad";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import {
   codigoDelProveedorParaElAltaDesdeLaLista,
   precargaDelAltaDesdeLaLista,
 } from "@/lib/proveedores/listas/altaDesdeLaLista";
+import {
+  costoDelAltaDesdeLaLista,
+  preguntaDelPrecioDeLaLista,
+} from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 
-export default function AltaDesdeLaLista({ fila, proveedorId, onCreado, onCancelar }) {
+/**
+ * @param cuentaDeLaLista  `{ recargoPct, impuestoAdicionalPct }` de la
+ *                         importación: la misma cuenta que aplicar le hace al
+ *                         precio del renglón.
+ * @param onCreado         `(producto, { precioEs })`: lo que eligió la persona
+ *                         viaja al vínculo, que lo recuerda para el proveedor.
+ */
+export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = null, onCreado, onCancelar }) {
   const { contexto } = useContextoActivo();
   const localId = contexto?.localId || 0;
   const [catalogos, setCatalogos] = useState({ CATEGORIAS: [], PROVEEDORES: [], AREAS: [] });
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  // Memorizada: el formulario se reinicia cada vez que cambia su `initialData`.
-  const precarga = useMemo(() => precargaDelAltaDesdeLaLista({ fila, proveedorId }), [fila, proveedorId]);
+  // ── POR LA CAJA O POR UNIDAD (Emanuel, 2026-11-06) ─────────────────────
+  // Arranca SIN elegir: hasta que la persona conteste, el costo queda vacío.
+  const [precioEs, setPrecioEs] = useState(null);
+  const recargoPct = cuentaDeLaLista?.recargoPct ?? 0;
+  const impuestoAdicionalPct = cuentaDeLaLista?.impuestoAdicionalPct ?? null;
+  // Memorizada y SIN la respuesta: el formulario se reinicia cada vez que
+  // cambia su `initialData`, y contestar no puede borrar lo que ya se cargó. El
+  // costo de la respuesta entra aparte, por `costoSugerido`.
+  // Sin pregunta (sin cantidad, o 1), el costo ya se sabe y va en la precarga;
+  // con pregunta, `costoDelAltaDesdeLaLista` sin respuesta da null y queda vacío.
+  const precarga = useMemo(
+    () =>
+      precargaDelAltaDesdeLaLista({
+        fila,
+        proveedorId,
+        costo: costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct }),
+      }),
+    [fila, proveedorId, recargoPct, impuestoAdicionalPct]
+  );
+  const pregunta = useMemo(() => preguntaDelPrecioDeLaLista(fila), [fila]);
+  const costoSugerido = pregunta
+    ? costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, precioEs })
+    : null;
 
   useEffect(() => {
     let vivo = true;
@@ -69,7 +102,7 @@ export default function AltaDesdeLaLista({ fila, proveedorId, onCreado, onCancel
         alert(data?.error || "No se pudo crear el producto.");
         return;
       }
-      await onCreado?.(data.item);
+      await onCreado?.(data.item, { precioEs });
     } catch (e) {
       alert("No se pudo crear el producto: se cortó la conexión.");
     }
@@ -86,6 +119,18 @@ export default function AltaDesdeLaLista({ fila, proveedorId, onCreado, onCancel
         catalogos={catalogos}
         initialData={precarga}
         codigoProveedorAlCrear={codigoDelProveedorParaElAltaDesdeLaLista(fila)}
+        antesDelCosto={
+          pregunta ? (
+            <SunmiSelectorUnidad
+              rotulo={pregunta.texto}
+              opciones={pregunta.opciones.map((o) => ({ clave: o.valor, texto: o.texto }))}
+              valor={precioEs}
+              onCambiar={setPrecioEs}
+              nota={precioEs ? null : "Elegí una para que se cargue el costo."}
+            />
+          ) : null
+        }
+        costoSugerido={costoSugerido}
       />
     </>
   );

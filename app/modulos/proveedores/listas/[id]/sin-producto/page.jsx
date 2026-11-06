@@ -119,15 +119,19 @@ export default function SinProductoDeLaListaPage() {
   const porId = useMemo(() => new Map(items.map((f) => [f.id, f])), [items]);
   const visibles = useMemo(() => items.filter((f) => filaCoincideConLaBusqueda(f, buscar)), [items, buscar]);
 
-  /** Vincula y relee sin el cargador. Devuelve `{ ok, error? }` a la hoja. */
-  const vincular = async (fila, productoBaseId) => {
+  /**
+   * Vincula y relee sin el cargador. Devuelve `{ ok, error? }` a la hoja.
+   * `extra.precioEs` es lo que el alta preguntó —por la caja o por unidad— y el
+   * servidor lo recuerda para el producto con este proveedor.
+   */
+  const vincular = async (fila, productoBaseId, extra = null) => {
     setGuardando(true);
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/vincular`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productoBaseId }),
+        body: JSON.stringify({ productoBaseId, ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}) }),
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) return { ok: false, error: j?.error || "El servidor no pudo vincularlo y no dijo por qué." };
@@ -258,6 +262,7 @@ export default function SinProductoDeLaListaPage() {
               proveedorId={proveedor?.id ?? null}
               proveedorNombre={proveedor?.nombre ?? null}
               puedeCrearProducto={puedeCrearProducto}
+              cuentaDeLaLista={cabecera.cuentaDeLaLista ?? null}
             />
           ) : null
         }

@@ -43,6 +43,7 @@ import {
   reconciliarLaFila,
 } from "@/lib/proveedores/listas/vincularFilaSinProducto";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
+import { lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 
 export async function POST(req, context) {
   try {
@@ -131,7 +132,21 @@ export async function POST(req, context) {
       operandoEnLocalId: ubicacionQueJuzgaElCosto({ producto, operandoEnLocalId: localId, depositoLocalId }),
       depositoLocalId,
     });
-    const recalculada = reconciliarLaFila({ fila, producto, codigo: decision.codigo, config, contexto, ahora });
+    // ── LO QUE EL ALTA PREGUNTÓ: POR LA CAJA O POR UNIDAD (2026-11-06) ────
+    //
+    // Se recuerda para el producto con este proveedor, como una lectura
+    // confirmada, y el motor la usa ya para este renglón: así la cuenta contra
+    // la lista sale con la misma lectura con la que se cargó el costo, y la
+    // próxima lista no lo vuelve a preguntar.
+    const lectura = lecturaRecordadaDelAlta({ fila, precioEs: body?.precioEs ?? null });
+    const recalculada = reconciliarLaFila({
+      fila,
+      producto,
+      codigo: decision.codigo,
+      config,
+      contexto: lectura ? { ...contexto, lecturasRecordadas: new Map([[productoBaseId, { productoBaseId, ...lectura }]]) } : contexto,
+      ahora,
+    });
     const identidad = identidadDelVinculo({
       grupoId,
       proveedorId: cab.proveedorId,
@@ -143,6 +158,23 @@ export async function POST(req, context) {
 
     await prisma.$transaction(async (tx) => {
       await persistirIdentidad(tx, identidad);
+
+      if (lectura) {
+        await tx.lecturaProductoProveedor.upsert({
+          where: {
+            lectura_unica_por_producto_y_proveedor: { grupoId, proveedorId: cab.proveedorId, productoBaseId },
+          },
+          create: {
+            grupoId,
+            proveedorId: cab.proveedorId,
+            productoBaseId,
+            ...lectura,
+            confirmadaPorUsuarioId: usuarioId,
+            confirmadaEn: ahora,
+          },
+          update: { ...lectura, confirmadaPorUsuarioId: usuarioId, confirmadaEn: ahora },
+        });
+      }
 
       if (lugar.lugar) {
         // Solo si el lugar sigue vacío: si otro lo llenó en el medio, no se pisa.
