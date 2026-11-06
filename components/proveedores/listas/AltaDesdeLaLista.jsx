@@ -18,8 +18,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import ModalProducto from "@/components/productos/ModalProductoFinal";
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import {
   codigoDelProveedorParaElAltaDesdeLaLista,
@@ -62,7 +61,11 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
       }),
     [fila, proveedorId, recargoPct, impuestoAdicionalPct]
   );
-  const pregunta = useMemo(() => preguntaDelPrecioDeLaLista(fila), [fila]);
+  // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
+  const pregunta = useMemo(
+    () => preguntaDelPrecioDeLaLista(fila, { recargoPct, impuestoAdicionalPct }),
+    [fila, recargoPct, impuestoAdicionalPct]
+  );
   const costoSugerido = pregunta
     ? costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, precioEs })
     : null;
@@ -121,35 +124,37 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
         initialData={precarga}
         codigoProveedorAlCrear={codigoDelProveedorParaElAltaDesdeLaLista(fila)}
         antesDelCosto={
-          // ── LA FORMA DE "¿EL PRECIO YA TIENE EL DESCUENTO APLICADO?" ──────
-          // Copiada tal cual de `ConfirmarColumnas` (2026-11-06): el texto a
-          // todo el ancho en su renglón, y abajo los dos botones en dos columnas
-          // iguales. Con `SunmiSelectorUnidad` iban en un mismo renglón y en el
-          // celular "Por la caja de 10" se partía en cinco líneas.
-          // `type="button"`: adentro del formulario del alta, un botón sin tipo
-          // lo enviaría.
+          // ── DISEÑO DE EMANUEL (2026-11-06) ────────────────────────────────
+          // El título a todo el ancho, lo que dice la lista en gris, y las dos
+          // opciones una abajo de la otra, cada una con su cuenta. La pieza es
+          // `SunmiOpcionElegible` del kit; no envía el formulario.
           pregunta ? (
-            <SunmiCard className="p-4 space-y-2">
-              <p className="text-sm3 font-semibold sunmi-text-strong">{pregunta.texto}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {pregunta.opciones.map((o) => (
-                  <SunmiButton
-                    key={o.valor}
-                    type="button"
-                    color={precioEs === o.valor ? "cyan" : "slate"}
-                    onClick={() => setPrecioEs(o.valor)}
-                    aria-pressed={precioEs === o.valor}
-                    className="min-h-toque text-base font-semibold"
-                  >
-                    {o.texto}
-                  </SunmiButton>
-                ))}
-              </div>
-              {!precioEs && (
-                <p className="text-sm2 sunmi-text-muted leading-snug">Elegí una para que se cargue el costo.</p>
-              )}
-            </SunmiCard>
+            <div role="radiogroup" aria-label={pregunta.titulo} className="flex flex-col gap-renglon">
+              <p className="text-sm3 font-semibold sunmi-text-strong break-words">{pregunta.titulo}</p>
+              <p className="text-xs2 sunmi-text-muted tabular-nums break-words">{pregunta.detalle}</p>
+              {pregunta.opciones.map((o) => (
+                <SunmiOpcionElegible
+                  key={o.valor}
+                  titulo={o.texto}
+                  subtitulo={o.cuenta}
+                  elegida={precioEs === o.valor}
+                  onElegir={() => setPrecioEs(o.valor)}
+                />
+              ))}
+            </div>
           ) : null
+        }
+        // Los rótulos de los dos campos de costo, SOLO en este circuito: la
+        // pregunta habla de "caja" y "unidad", y los campos también.
+        textosDelCosto={
+          pregunta
+            ? {
+                costo: "Costo * (por caja)",
+                ayudaCosto: precioEs ? null : "Elegí arriba si el precio es por caja o por unidad y se carga solo.",
+                unitario: "Costo por unidad",
+                ayudaUnitario: `Sale solo: costo de la caja ÷ ${pregunta.cantidad}.`,
+              }
+            : null
         }
         costoSugerido={costoSugerido}
       />

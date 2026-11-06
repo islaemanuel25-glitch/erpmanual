@@ -129,6 +129,10 @@ export default function FormProducto({
   // Productos, que no cambia.
   antesDelCosto = null,
   costoSugerido = null,
+  // Los rótulos y ayudas de los dos campos de costo, en el alta desde una lista:
+  // `{ costo, ayudaCosto, unitario, ayudaUnitario }` ("Costo * (por caja)",
+  // "Costo por unidad"). Null: los de siempre.
+  textosDelCosto = null,
 }) {
   // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
   const soloLocal = !puedeEditarBase;
@@ -1336,7 +1340,7 @@ export default function FormProducto({
             {/* Arriba del costo, lo que mande el alta desde una lista. */}
             {antesDelCosto && <div className="md:col-span-2">{antesDelCosto}</div>}
             {/* Fila 1: Costo (+ costo unitario ref. en pack/cajón) */}
-            <Field label={`Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
+            <Field label={textosDelCosto?.costo ?? `Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
               {puedeEditarCosto ? (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
@@ -1346,6 +1350,9 @@ export default function FormProducto({
                       onWheel={(e) => e.target.blur()}
                       onChange={(e) => onChangeCosto(e.target.value)}
                     />
+                    {textosDelCosto?.ayudaCosto && (
+                      <p className="text-xs sunmi-text-muted mt-1">{textosDelCosto.ayudaCosto}</p>
+                    )}
                   </div>
                   {enableVoiceInputs && (
                     <VoiceFieldButton
@@ -1377,7 +1384,7 @@ export default function FormProducto({
                 Ahora se muestra siempre que haya pack, y cuando el costo no es editable
                 se presenta en solo lectura igual que el campo de costo de arriba. */}
             {showPreciosRef && (
-              <Field label="Costo unitario ref." fieldKey="precio_costo_unitario_ref">
+              <Field label={textosDelCosto?.unitario ?? "Costo unitario ref."} fieldKey="precio_costo_unitario_ref">
                 {puedeEditarCosto ? (
                   <SunmiInput
                     type="number"
@@ -1394,7 +1401,7 @@ export default function FormProducto({
                   />
                 )}
                 <p className="text-xs text-slate-500 mt-1">
-                  Referencia: costo del bulto ÷ {factorPackPrecios} uds.
+                  {textosDelCosto?.ayudaUnitario ?? <>Referencia: costo del bulto ÷ {factorPackPrecios} uds.</>}
                 </p>
               </Field>
             )}

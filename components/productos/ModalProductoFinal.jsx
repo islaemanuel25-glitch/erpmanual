@@ -21,6 +21,7 @@ export default function ModalProducto({
   // el costo que sale de la respuesta. Ver `FormProducto`.
   antesDelCosto = null,
   costoSugerido = null,
+  textosDelCosto = null,
 }) {
   return (
     <SunmiModalLayout
@@ -74,6 +75,7 @@ export default function ModalProducto({
           codigoProveedorAlCrear={codigoProveedorAlCrear}
           antesDelCosto={antesDelCosto}
           costoSugerido={costoSugerido}
+          textosDelCosto={textosDelCosto}
         />
       )}
     </SunmiModalLayout>
