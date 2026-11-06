@@ -69,7 +69,7 @@ const SANTA_JULIA = fila({
 // la botella— y no lleva; Santa Julia es un salto de PRECIO, cuya cantidad
 // cierra con el importe, y desde el 2026-10-29 sí lo lleva (Emanuel, PICNIC):
 // el papel $3.890 contra el ERP $6.690. Desde el 2026-11-06 dice cuánto varió
-// el precio, (papel − ERP) ÷ ERP: bajó, "−41,9 %" con el color de baja.
+// el precio, (papel − ERP) ÷ ERP: bajó, "−41,9 %". Pagás menos: color de éxito del tema (Emanuel, 2026-11-06).
 for (const [nombre, f, porUnidad, papel, porcentaje] of [
   ["CHANDON DELICE XCAJA", CHANDON, 15000, 7700, null],
   ["SANTA JULIA MALBEC", SANTA_JULIA, 6690, 3890, "−41,9 %"],
@@ -86,7 +86,7 @@ for (const [nombre, f, porUnidad, papel, porcentaje] of [
       // Con la escala sin resolver no hay porcentaje.
       assert.doesNotMatch(texto, /%/);
     } else {
-      assert.match(html, new RegExp(`sunmi-text-danger">${escapar(porcentaje)}<`));
+      assert.match(html, new RegExp(`sunmi-text-success">${escapar(porcentaje)}<`));
     }
     // Y no vuelve a frenar.
     assert.doesNotMatch(texto, /revisá la cantidad|Fijate si es este producto/);

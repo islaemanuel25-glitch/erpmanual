@@ -40,9 +40,24 @@ export function pct(v) {
 }
 
 /**
- * EL COLOR DE UN PORCENTAJE DICE SOLO PARA DÓNDE VA (Emanuel, 2026-10-24).
+ * EL COLOR DE UN PORCENTAJE DICE SI ES BUENO O MALO PARA EMANUEL (2026-11-06).
  *
- * Verde sube, rojo baja, gris es el mismo precio. Antes un porcentaje fuera del
+ * El porcentaje es cuánto varió un COSTO: si sube, pagás más, y es el color de
+ * peligro del tema; si baja, pagás menos, y es el de éxito; gris es el mismo
+ * precio. Es el ÚNICO lugar que decide ese color: la tarjeta de recepción, el
+ * "Tenías…" de Corregir y las pantallas de listas lo piden acá.
+ *
+ * ── LA HISTORIA ───────────────────────────────────────────────────────────
+ *
+ * El 2026-10-24 era "verde sube, rojo baja". Del 2026-10-26 al 2026-11-05 la
+ * tarjeta de recepción mostraba el ERP contra el papel, así que una factura más
+ * barata —Philips, $33.600 contra $34.603,20— salía positiva y VERDE, que es lo
+ * que Emanuel quería ver. Desde bf6f9dfd el signo es el de la variación del
+ * precio (papel − ERP) ÷ ERP, "−2,9 %", y el color se dio vuelta con él a rojo.
+ * Emanuel mantuvo su regla del color: bueno para él, verde. Por eso el color
+ * ahora se lee al revés del signo.
+ *
+ * Antes un porcentaje fuera del
  * rango salía en ámbar aunque subiera —ALICANTE PEREJIL, +14,3 %— y el ámbar
  * rojizo se leía como una baja. Que esté fuera del rango se dice APARTE, con
  * `EtiquetaFueraDeRango`: son dos datos y no pueden pelear por el mismo color.
@@ -54,7 +69,7 @@ export function tonoDelPorcentaje(variacionPct) {
   if (variacionPct === null || variacionPct === undefined) return "sunmi-text-muted";
   const v = Number(variacionPct);
   if (!Number.isFinite(v) || esMismoPrecio(v)) return "sunmi-text-muted";
-  return v > 0 ? "sunmi-text-success" : "sunmi-text-danger";
+  return v > 0 ? "sunmi-text-danger" : "sunmi-text-success";
 }
 
 export const TEXTO_FUERA_DE_RANGO = "Fuera de rango";

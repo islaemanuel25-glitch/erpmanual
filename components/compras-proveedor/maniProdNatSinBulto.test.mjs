@@ -115,8 +115,8 @@ test("LA HOJA: «El precio bajó 53,8 %» con las dos opciones de siempre, y vie
 test("LA TARJETA: sin el cartel de escala, con la diferencia en el renglón del ERP", () => {
   const html = tarjeta(mani());
   assert.doesNotMatch(aLaVistaHtml(html), new RegExp(literal(AVISO_ESCALA)));
-  // Cuánto varió el precio (2026-11-06): bajó 53,8 %, con el color de baja.
-  assert.match(html, /sunmi-text-danger">−53,8 %</, "el papel cobra menos que el ERP: es una baja");
+  // Cuánto varió el precio (2026-11-06): bajó 53,8 %. Pagás menos: verde.
+  assert.match(html, /sunmi-text-success">−53,8 %</, "el papel cobra menos que el ERP: es una baja, buena para vos");
   assert.match(html, /sunmi-state-warning/);
 });
 

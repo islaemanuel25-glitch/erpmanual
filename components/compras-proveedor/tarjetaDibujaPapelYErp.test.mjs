@@ -66,12 +66,12 @@ test("CON PEDIDO PREVIO, LA TARJETA DIBUJA FACTURA, PAPEL Y ERP", () => {
   assert.match(texto, /8\.166,54/);
   assert.match(texto, /9\.500,00/);
   assert.match(texto, /\/ u/);
-  // El papel cobra menos que el ERP: el precio bajó, "−14,0 %" con el color de
-  // baja. Cuánto varió el precio, el mismo número del título de Corregir
+  // El papel cobra menos que el ERP: el precio bajó, "−14,0 %", en verde porque
+  // pagás menos. Cuánto varió el precio, el mismo número del título de Corregir
   // (Emanuel, 2026-11-06; la historia en `porcentajeDelErpReglaDel26.test.mjs`).
   assert.match(texto, /−14,0 %/);
   const html = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: FILA }));
-  assert.match(html, /sunmi-text-danger[^"]*">−14,0 %/);
+  assert.match(html, /sunmi-text-success[^"]*">−14,0 %/);
   // Y el pie: la acción a la izquierda, el total a la derecha.
   assert.match(texto, /Corregir/);
   assert.match(texto, /97\.998,47/);

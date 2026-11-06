@@ -101,12 +101,13 @@ test("1 · CONTRAPRUEBA: SIN DIFERENCIA EL RENGLÓN QUEDA APAGADO", async () => 
 });
 
 // Desde el 2026-11-06 el porcentaje es cuánto varió el precio (papel − ERP) ÷
-// ERP: el papel 12,1 % más barato es una baja, "−12,1 %" con el color de baja
-// (`porcentajeDelErpReglaDel26.test.mjs` tiene la historia).
-test("2 · EL PAPEL 12,1 % MÁS BARATO DICE −12,1 % CON EL COLOR DE BAJA, EN LA TARJETA Y EN LA HOJA", async () => {
+// ERP: el papel 12,1 % más barato es una baja, "−12,1 %". Pagás menos: color
+// de éxito del tema (Emanuel, 2026-11-06; la historia en
+// `porcentajeDelErpReglaDel26.test.mjs`).
+test("2 · EL PAPEL 12,1 % MÁS BARATO DICE −12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
   const f = liverpool();
   for (const html of [renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f })), await hojaMontada(f)]) {
-    assert.match(html, /sunmi-text-danger">−12,1 %</);
+    assert.match(html, /sunmi-text-success">−12,1 %</);
     assert.doesNotMatch(html, /\+12,1 %/);
   }
 });

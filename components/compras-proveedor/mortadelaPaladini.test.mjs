@@ -79,8 +79,9 @@ function fila({ neto = 41330.09, base = recortar(MORTADELA, CAMPOS_DE_LA_BASE), 
 }
 
 const tarjeta = (f) => renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f }));
+const hojaHtml = (f) => renderToStaticMarkup(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {}, onGuardar() {} }));
 const hoja = (f) =>
-  renderToStaticMarkup(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {}, onGuardar() {} }))
+  hojaHtml(f)
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ");
 
@@ -154,20 +155,24 @@ test("CONTRAPRUEBA: UNA RELACIÓN DE ≈10 CON BULTO DE 10 SIGUE FRENANDO CON EL
 
 // ── PUNTO 2: EL SIGNO ───────────────────────────────────────────────────
 
-test("SUBIÓ: +3,3 % EN LA TARJETA, EN EL «TENÍAS…» Y EN EL TÍTULO, CON EL COLOR DE SUBA DEL TEMA", () => {
+// El color dice si es bueno para Emanuel (su regla del 26/10, mantenida el
+// 2026-11-06): subió, pagás más, rojo del tema; bajó, verde.
+test("SUBIÓ: +3,3 % EN ROJO EN LA TARJETA Y EN EL «TENÍAS…», Y EL TÍTULO DICE SUBIÓ 3,3 %", () => {
   const f = fila();
   assert.equal(Math.round(variacionDelPrecioPct({ papel: 41330.09, erp: 40000.01 }) * 10) / 10, 3.3);
-  assert.match(tarjeta(f), /sunmi-text-success">\+3,3 %</);
+  assert.match(tarjeta(f), /sunmi-text-danger">\+3,3 %</);
+  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-danger">\+3,3 %</, "el «Tenías…» con el mismo color");
   const h = hoja(f);
   assert.match(h, / El precio subió 3,3 % /);
   assert.match(h, /Tenías [^%]*\+3,3 %/);
   assert.ok(!/−3,3 %/.test(h), "ningún «−3,3 %» en la hoja");
 });
 
-test("BAJÓ: «−» EN LOS TRES LUGARES, CON EL COLOR DE BAJA DEL TEMA", () => {
+test("BAJÓ: «−» EN LOS TRES LUGARES, EN VERDE", () => {
   const f = fila({ neto: 38000 });
   assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−5,0 %");
-  assert.match(tarjeta(f), /sunmi-text-danger">−5,0 %</);
+  assert.match(tarjeta(f), /sunmi-text-success">−5,0 %</);
+  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-success">−5,0 %</);
   const h = hoja(f);
   assert.match(h, / El precio bajó 5,0 % /);
   assert.match(h, /Tenías [^%]*−5,0 %/);

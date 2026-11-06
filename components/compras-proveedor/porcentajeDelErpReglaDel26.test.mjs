@@ -10,15 +10,28 @@
 // título. La pidió Emanuel con la Mortadela Paladini: subió 3,3 % y la tarjeta
 // decía "−3,3 %" en rojo debajo de "El precio subió 3,3 %".
 //
+// ── EL COLOR DICE SI ES BUENO O MALO PARA EMANUEL ─────────────────────────
+//
+// El signo es de la variación; el color, de lo que le conviene. Precio que
+// SUBE (pagás más): "+" con el color de peligro del tema. Precio que BAJA
+// (pagás menos): "−" con el color de éxito. Sin cambio: el tono neutro. Lo
+// decide un solo lugar, `tonoDelPorcentaje`, para la tarjeta, el "Tenías…" de
+// Corregir y las pantallas de listas.
+//
 // ── LA HISTORIA, PARA QUE NO SE DÉ VUELTA POR ACCIDENTE ───────────────────
 //
-// Del 2026-10-26 al 2026-11-05 la regla fue la contraria —el ERP contra el
-// papel, (ERP − papel) ÷ ERP, positivo cuando el ERP está más caro— y se dio
-// vuelta tres veces sin querer (7a50f0e5, el Liverpool del 2026-11-04, el maní
-// de Prod Nat con 10c5695d), y las tres se deshizo porque Emanuel la quería
-// así. Esta vez el cambio es una orden explícita de Emanuel. Los tres casos que
-// la vieron quedan acá con el signo nuevo: el número es el mismo, y el signo y
-// el color se dan vuelta.
+// Del 2026-10-26 al 2026-11-05 el porcentaje era el ERP contra el papel,
+// (ERP − papel) ÷ ERP: una factura más barata —Philips, $33.600 contra
+// $34.603,20— decía "+2,9 %" en verde. Se dio vuelta tres veces sin querer
+// (7a50f0e5, el Liverpool del 2026-11-04, el maní de Prod Nat con 10c5695d), y
+// las tres se deshizo porque Emanuel la quería así.
+//
+// El 2026-11-06, en bf6f9dfd, Emanuel pidió el signo del título de Corregir
+// —(papel − ERP) ÷ ERP—, y el color se dio vuelta con él: la factura más
+// barata pasó a "−2,9 %" en ROJO. Ese mismo día Emanuel mantuvo su regla del
+// 26/10 sobre el color —verde lo que le conviene—, así que el signo quedó el
+// de bf6f9dfd y el color volvió a ser el de antes: "−2,9 %" en verde,
+// "+3,3 %" de la Mortadela en rojo.
 //
 // Las filas salen por el camino de la conciliación —`analizarPrecioDeLinea` y
 // `filasDeConciliacion`—, con los renglones de `maniProdNatSinBulto`,
@@ -78,11 +91,11 @@ const hoja = (fila) =>
     .replace(/\s+/g, " ");
 
 for (const [nombre, fila, texto, tono, porque] of [
-  ["EL MANÍ DE PROD NAT", MANI, "−53,8 %", "sunmi-text-danger", "el precio bajó: el papel ($2.312,50) cobra menos que el ERP ($5.000)"],
-  ["EL LIVERPOOL DEL PEDIDO 25", LIVERPOOL, "−12,1 %", "sunmi-text-danger", "el precio bajó: el papel ($11.600) cobra menos que el ERP ($13.200)"],
-  ["EL DURAZNO DEL PEDIDO 491", DURAZNO, "+2,3 %", "sunmi-text-success", "el precio subió: el papel ($39.271,16) cobra más que el ERP ($38.400)"],
+  ["EL MANÍ DE PROD NAT", MANI, "−53,8 %", "sunmi-text-success", "el precio bajó: el papel ($2.312,50) cobra menos que el ERP ($5.000)"],
+  ["EL LIVERPOOL DEL PEDIDO 25", LIVERPOOL, "−12,1 %", "sunmi-text-success", "el precio bajó: el papel ($11.600) cobra menos que el ERP ($13.200)"],
+  ["EL DURAZNO DEL PEDIDO 491", DURAZNO, "+2,3 %", "sunmi-text-danger", "el precio subió: el papel ($39.271,16) cobra más que el ERP ($38.400)"],
 ]) {
-  test(`${nombre}: la tarjeta dice ${texto}, ${tono === "sunmi-text-success" ? "con el color de suba" : "con el color de baja"}`, () => {
+  test(`${nombre}: la tarjeta dice ${texto}, ${tono === "sunmi-text-success" ? "en verde: pagás menos" : "en rojo: pagás más"}`, () => {
     const r = renglonesDeLaTarjeta(fila);
     assert.equal(r.erp.texto, texto, porque);
     const html = tarjeta(fila);

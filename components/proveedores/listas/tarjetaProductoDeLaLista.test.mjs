@@ -116,8 +116,9 @@ test("PARA REVISAR CON LECTURA: «✓ Usar» arriba y «Corregir» abajo, el ren
   assert.ok(html.includes("1612 · SOLITAS ANIMACION 400G"), "no está el renglón de la lista");
   // La multiplicación hecha, no solo "× 10" (2026-10-24).
   assert.equal(conEspacios(cuentaDe(item)), "$ 146,98 × 10 = $ 1.469,75 · hoy $ 1.300,00");
-  // El porcentaje, verde porque está adentro del rango.
-  assert.match(html, /sunmi-text-success[^>]*>\+13,1 %</);
+  // El porcentaje: una suba de costo, en rojo (Emanuel, 2026-11-06: el color
+  // dice si es bueno para él, `tonoDelPorcentaje`).
+  assert.match(html, /sunmi-text-danger[^>]*>\+13,1 %</);
 });
 
 test("CAMBIA: el mismo «✓ Usar», relleno y apretado", () => {
@@ -128,13 +129,15 @@ test("CAMBIA: el mismo «✓ Usar», relleno y apretado", () => {
   assert.ok(!b[0].atributos.includes(CLASE_ACCION_RAPIDA), "relleno no puede ser el contorno");
 });
 
-test("UNA SUBA FUERA DE RANGO VA EN VERDE, CON «FUERA DE RANGO» APARTE Y EL BORDE ÁMBAR (ALICANTE PEREJIL)", () => {
-  // +14,3 % sobre el 0 a 12 de Dab: antes salía en ámbar y se leía como baja.
+test("UNA SUBA FUERA DE RANGO VA EN ROJO, CON «FUERA DE RANGO» APARTE Y EL BORDE ÁMBAR (ALICANTE PEREJIL)", () => {
+  // +14,3 % sobre el 0 a 12 de Dab: antes salía en ámbar. Del 2026-10-24 al
+  // 2026-11-06 iba en verde ("verde sube"); desde entonces una suba de costo va
+  // en rojo, porque pagás más. Que esté fuera de rango se sigue diciendo aparte.
   const rango = { minPct: 0, maxPct: 12 };
   const f = fila({ diferenciaPct: 14.3, costoMaestroPropuesto: 1485.9, aumentoEsperadoMinPct: 0, aumentoEsperadoMaxPct: 12 });
   const item = tusProductosDeLaLista({ productos: [{ id: 7, nombre: "ALICANTE PEREJIL 25G", precio_costo: 1300, filas: [f] }], rango }).items[0];
   const html = dibujar({ item, abierta: true });
-  assert.match(html, /sunmi-text-success[^>]*>\+14,3 %</, "la suba no está en verde");
+  assert.match(html, /sunmi-text-danger[^>]*>\+14,3 %</, "la suba no está en rojo");
   assert.ok(!/sunmi-text-warning[^>]*>\+14,3 %</.test(html), "el porcentaje volvió a ámbar");
   assert.ok(html.includes(TEXTO_FUERA_DE_RANGO), "falta la etiqueta «Fuera de rango»");
   assert.ok(html.includes(CLASE_TARJETA_FUERA_DE_RANGO), "falta el borde ámbar de la tarjeta");
@@ -144,14 +147,14 @@ test("UNA SUBA FUERA DE RANGO VA EN VERDE, CON «FUERA DE RANGO» APARTE Y EL BO
     rango: { minPct: 0, maxPct: 15 },
   }).items[0];
   const h2 = dibujar({ item: adentro, abierta: true });
-  assert.match(h2, /sunmi-text-success[^>]*>\+14,3 %</);
+  assert.match(h2, /sunmi-text-danger[^>]*>\+14,3 %</);
   assert.ok(!h2.includes(TEXTO_FUERA_DE_RANGO));
   assert.ok(!h2.includes(CLASE_TARJETA_FUERA_DE_RANGO));
 });
 
-test("EL COLOR DEL PORCENTAJE DICE SOLO LA DIRECCIÓN: verde sube, rojo baja, gris igual", () => {
-  assert.equal(tonoDelPorcentaje(14.3), "sunmi-text-success");
-  assert.equal(tonoDelPorcentaje(-0.5), "sunmi-text-danger");
+test("EL COLOR DEL PORCENTAJE DICE SI ES BUENO PARA VOS: rojo sube (pagás más), verde baja, gris igual", () => {
+  assert.equal(tonoDelPorcentaje(14.3), "sunmi-text-danger");
+  assert.equal(tonoDelPorcentaje(-0.5), "sunmi-text-success");
   assert.equal(tonoDelPorcentaje(0.05), "sunmi-text-muted", "dentro de la tolerancia es el mismo precio");
   assert.equal(tonoDelPorcentaje(null), "sunmi-text-muted");
 });
@@ -193,7 +196,7 @@ test("UNA VINCULADA DICE QUE EL VÍNCULO ESTÁ HECHO, Y NUNCA QUEDA SIN ACCIÓN"
   assert.deepEqual(botones(dibujar({ item: aplicada, abierta: true })).map((x) => x.texto), []);
 });
 
-test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en rojo y fuera de rango, y «✓ Usar» además de «Corregir»", () => {
+test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en verde y fuera de rango, y «✓ Usar» además de «Corregir»", () => {
   // Las lecturas salen de `lecturasDeLaFila` con los números del renglón 281 de
   // Dab; no se escriben a mano.
   const f = fila({
@@ -218,8 +221,8 @@ test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en rojo y fuer
   assert.equal(conEspacios(cuentaDe(item)), "$ 955,00 × 20 = $ 19.100,00 · hoy $ 19.200,00");
   const html = dibujar({ item, abierta: true });
   assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
-  // Una baja va en rojo; que esté fuera del 0 a 12 lo dice la etiqueta aparte.
-  assert.match(html, /sunmi-text-danger[^>]*>-0,5 %</);
+  // Una baja va en verde (2026-11-06); que esté fuera del 0 a 12 lo dice la etiqueta aparte.
+  assert.match(html, /sunmi-text-success[^>]*>-0,5 %</);
   assert.ok(html.includes(TEXTO_FUERA_DE_RANGO));
   // El cartel ámbar que explica el motivo se mantiene.
   assert.ok(html.includes("Bajó 0,5 %. Dab suele aumentar entre 0 % y 12 %."));
@@ -355,8 +358,8 @@ test("GRANIX CON LA PIEZA DE 2 KG: LA CUENTA EN KILOS CONTRA $ 6.405 EL KILO, Y 
   const html = dibujar({ item, abierta: true });
   assert.ok(!html.includes(TEXTO_PREGUNTA_KILOS));
   assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
-  // Una baja va en rojo, y fuera del 0 a 12 lo dice la etiqueta aparte.
-  assert.match(html, /sunmi-text-danger[^>]*>-13,7 %</);
+  // Una baja va en verde (2026-11-06), y fuera del 0 a 12 lo dice la etiqueta aparte.
+  assert.match(html, /sunmi-text-success[^>]*>-13,7 %</);
   // La pieza sola, con la cuenta del pedido de Emanuel.
   const soloPieza = { ...item, divisorKg: 2, kilosPorPieza: 2, piezas: null, costoNuevo: 11052.87, precioBase: 22105.73 };
   assert.equal(conEspacios(cuentaDe(soloPieza)), "$ 22.105,73 ÷ 2 kg = $ 11.052,87 el kilo · hoy $ 6.405,00 el kilo");

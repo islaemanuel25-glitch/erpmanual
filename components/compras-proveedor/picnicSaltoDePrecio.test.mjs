@@ -137,9 +137,9 @@ test("lo que no es un precio sigue sin poder aceptarse: un papel corrido, una es
 //
 // 1. Viene marcada la opción del precio MÁS ALTO entre el ERP y el papel, en
 //    todos los casos de la hoja.
-// 2. Al lado del renglón ERP, cómo está el ERP contra el papel: positivo y
-//    verde si el ERP está más caro, negativo y rojo si está más barato. Con la
-//    pieza de las líneas normales, en la tarjeta y en la hoja.
+// 2. Al lado del renglón ERP, un porcentaje con la pieza de las líneas
+//    normales, en la tarjeta y en la hoja. Desde el 2026-11-06 es cuánto varió
+//    el precio —"+" si subió—, verde si pagás menos y rojo si pagás más.
 // 3. Una diferencia mayor a la variación normal del proveedor alerta solo con
 //    el tono de la tarjeta, sin frases.
 
@@ -161,9 +161,12 @@ const tarjetaHtml = (fila) => renderToStaticMarkup(React.createElement(TarjetaLi
 const porcentaje = (html, texto, tono) => new RegExp(`${tono}">${literal(texto)}<`).test(html);
 
 // Desde el 2026-11-06 el porcentaje es cuánto varió el precio, (papel − ERP) ÷
-// ERP, el mismo del título: una suba es "+" con el color de suba y una baja
-// "−" con el de baja (`porcentajeDelErpReglaDel26.test.mjs`).
-test("PICNIC: el papel sube 52,6 %, ninguna opción marcada, +52,6 % con el color de suba y la tarjeta en alerta, sin frases", () => {
+// ERP, el mismo del título: una suba es "+" y una baja "−". El color dice si
+// es bueno para Emanuel: una suba (pagás más) en el color de peligro del tema,
+// una baja (pagás menos) en el de éxito (`porcentajeDelErpReglaDel26.test.mjs`).
+const TONO_SUBA = "sunmi-text-danger";
+const TONO_BAJA = "sunmi-text-success";
+test("PICNIC: el papel sube 52,6 %, ninguna opción marcada, +52,6 % en rojo y la tarjeta en alerta, sin frases", () => {
   // Hasta el 2026-11-05 venía marcado aceptar, por ser el más alto. Desde
   // entonces una suba del papel de más del 35 % no viene marcada: hay que
   // tocar una (`subeMasQueLoPlausible`).
@@ -171,9 +174,9 @@ test("PICNIC: el papel sube 52,6 %, ninguna opción marcada, +52,6 % con el colo
   const hoja = hojaHtml(f);
   assert.equal(marcada(hoja, "Aceptar el precio nuevo"), false, "el papel sube más del 35 %");
   assert.equal(marcada(hoja, "Dejar el que tenía"), false);
-  assert.ok(porcentaje(hoja, "+52,6 %", "sunmi-text-success"), "el precio subió: positivo");
+  assert.ok(porcentaje(hoja, "+52,6 %", TONO_SUBA), "el precio subió: positivo");
   const tarjeta = tarjetaHtml(f);
-  assert.ok(porcentaje(tarjeta, "+52,6 %", "sunmi-text-success"), "la tarjeta dice el mismo porcentaje");
+  assert.ok(porcentaje(tarjeta, "+52,6 %", TONO_SUBA), "la tarjeta dice el mismo porcentaje");
   assert.match(tarjeta, /sunmi-state-warning/, "+53 % es más que la variación normal del 10 %");
   for (const html of [hoja, tarjeta]) {
     assert.doesNotMatch(html, /Fijate si es este producto|El precio no se puede comparar/);
@@ -189,12 +192,12 @@ test("PICNIC con el ERP más caro, en el salto: −39,0 % con el color de baja, 
   const f = picnic({ neto: 150 });
   assert.equal(loQueNoCuadra(f).que, "PRECIO");
   const hoja = hojaHtml(f);
-  assert.ok(porcentaje(hoja, "−39,0 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(hoja, "−39,0 %", TONO_BAJA));
   assert.match(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), / El precio bajó 39,0 % /);
   assert.equal(marcada(hoja, "Aceptar el precio nuevo"), false);
   assert.equal(marcada(hoja, "Dejar el que tenía"), true);
   assert.doesNotMatch(hoja, /El papel cobra|tu costo no se toca/);
-  assert.ok(porcentaje(tarjetaHtml(f), "−39,0 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(tarjetaHtml(f), "−39,0 %", TONO_BAJA));
 });
 
 test("fuera de la variación sin ser un salto, el ERP más caro: «Dejar» marcado, color de baja, alerta sin frase", () => {
@@ -203,11 +206,11 @@ test("fuera de la variación sin ser un salto, el ERP más caro: «Dejar» marca
   assert.equal(loQueNoCuadra(f), null, "no es un salto: la hoja compara normal");
   const hoja = hojaHtml(f);
   assert.equal(marcada(hoja, "Dejar el que tenía"), true, "fuera de la variación también viene marcado el más alto");
-  assert.ok(porcentaje(hoja, "−10,6 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(hoja, "−10,6 %", TONO_BAJA));
   assert.doesNotMatch(hoja, /no es normal para|Revisá la cantidad y el producto/, "sin frase de advertencia");
   const tarjeta = tarjetaHtml(f);
   assert.match(tarjeta, /sunmi-state-warning/);
-  assert.ok(porcentaje(tarjeta, "−10,6 %", "sunmi-text-danger"));
+  assert.ok(porcentaje(tarjeta, "−10,6 %", TONO_BAJA));
 });
 
 test("fuera de la variación, el papel más caro: «Aceptar» marcado, color de suba, alerta sin frase", () => {
@@ -219,7 +222,7 @@ test("fuera de la variación, el papel más caro: «Aceptar» marcado, color de 
   const hoja = hojaHtml(f);
   assert.equal(marcada(hoja, "Aceptar el precio nuevo"), true);
   assert.equal(marcada(hoja, "Dejar el que tenía"), false);
-  assert.ok(porcentaje(hoja, "+11,8 %", "sunmi-text-success"));
+  assert.ok(porcentaje(hoja, "+11,8 %", TONO_SUBA));
   assert.doesNotMatch(hoja, /no es normal para|Revisá la cantidad y el producto/);
   assert.match(tarjetaHtml(f), /sunmi-state-warning/);
 });
@@ -230,7 +233,7 @@ test("dentro de la variación normal no se pinta de alerta, y viene marcado el m
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.PRECIO_DISTINTO, "no es «Coincide»: se decide en la hoja");
   const tarjeta = tarjetaHtml(f);
   assert.doesNotMatch(tarjeta, /sunmi-state-warning/);
-  assert.ok(porcentaje(tarjeta, "+1,6 %", "sunmi-text-success"));
+  assert.ok(porcentaje(tarjeta, "+1,6 %", TONO_SUBA));
   assert.equal(marcada(hojaHtml(f), "Aceptar el precio nuevo"), true, "el papel es el más alto");
 });
 
