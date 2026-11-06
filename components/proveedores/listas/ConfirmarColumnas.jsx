@@ -104,7 +104,11 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
   const comparacion = useMemo(() => comparacionDeColumnas(opciones, titulos), [opciones, titulos]);
 
   const precioElegido = columnaPrecio !== null && columnaPrecio !== undefined;
-  const puedeSeguir = !trabajando && mapeo.codigo !== null && mapeo.descripcion !== null && precioElegido;
+  // Sin código se puede seguir (Mauro, 2026-11-06): una lista sin columna de
+  // código no tiene código del proveedor, y sus renglones se vinculan por la
+  // descripción. Antes había que elegir alguna columna como código, y la que
+  // quedaba —el precio— terminaba guardada como código del proveedor.
+  const puedeSeguir = !trabajando && mapeo.descripcion !== null && precioElegido;
 
   const cambiarColumna = (campo, indice) => {
     setMapeo((ant) => {
@@ -309,6 +313,7 @@ const EN_CRIOLLO = {
   TITULO_O_SUELTA: ["título o renglón suelto", "títulos y renglones sueltos"],
   SIN_CODIGO: ["título de rubro, sin código", "títulos de rubro, sin código"],
   SIN_PRECIO: ["renglón sin precio", "renglones sin precio"],
+  SIN_NOMBRE: ["renglón sin nombre", "renglones sin nombre"],
 };
 
 function motivosEnCriollo(porMotivo) {

@@ -177,8 +177,9 @@ export async function POST(req, context) {
       estado: recalculada.estado,
       sumadoAlProveedor: Boolean(lugar.lugar),
       mensaje:
-        `${producto.nombre} quedó atado al renglón «${fila.descripcionProveedor}» ` +
-        `(código ${fila.codigoCrudo}). Las próximas listas de este proveedor lo van a usar solo.`,
+        `${producto.nombre} quedó atado al renglón «${fila.descripcionProveedor}»` +
+        // Sin código, el vínculo es por el nombre: no se muestra un "código" vacío.
+        `${decision.codigo ? ` (código ${fila.codigoCrudo})` : ""}. Las próximas listas de este proveedor lo van a usar solo.`,
     });
   } catch (e) {
     console.error("[listas/filas/vincular POST]", e);
