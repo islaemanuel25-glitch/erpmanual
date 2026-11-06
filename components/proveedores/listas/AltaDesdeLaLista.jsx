@@ -18,7 +18,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import ModalProducto from "@/components/productos/ModalProductoFinal";
-import SunmiSelectorUnidad from "@/components/sunmi/SunmiSelectorUnidad";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import {
   codigoDelProveedorParaElAltaDesdeLaLista,
@@ -120,14 +121,34 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
         initialData={precarga}
         codigoProveedorAlCrear={codigoDelProveedorParaElAltaDesdeLaLista(fila)}
         antesDelCosto={
+          // ── LA FORMA DE "¿EL PRECIO YA TIENE EL DESCUENTO APLICADO?" ──────
+          // Copiada tal cual de `ConfirmarColumnas` (2026-11-06): el texto a
+          // todo el ancho en su renglón, y abajo los dos botones en dos columnas
+          // iguales. Con `SunmiSelectorUnidad` iban en un mismo renglón y en el
+          // celular "Por la caja de 10" se partía en cinco líneas.
+          // `type="button"`: adentro del formulario del alta, un botón sin tipo
+          // lo enviaría.
           pregunta ? (
-            <SunmiSelectorUnidad
-              rotulo={pregunta.texto}
-              opciones={pregunta.opciones.map((o) => ({ clave: o.valor, texto: o.texto }))}
-              valor={precioEs}
-              onCambiar={setPrecioEs}
-              nota={precioEs ? null : "Elegí una para que se cargue el costo."}
-            />
+            <SunmiCard className="p-4 space-y-2">
+              <p className="text-sm3 font-semibold sunmi-text-strong">{pregunta.texto}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {pregunta.opciones.map((o) => (
+                  <SunmiButton
+                    key={o.valor}
+                    type="button"
+                    color={precioEs === o.valor ? "cyan" : "slate"}
+                    onClick={() => setPrecioEs(o.valor)}
+                    aria-pressed={precioEs === o.valor}
+                    className="min-h-toque text-base font-semibold"
+                  >
+                    {o.texto}
+                  </SunmiButton>
+                ))}
+              </div>
+              {!precioEs && (
+                <p className="text-sm2 sunmi-text-muted leading-snug">Elegí una para que se cargue el costo.</p>
+              )}
+            </SunmiCard>
           ) : null
         }
         costoSugerido={costoSugerido}
