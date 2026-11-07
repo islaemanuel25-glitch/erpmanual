@@ -68,7 +68,10 @@ import {
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
-import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
+import {
+  costoDelCatalogoEnLaUnidadDelDeposito,
+  costoDelDepositoEnLaUnidadDelCatalogo,
+} from "@/lib/conversiones/stock";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
 export async function POST(req) {
@@ -488,8 +491,17 @@ export async function POST(req) {
       // unidad a $ 6.666,67, habría quedado a $ 44.543,90 cada botella. La
       // misma conversión que la siembra (`costoParaUnidad`); una línea por
       // BULTO queda igual.
+      //
+      // ── Y EN LA UNIDAD DEL CATÁLOGO, QUE ES LA DE LA LÍNEA (2026-11-07) ──
+      //
+      // `precioAEscribir` está en la unidad en que el depósito cuenta: la
+      // pieza de un fiambre por pieza. La línea del pedido guarda el kilo, como
+      // el catálogo. La Mortadela Paladini del pedido 530 quedó con la pieza,
+      // $41.330,09, escrita como kilo: el total de la factura del pedido subió
+      // $434.000 y el cierre arrastró el mismo número al catálogo.
+      const enElCatalogo = costoDelDepositoEnLaUnidadDelCatalogo({ base, costo: precioAEscribir }) ?? precioAEscribir;
       const precioEnLaLinea =
-        costoParaUnidad({ costoMaestro: precioAEscribir, unidad: detalle.unidad, producto: base }) ?? precioAEscribir;
+        costoParaUnidad({ costoMaestro: enElCatalogo, unidad: detalle.unidad, producto: base }) ?? enElCatalogo;
 
       // EL PRECIO ANTERIOR SE GUARDA ANTES DE PISARLO, en su columna propia.
       // Sin esto no se puede ver a qué se pidió y a qué terminó facturando, que
@@ -531,7 +543,9 @@ export async function POST(req) {
           productoBaseId: base.id,
           decision: DECISION_DE_PRECIO.ACEPTA_FACTURA,
           precioFacturado: precioAEscribir,
-          precioPropio: Number(detalle.precioCosto),
+          // En la MISMA unidad que el facturado, que es la de la hoja: la línea
+          // guarda el kilo de un fiambre por pieza y la decisión compara piezas.
+          precioPropio: costoDelCatalogoEnLaUnidadDelDeposito({ base, costo: detalle.precioCosto }) ?? Number(detalle.precioCosto),
           costoMaestroObservado,
           comprobanteLineaId: linea.id,
           usuarioId: session?.id ?? null,

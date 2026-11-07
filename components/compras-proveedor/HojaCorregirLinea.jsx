@@ -122,6 +122,7 @@ import {
   esPackIntermedio,
   quedoEnBultos,
   renglonesDeLaTarjeta,
+  textoDelCostoQueQueda,
   unidadDeComparacion,
 } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
@@ -1480,7 +1481,11 @@ export default function HojaCorregirLinea({
                     <OpcionDePrecio
                       elegida={aceptaPrecio === true}
                       titulo="Aceptar el precio nuevo"
-                      detalle={textoSiAceptaElSalto(deUnaUnidad.papel)}
+                      detalle={
+                        fila?.unidad?.fiambrePorPieza === true
+                          ? textoDelCostoQueQueda(fila)
+                          : textoSiAceptaElSalto(deUnaUnidad.papel)
+                      }
                       onElegir={() => setAceptaPrecio(true)}
                     />
                     <OpcionDePrecio
@@ -1550,7 +1555,7 @@ export default function HojaCorregirLinea({
                     <OpcionDePrecio
                       elegida={aceptaPrecio}
                       titulo="Aceptar el precio nuevo"
-                      detalle="Pasa a ser tu costo. El margen se recalcula."
+                      detalle={textoDelCostoQueQueda(fila)}
                       onElegir={() => setAceptaPrecio(true)}
                     />
                   )}

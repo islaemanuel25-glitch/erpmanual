@@ -1198,21 +1198,34 @@ export async function POST(req, { params }) {
         // efecto, útil para ver qué pasaría antes de encender la regla.
         // Sin costo que escribir —un renglón cuyo precio nadie aceptó— no se
         // escribe con ninguna de las dos.
-        // ── UN FIAMBRE POR PIEZA NO ESCRIBE COSTO DESDE LA RECEPCIÓN (2026-11-07) ──
-        //
-        // INCIDENTE: el cierre del pedido 530 escribió el costo de la Mortadela
-        // Paladini en $41.330,09 el kilo contra $8.888,89: el precio de la PIEZA
-        // de 4,5 kg guardado como precio del KILO, y la venta arrastrada ×4,6 en
-        // las cinco ubicaciones. La lectura del renglón de un fiambre está por
-        // pieza y la ficha guarda el costo por kilo; nada de este camino divide
-        // por el peso. Hasta que eso tenga su conversión, la mercadería entra y
-        // el costo de un fiambre no se toca desde acá: se corrige a mano.
-        const esFiambre = comoViene(base).naturaleza === "FIAMBRE";
-        const escribeCosto = esFiambre
-          ? false
-          : fronteraCostoActiva
+        const escribeCosto = fronteraCostoActiva
           ? decision.escribe
           : !costosExcluidos.has(det.id) && Number.isFinite(costoMaestro) && costoMaestro > 0;
+
+        // ── LO QUE SE ESCRIBE SE MUEVE LO MISMO QUE LO QUE SE VIO (2026-11-07) ──
+        //
+        // El cierre del pedido 530 escribió la pieza de la Mortadela Paladini
+        // como precio del kilo: la hoja mostró +3,3 % (pieza contra pieza) y el
+        // catálogo saltó +365 %. Un costo aceptado en Corregir tiene que moverse,
+        // en el catálogo, el mismo porcentaje que se aceptó mirando la hoja —se
+        // haya comparado en piezas, en bultos o en kilos—. Si no, la unidad se
+        // perdió en el camino y el número que entraría no lo vio nadie: frena y
+        // no entra nada.
+        if (escribeCosto && aceptadoDelPapel) {
+          const visto = Number(deLaLectura.fila?.costoMaestroHoy);
+          const precioVisto = Number(deLaLectura.fila?.costoFactura);
+          const razonVista = visto > 0 && precioVisto > 0 ? precioVisto / visto : null;
+          const anteriorDelCatalogo = Number(base?.precio_costo ?? 0);
+          const razonEscrita = anteriorDelCatalogo > 0 ? costoMaestro / anteriorDelCatalogo : null;
+          if (razonVista !== null && razonEscrita !== null && Math.abs(razonEscrita / razonVista - 1) > 0.01) {
+            throw new ErrorParaLaPersona(
+              `${base?.nombre || "Un producto"}: el costo que quedaría (${formatearMoneda(costoMaestro)}) no ` +
+                `es el que se aceptó en Corregir (${formatearMoneda(precioVisto)}, ` +
+                `${((razonVista - 1) * 100).toFixed(1).replace(".", ",")} %). Abrí Corregir y volvé a elegir el ` +
+                `precio. No entró nada.`
+            );
+          }
+        }
 
         // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
         //
@@ -1257,7 +1270,7 @@ export async function POST(req, { params }) {
         decisionesDeCosto.push({
           detalleId: det.id,
           escribio: escribeCosto,
-          motivo: escribeCosto ? null : esFiambre ? "FIAMBRE_POR_PIEZA" : decision.motivo,
+          motivo: escribeCosto ? null : decision.motivo,
           clase: clasificacion.clase,
           diferenciaPct: clasificacion.diferenciaPct,
           gobernadaPorUmbrales: fronteraCostoActiva,

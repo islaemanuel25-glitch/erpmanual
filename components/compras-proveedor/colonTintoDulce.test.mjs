@@ -318,7 +318,11 @@ test("EL CIERRE NO VUELVE A CALCULAR LA ESCALA DE UN RENGLÓN POR SU CUENTA", ()
   // Aceptar el precio tampoco lee el renglón por su cuenta: usa la conciliación.
   const aceptar = leer("../../app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
   assert.ok(!aceptar.includes("analizarPrecioDeLinea("), "aceptar-precio volvió a leer el renglón por su cuenta");
-  assert.match(aceptar, /costoParaUnidad\(\{ costoMaestro: precioAEscribir, unidad: detalle\.unidad/);
+  // El precio de la lectura, llevado a la unidad del catálogo (la pieza de un
+  // fiambre vuelve al kilo, 2026-11-07; un pack queda igual) y de ahí a la de la
+  // línea: el Colon pedido por unidad sigue quedando a $ 6.666,67 la botella.
+  assert.match(aceptar, /const enElCatalogo = costoDelDepositoEnLaUnidadDelCatalogo\(\{ base, costo: precioAEscribir \}\)/);
+  assert.match(aceptar, /costoParaUnidad\(\{ costoMaestro: enElCatalogo, unidad: detalle\.unidad/);
   assert.match(aceptar, /costoFinalUnitario: precioAEscribir,/);
   // La hoja usa la misma función del aviso que el cierre.
   assert.match(leer("./HojaCorregirLinea.jsx"), /laCantidadCuadraDeLaFila\(\{ fila, fisicas: ofrecidas \}\)/);
