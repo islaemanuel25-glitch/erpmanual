@@ -16,22 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **108 migraciones**, la última
-`20261105220000_lista_machea_por_nombre_vinculado`. Falta **1**:
-
-- `20261107025108_propuesta_ia_renglon` — **ADITIVA.** Crea la tabla
-  `PropuestaIaRenglon` (lo que la IA propone para un renglón dudoso de la
-  recepción, si cerró con los números y qué hizo la persona), con su índice
-  único por `comprobanteLineaId`, un índice por `grupoId` y la clave foránea a
-  `ComprobanteLinea` con `ON DELETE CASCADE`. No toca ninguna tabla existente,
-  no rellena nada y no tiene `DO`. Sin ella, la ruta de leer igual guarda la
-  lectura —la consulta a la IA corre aparte y su falla solo deja una línea en el
-  log—, pero la conciliación pide la relación `propuestaIa` y se cae: hay que
-  aplicarla ANTES de levantar la imagen, como todas.
+Ninguna. Producción está en **109 migraciones**, la última
+`20261107025108_propuesta_ia_renglon`.
 
 ---
 
 ## Historial reciente
+
+`20261107025108_propuesta_ia_renglon` se aplicó con el despliegue de `ad2e74f4`
+(2026-11-07 03:08), antes de levantar la imagen. El clasificador (`--vps
+--hasta`) la dio aditiva y salió con 0, sin autorización manual. El contenedor
+informó las **109** del árbol, imprimió "Applying migration" una vez y `migrate
+status` cerró con "Database schema is up to date!". Comprobada contra la base, en
+solo lectura: la tabla `PropuestaIaRenglon` existe con su clave primaria, el
+índice único por `comprobanteLineaId`, el índice por `grupoId` y la clave
+foránea a `ComprobanteLinea`, y tiene cero filas.
 
 `20261105220000_lista_machea_por_nombre_vinculado` se aplicó con el despliegue de
 `b17ae400` (2026-11-05 23:30), antes de levantar la imagen. El clasificador
