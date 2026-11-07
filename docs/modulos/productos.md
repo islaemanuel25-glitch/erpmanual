@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-06 02:47
+**Última actualización:** 2026-11-07 17:52
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-07: fix: la recepción lee el fiambre por pieza en piezas y escribe el kilo; se va el freno de los 64 productos — SIN VERIFICAR en pantalla
 - 2026-11-06: feat: la pregunta "caja o unidad" del alta con el diseño de Emanuel, y SunmiOpcionElegible en el kit — SIN VERIFICAR en pantalla
 - 2026-11-06: feat: el alta desde la lista trae el costo y pregunta si el precio es por la caja o por unidad — SIN VERIFICAR en pantalla
 - 2026-11-05: refactor: combos, stock valorizado y cantidad en pedido cuentan con la pieza única (regla de unidades, tanda 15)
