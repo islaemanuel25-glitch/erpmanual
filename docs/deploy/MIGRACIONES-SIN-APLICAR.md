@@ -16,8 +16,19 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **109 migraciones**, la última
-`20261107025108_propuesta_ia_renglon`.
+Producción está en **109 migraciones**, la última
+`20261107025108_propuesta_ia_renglon`. Falta **1**:
+
+- `20261107180000_mortadela_paladini_vuelve_a_su_precio` — **DE DATOS, NO
+  ADITIVA** (dos `UPDATE`). Incidente del 2026-11-07: devuelve el costo y la
+  venta de la Mortadela Paladini (ficha 2099 y sus cinco ubicaciones) a los
+  valores de antes del cierre del pedido 530, que guardó el precio de la pieza
+  como precio del kilo. Solo escribe si el valor sigue siendo el roto. Ensayada
+  contra producción dentro de una transacción con ROLLBACK: 1 ficha y 5
+  ubicaciones, con los valores esperados. El clasificador la marca por los
+  `UPDATE`: va con `DEPLOY_MIGRACION_AUTORIZADA=1`, por el pedido explícito de
+  volver los precios. Quinto chequeo del backup: la ficha 2099 tiene que estar
+  en el dump PRE con $41.330,09. La reposición es el propio dump.
 
 ---
 
