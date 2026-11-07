@@ -16,23 +16,24 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **109 migraciones**, la última
-`20261107025108_propuesta_ia_renglon`. Falta **1**:
-
-- `20261107180000_mortadela_paladini_vuelve_a_su_precio` — **DE DATOS, NO
-  ADITIVA** (dos `UPDATE`). Incidente del 2026-11-07: devuelve el costo y la
-  venta de la Mortadela Paladini (ficha 2099 y sus cinco ubicaciones) a los
-  valores de antes del cierre del pedido 530, que guardó el precio de la pieza
-  como precio del kilo. Solo escribe si el valor sigue siendo el roto. Ensayada
-  contra producción dentro de una transacción con ROLLBACK: 1 ficha y 5
-  ubicaciones, con los valores esperados. El clasificador la marca por los
-  `UPDATE`: va con `DEPLOY_MIGRACION_AUTORIZADA=1`, por el pedido explícito de
-  volver los precios. Quinto chequeo del backup: la ficha 2099 tiene que estar
-  en el dump PRE con $41.330,09. La reposición es el propio dump.
+Ninguna. Producción está en **110 migraciones**, la última
+`20261107180000_mortadela_paladini_vuelve_a_su_precio`.
 
 ---
 
 ## Historial reciente
+
+`20261107180000_mortadela_paladini_vuelve_a_su_precio` —de datos, incidente del
+2026-11-07: el cierre del pedido 530 había guardado el precio de la pieza de la
+Mortadela Paladini como precio del kilo— se aplicó con el despliegue de
+`f339deaa` (2026-11-07 17:26), antes de levantar la imagen, con
+`DEPLOY_MIGRACION_AUTORIZADA=1` dada por el pedido explícito de volver los
+precios; quedó en la bitácora. El clasificador la marcó NO ADITIVA por los dos
+`UPDATE`. Quinto chequeo del backup: la ficha 2099 estaba en `pre-f339deaa` con
+$41.330,09 y $57.900. El contenedor informó las **110** del árbol e imprimió
+"Applying migration". Comprobada contra la base: la ficha quedó en $8.888,89 y
+$12.500, y las cinco ubicaciones en $8.888,89 con su venta de antes (12.500,
+11.600, 12.500, 14.500 y 12.500); el margen, sin tocar.
 
 `20261107025108_propuesta_ia_renglon` se aplicó con el despliegue de `ad2e74f4`
 (2026-11-07 03:08), antes de levantar la imagen. El clasificador (`--vps
