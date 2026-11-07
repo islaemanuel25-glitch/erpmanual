@@ -35,10 +35,7 @@ import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/preci
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 import { cuantoEntroAlAbrir } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { recibidosDelCierre } from "@/lib/compras-proveedor/cierreDeRecepcion";
-import {
-  elPapelCuentaUnidades,
-  laCantidadCuadraConElPrecio,
-} from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { laCantidadCuadraDeLaFila } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const codigoDe = (rel) =>
@@ -52,8 +49,11 @@ const MARLBORO = { precio_costo: 58000, factor_pack: 10, unidad_medida: "pack", 
 const DETALLE = { id: 900, cantidad: 6, precioCosto: 58000, unidad: "BULTO", productoBaseId: 77, factorPack: 10, cantidadRecibida: 6, unidadesFisicas: 60 };
 const RENGLON = { orden: 2, textoCrudo: "MARLBORO 20 XL FUXI UVA", cantidad: 10, netoUnitario: 6200, subtotalImpreso: 62000, costoFinalRenglon: 62000, enQueViene: "unidad" };
 
-function fuxi({ revisado = false } = {}) {
-  const precio = analizarPrecioDeLinea({ linea: RENGLON, producto: MARLBORO, proveedor: { nombre: "Mauro" } });
+const fuxi = ({ revisado = false } = {}) => fuxiCon({}, { revisado });
+
+function fuxiCon(cambios, { revisado = false } = {}) {
+  const RENGLON_DEL_CASO = { ...RENGLON, ...cambios };
+  const precio = analizarPrecioDeLinea({ linea: RENGLON_DEL_CASO, producto: MARLBORO, proveedor: { nombre: "Mauro" } });
   const [f] = filasDeConciliacion({
     comprobantes: [
       {
@@ -61,7 +61,7 @@ function fuxi({ revisado = false } = {}) {
         estado: "CARGADO",
         lineas: [
           {
-            ...RENGLON,
+            ...RENGLON_DEL_CASO,
             id: 700,
             pedidoDetalleId: DETALLE.id,
             productoLocalId: 1,
@@ -107,14 +107,12 @@ test("DEFECTO 2 · al cerrar, lo pedido que la pantalla lleva como «contado» n
 });
 
 // ── DEFECTO 3 ─────────────────────────────────────────────────────────────
-const comoElCierre = (fisicas) =>
-  laCantidadCuadraConElPrecio({
-    subtotal: 62000,
-    cantidad: 10,
-    fisicas,
-    factorPack: 10,
-    papelEnUnidades: elPapelCuentaUnidades({ subtotal: 62000, cantidad: 10, costoDelProducto: 58000, factorPack: 10 }),
-  });
+//
+// Desde el 2026-11-07 el cierre arma el aviso con la LECTURA DE LA FILA —la
+// misma que ve Corregir— y con la misma función que la hoja
+// (`laCantidadCuadraDeLaFila`). Antes tenía su propia deducción
+// (`elPapelCuentaUnidades`, borrada) y la hoja y el aviso contaban distinto.
+const comoElCierre = (fisicas, fila = fuxi()) => laCantidadCuadraDeLaFila({ fila, fisicas });
 
 test("DEFECTO 3 · papel 10 u, factor 10, entra 1 bulto (10 u): no hay aviso", () => {
   const r = comoElCierre(10);
@@ -122,15 +120,17 @@ test("DEFECTO 3 · papel 10 u, factor 10, entra 1 bulto (10 u): no hay aviso", (
 });
 
 test("DEFECTO 3 · papel 10 u, entran 6 bultos (60 u): el aviso dice 60 contra 10, no contra 100", () => {
-  assert.equal(elPapelCuentaUnidades({ subtotal: 62000, cantidad: 10, costoDelProducto: 58000, factorPack: 10 }), true);
   const r = comoElCierre(60);
   assert.equal(r.cuadra, false);
   assert.equal(r.esperado, 10, "decía 100: tomaba los 10 del papel como bultos");
-  // Y el cierre usa esa misma deducción.
+  // Y el cierre usa esa misma función, con la fila de la conciliación.
   const ruta = codigoDe("app/api/compras-proveedor/recibir/[id]/route.js");
-  assert.match(ruta, /papelEnUnidades: elPapelCuentaUnidades\(\{/);
+  assert.match(ruta, /laCantidadCuadraDeLaFila\(\{ fila: filaDelPapel, fisicas: incremento \}\)/);
+  assert.doesNotMatch(ruta, /laCantidadCuadraConElPrecio\(/);
   // Un papel que factura BULTOS sigue esperando las unidades del bulto.
-  assert.equal(elPapelCuentaUnidades({ subtotal: 174000, cantidad: 3, costoDelProducto: 58000, factorPack: 10 }), false);
+  const porBulto = fuxiCon({ cantidad: 3, netoUnitario: 58000, subtotalImpreso: 174000, costoFinalRenglon: 174000, enQueViene: null });
+  assert.equal(porBulto.unidad?.unidad, "POR_BULTO");
+  assert.equal(comoElCierre(20, porBulto).esperado, 30);
 });
 
 test("DEFECTO 3 · el aviso del cierre se borra apenas cambia un renglón", () => {

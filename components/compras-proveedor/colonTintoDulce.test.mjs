@@ -52,7 +52,12 @@ import {
   hayDiferenciaDePrecio,
   loQueNoCuadra,
   saltoDePrecioAceptable,
+  unidadesFisicasDeLaFactura,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import { laCantidadCuadraDeLaFila } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { costoMaestroDeLaLectura } from "@/lib/compras-proveedor/lecturaDelCierre";
+import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
+import { escalaDelPrecio } from "@/lib/unidades/reglaDeUnidades";
 
 // Sin comentarios: un candado que busca texto encuentra la prosa (regla 5).
 const leer = (ruta) =>
@@ -222,21 +227,101 @@ test("LO ELEGIDO SE RECUERDA POR PRODUCTO Y PROVEEDOR, CON EL MECANISMO DEL ALTA
   assert.match(analisis, /unidadesDeLaLecturaRecordada\(/);
 });
 
-// ── LO QUE NO CAMBIA ───────────────────────────────────────────────────────
+// ── UNA RECEPCIÓN LEE CADA RENGLÓN UNA SOLA VEZ (2026-11-07) ──────────────
+//
+// Corregir, la tarjeta, el aviso del cierre, el costo maestro que escribe el
+// cierre y la importación usan la MISMA lectura. Hasta acá el cierre y la
+// importación seguían con la regla vieja, y con el Marlboro Fuxi la hoja y el
+// aviso del cierre contaron distinto.
 
-test("EL CIERRE SIGUE CON LA REGLA DE ANTES: SIN `menorDiferencia` NO ELIGE POR CERCANÍA", () => {
+/**
+ * "Aceptar el precio nuevo" en Corregir: `aceptar-precio` guarda en el renglón
+ * (`costoFinalUnitario`) y en la decisión (`precioFacturado`) el precio de la
+ * lectura —`precioAEscribir`, que en la fila es `costoFactura`—. El cierre lo
+ * reconoce como aceptado si es ESE número (`aceptadoEnElPapel`, en centavos).
+ */
+const aceptadoEnCorregir = (fila) => (precio) => Math.round(precio * 100) === Math.round(fila.costoFactura * 100);
+
+test("UNA SOLA REGLA: LA IMPORTACIÓN Y EL CIERRE SIN PAPEL LEEN COLON COMO CORREGIR", () => {
+  // La importación, con la pieza única: el pack de 6.
+  assert.equal(escalaDelPrecio({ precio: 44543.9, base: COLON, costoActual: 40000 }).unidad, "BULTO");
+  // La deducción ya no tiene una regla "de antes" a la que volver.
   const caso = { costoAnteriorFinal: 40000, precioFacturaFinal: 44543.9, factorPack: 6, descripcion: "COLON SELECTO TINTO DULCE" };
-  const sinBandera = deducirUnidad(caso);
-  assert.equal(sinBandera.lecturasCandidatas, undefined);
-  const conBandera = deducirUnidad({ ...caso, menorDiferencia: true, variacionPct: 10 });
-  assert.equal(conBandera.unidadesPorFacturada, 6);
-  assert.ok(Array.isArray(conBandera.lecturasCandidatas));
+  assert.equal(deducirUnidad(caso).unidadesPorFacturada, 6);
+  assert.ok(Array.isArray(deducirUnidad(caso).lecturasCandidatas));
+  assert.ok(!leer("../../lib/compras-proveedor/comprobante/unidadPorPrecio.js").includes("menorDiferencia"));
 });
 
-test("ACEPTAR EL PRECIO ESCRIBE LA LÍNEA DEL PEDIDO EN LA UNIDAD DE LA LÍNEA", () => {
-  const ruta = leer("../../app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
-  assert.match(ruta, /costoParaUnidad\(\{ costoMaestro: precioAEscribir, unidad: detalle\.unidad/);
-  assert.match(ruta, /variacionPct: variacionDelProveedor/);
+test("COLON DE PUNTA A PUNTA (línea por UNIDAD): CORREGIR → ACEPTAR → CIERRE ESCRIBE $44.543,90 EL PACK, SIN AVISO", () => {
+  const f = COLON_UNIDAD();
+  // Corregir: pack de 6, +11,4 %, Aceptar / Dejar.
+  assert.equal(f.unidad.unidadesPorFacturada, 6);
+  assert.equal(saltoDePrecioAceptable(f), true);
+  // Lo que aceptar escribe: la lectura en la unidad de la ficha (el pack),
+  // y la línea del pedido en SU unidad (la unidad, 7.423,98).
+  assert.equal(Math.round(f.costoFactura * 100) / 100, 44543.9);
+  assert.equal(
+    Math.round(costoParaUnidad({ costoMaestro: f.costoFactura, unidad: "UNIDAD", producto: COLON }) * 100) / 100,
+    7423.98
+  );
+  // El cierre: el costo maestro es la lectura aceptada, en la unidad de la
+  // ficha —el pack de 6—, no el 7.423,98 de la línea.
+  const escrito = costoMaestroDeLaLectura({ filas: [f], base: COLON, aceptado: aceptadoEnCorregir(f) });
+  assert.equal(escrito?.costoMaestro, 44543.9);
+  // Y no avisa: entran las 6 unidades que dice la lectura.
+  assert.equal(unidadesFisicasDeLaFactura(f), 6);
+  assert.equal(laCantidadCuadraDeLaFila({ fila: f, fisicas: 6 }).cuadra, true);
+  // Sin aceptar, el costo maestro no se toca.
+  assert.equal(costoMaestroDeLaLectura({ filas: [f], base: COLON, aceptado: () => false }), null);
+});
+
+test("COLON DE PUNTA A PUNTA (línea por BULTO): ESCRIBE $44.543,90 Y NO AVISA", () => {
+  const f = COLON_BULTO();
+  const escrito = costoMaestroDeLaLectura({ filas: [f], base: COLON, aceptado: aceptadoEnCorregir(f) });
+  assert.equal(escrito?.costoMaestro, 44543.9);
+  assert.equal(laCantidadCuadraDeLaFila({ fila: f, fisicas: 6 }).cuadra, true);
+});
+
+test("7UP X 6 DE PUNTA A PUNTA: 48 CONTRA 48 SIN AVISO, Y SIN ACEPTAR EL COSTO NO SE TOCA", () => {
+  const f = SIETE();
+  assert.equal(unidadesFisicasDeLaFactura(f), 48);
+  assert.equal(laCantidadCuadraDeLaFila({ fila: f, fisicas: 48 }).cuadra, true);
+  // Una cantidad en otra escala sigue avisando, con el número de la lectura.
+  const otra = laCantidadCuadraDeLaFila({ fila: f, fisicas: 30 });
+  assert.equal(otra.cuadra, false);
+  assert.equal(otra.esperado, 48);
+  assert.equal(costoMaestroDeLaLectura({ filas: [f], base: SEVEN_UP, aceptado: () => false }), null);
+  // Aceptado, sería el bulto de 24 desde el pack de 6: 4 × 5.900.
+  assert.equal(costoMaestroDeLaLectura({ filas: [f], base: SEVEN_UP, aceptado: aceptadoEnCorregir(f) })?.costoMaestro, 23600);
+});
+
+test("UNA LECTURA SIN DECIDIR NO ESCRIBE COSTO NI APORTA PROPORCIÓN AL AVISO", () => {
+  const f = DOS_PARECIDAS();
+  assert.equal(costoMaestroDeLaLectura({ filas: [f], base: PARECIDAS, aceptado: () => true }), null);
+});
+
+test("EL CIERRE NO VUELVE A CALCULAR LA ESCALA DE UN RENGLÓN POR SU CUENTA", () => {
+  const ruta = leer("../../app/api/compras-proveedor/recibir/[id]/route.js");
+  // La lectura es la de la conciliación que dibuja la pantalla.
+  assert.match(ruta, /const filasDelPapel = filasDelPapelPorDetalle\(await cargarConciliacion\(prisma, \{ grupoId, localId, pedidoId \}\)\);/);
+  // El aviso, con la misma función que la hoja.
+  assert.match(ruta, /laCantidadCuadraDeLaFila\(\{ fila: filaDelPapel, fisicas: incremento \}\)/);
+  // El costo, con la lectura aceptada.
+  assert.match(ruta, /costoMaestroDeLaLectura\(\{/);
+  assert.match(ruta, /const costoMaestro = tienePapel\s*\? deLaLectura\?\.costoMaestro \?\? null/);
+  // Y ninguna deducción propia: ni la del aviso viejo ni la escala del costo
+  // de la línea para un renglón con papel.
+  for (const propia of ["elPapelCuentaUnidades", "unidadesQueDiceElRenglon", "unidadesQueDiceLaDescripcion", "laCantidadCuadraConElPrecio(", "deducirUnidad("]) {
+    assert.ok(!ruta.includes(propia), `el cierre volvió a deducir con ${propia}`);
+  }
+  assert.match(ruta, /const escala = tienePapel\s*\? \{ unidad: "BULTO", requiereDecision: false \}\s*: escalaDelCosto\(/);
+  // Aceptar el precio tampoco lee el renglón por su cuenta: usa la conciliación.
+  const aceptar = leer("../../app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
+  assert.ok(!aceptar.includes("analizarPrecioDeLinea("), "aceptar-precio volvió a leer el renglón por su cuenta");
+  assert.match(aceptar, /costoParaUnidad\(\{ costoMaestro: precioAEscribir, unidad: detalle\.unidad/);
+  assert.match(aceptar, /costoFinalUnitario: precioAEscribir,/);
+  // La hoja usa la misma función del aviso que el cierre.
+  assert.match(leer("./HojaCorregirLinea.jsx"), /laCantidadCuadraDeLaFila\(\{ fila, fisicas: ofrecidas \}\)/);
 });
 
 test("EL CARTEL «NO SE PUEDE SABER EN QUÉ VIENE» NO QUEDA EN NINGÚN LADO DEL CÓDIGO", () => {

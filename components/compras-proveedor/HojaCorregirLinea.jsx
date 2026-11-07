@@ -98,7 +98,6 @@ import {
   precioDeUnaUnidad,
   cantidadFueConvertida,
   costoPropioParaDecidir,
-  bultoDeLaFila,
   difiereDeLoPedido,
   enUnidadesDeLaFila,
   estadoDeLinea,
@@ -126,7 +125,7 @@ import {
   unidadDeComparacion,
 } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
-  laCantidadCuadraConElPrecio,
+  laCantidadCuadraDeLaFila,
   textoDeLaEscalaQueNoCuadra,
 } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { contenidoDelBulto, textoDelContenido } from "@/lib/compras-proveedor/contenidoDelBulto";
@@ -767,36 +766,15 @@ export default function HojaCorregirLinea({
   const escalaOfrecida = useMemo(() => {
     const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
     const ofrecidas = enUnidadesDeLaFila(Number(cantidadDeLaFactura) || 0, factor);
-    return laCantidadCuadraConElPrecio({
-      subtotal: fila?.subtotal,
-      cantidad: fila?.cantidad,
-      fisicas: ofrecidas,
-      porKilo: fila?.porKilo === true,
-      // ── EL MISMO FACTOR QUE USA EL CIERRE ──────────────────────────────
-      //
-      // Sin esto, la hoja valuaba lo que entra al stock al precio del BULTO y
-      // acusaba un renglón perfecto. El caso: MOGUL MORAS del pedido 245, bolsa
-      // de 83. Entran 996 unidades y el papel cobra $5.759,12 la BOLSA, así que
-      // la hoja calculaba 996 × 5.759,12 = **$5.736.083,52** contra los
-      // $69.109,44 impresos — cuando 12 bolsas × $5.759,12 da exactamente eso.
-      //
-      // El arreglo del cierre —66cc426e, mirar la igualdad en las DOS escalas
-      // posibles— ya estaba; lo que faltaba era que la hoja le pasara el factor.
-      // Es la misma función para las dos, que es el punto: una sola respuesta a
-      // "¿la escala cuadra?".
-      //
-      // El bulto, leído por la pieza (tanda 16): el maní 1881 trae factor 2 y
-      // no tiene bulto, así que 3 bolsas esperan 3, no 6.
-      factorPack: bultoDeLaFila(fila),
-      // Lo que trae lo facturado según la lectura del precio: el bulto de 40
-      // del sachet de Super Mario, que el ERP cuenta por unidad. Solo si la
-      // lectura quedó decidida.
-      unidadesPorFacturada: fila?.unidad?.requiereDecision ? null : fila?.unidad?.unidadesPorFacturada ?? null,
-      // Lo esperado en la unidad en que el papel cuenta, según la misma
-      // deducción que dice "la factura dice 1" (Mauro, 2026-11-06).
-      papelEnUnidades: fila?.unidad?.requiereDecision ? false : fila?.unidad?.unidad === "POR_UNIDAD",
-    });
-  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.esFiambre, fila?.subtotal, fila?.cantidad, fila?.porKilo, fila?.unidad]);
+    // ── LA MISMA FUNCIÓN Y LA MISMA LECTURA QUE EL CIERRE ────────────────
+    //
+    // Sin el factor, la hoja valuaba lo que entra al stock al precio del BULTO
+    // y acusaba un renglón perfecto (MOGUL MORAS del pedido 245). Y con otra
+    // deducción que la del cierre, la hoja y el aviso del cierre contaban
+    // distinto (Marlboro Fuxi, 2026-11-07). Las dos llaman a
+    // `laCantidadCuadraDeLaFila` con la lectura de la fila.
+    return laCantidadCuadraDeLaFila({ fila, fisicas: ofrecidas });
+  }, [cantidadDeLaFactura, vaPorPack, fila]);
 
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
 

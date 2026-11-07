@@ -76,8 +76,12 @@ test("TANDA 16, CONTRAPRUEBA: el pack de 12 y el producto por kilo siguen igual"
 
 test("TANDA 16: la hoja le pasa al control el bulto leído con la pieza", () => {
   const fuente = fs.readFileSync(new URL("./HojaCorregirLinea.jsx", import.meta.url), "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  const i = fuente.indexOf("laCantidadCuadraConElPrecio({");
-  assert.ok(i > 0);
-  assert.match(fuente.slice(i, i + 600), /factorPack: bultoDeLaFila\(fila\),/);
-  assert.match(fuente, /fila\?\.esFiambre, fila\?\.subtotal/, "el memo se recalcula si cambia cómo se compra");
+  // Desde el 2026-11-07 la hoja y el cierre llaman a la misma función con la
+  // fila (`laCantidadCuadraDeLaFila`), y es ella la que lee el bulto con la pieza.
+  assert.match(fuente, /laCantidadCuadraDeLaFila\(\{ fila, fisicas: ofrecidas \}\)/);
+  const lib = fs.readFileSync(new URL("../../lib/compras-proveedor/laCantidadCuadraConElPrecio.js", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const j = lib.indexOf("export function laCantidadCuadraDeLaFila");
+  assert.ok(j > 0);
+  assert.match(lib.slice(j, j + 900), /factorPack: bultoDeLaFila\(fila\),/);
+  assert.match(fuente, /\}, \[cantidadDeLaFactura, vaPorPack, fila\]\);/, "el memo se recalcula si cambia la fila");
 });

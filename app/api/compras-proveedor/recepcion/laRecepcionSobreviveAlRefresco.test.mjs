@@ -166,7 +166,12 @@ test("Y LA ELECCIÓN DE UNIDAD SE GUARDA Y SE VUELVE A LEER", () => {
   // Llegaba, se usaba para la cuenta de esa llamada y se tiraba.
   const aceptar = codigoDe("app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
   assert.match(aceptar, /data: \{ unidadElegida: String\(body\.unidad\) \}/);
-  assert.match(aceptar, /unidadElegida: body\?\.unidad \?\? linea\.unidadElegida/);
+  // Y la lectura que usa es la de la conciliación, cargada DESPUÉS de guardar
+  // la elección: así la ve igual que la hoja (2026-11-07, una sola lectura).
+  const guarda = aceptar.indexOf("data: { unidadElegida: String(body.unidad) }");
+  const lee = aceptar.indexOf("await cargarConciliacion(");
+  assert.ok(guarda > 0 && lee > guarda, "la conciliación se carga antes de guardar la elección");
+  assert.match(aceptar, /const analisis = analizadaDeLaHoja\?\.precio \?\? analizada\?\.precio \?\? null;/);
   // La conciliación la trae y el análisis la usa, así que sobrevive al refresco
   // para las dos pantallas y no solo para la que la eligió.
   // La carga de la conciliación vive en `conciliacionDelPedido.js` desde Mauro #298.

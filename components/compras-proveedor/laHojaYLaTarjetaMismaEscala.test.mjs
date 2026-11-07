@@ -152,8 +152,9 @@ test("LA HOJA NO TIENE SU PROPIA LECTURA DE LA ESCALA", () => {
     !/unidadPedido \?\? "BULTO"\) === "BULTO" && Number\(fila\?\.factorPack\)/.test(hoja),
     "la hoja volvió a deducir la escala por su cuenta"
   );
-  // Y avisa cuando lo que ofrece no cuadra con el precio del papel.
-  assert.match(hoja, /laCantidadCuadraConElPrecio\(/);
+  // Y avisa cuando lo que ofrece no cuadra con el precio del papel, con la
+  // misma función y la misma lectura que el cierre (2026-11-07).
+  assert.match(hoja, /laCantidadCuadraDeLaFila\(/);
   assert.match(hoja, /avisoDeEscala/);
   // Y la diferencia se mide en PIEZAS de los dos lados. No contra lo que entra
   // al stock: en un producto por peso eso son kilos, y comparar kilos contra
@@ -173,7 +174,7 @@ test("Y EL CIERRE USA LO QUE LA HOJA DIJO, NO SU PROPIA CUENTA", () => {
   // escribir stock.
   const cierre = codigoDe(CIERRE);
   assert.match(cierre, /body\.fisicas/);
-  assert.match(cierre, /laCantidadCuadraConElPrecio\(/);
+  assert.match(cierre, /laCantidadCuadraDeLaFila\(/);
   assert.match(cierre, /hayFisicas\s*\n?\s*\?\s*Number\(declaradasFisicas\)/);
   // La deducción vieja sigue como respaldo para una línea que nadie abrió, y
   // eso es a propósito: sacarla dejaría sin stock a las líneas no tocadas.

@@ -17,8 +17,9 @@ import {
 import { esComboBase } from "@/lib/combos/guards";
 import { unidadFisicaDelIngreso } from "@/lib/compras-proveedor/stockIngresado";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
-import { elPapelCuentaUnidades, laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
-import { unidadesQueDiceElRenglon, unidadesQueDiceLaDescripcion } from "@/lib/compras-proveedor/contenidoDelBulto";
+import { laCantidadCuadraDeLaFila } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { cargarConciliacion } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
+import { costoMaestroDeLaLectura, filasDelPapelPorDetalle } from "@/lib/compras-proveedor/lecturaDelCierre";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
@@ -687,6 +688,16 @@ export async function POST(req, { params }) {
     }
     for (const d of repetidos) lineaDelPapelPorDetalle.delete(d);
 
+    // ── LA LECTURA DE CADA RENGLÓN: LA DE CORREGIR ───────────────────────
+    //
+    // La misma conciliación que dibuja la pantalla, con la lectura que
+    // decidió `analizarPrecioDeLinea` en cada fila. El aviso de escala y el
+    // costo maestro salen de acá; el cierre no vuelve a calcular la escala de
+    // un renglón por su cuenta (Emanuel, 2026-11-07). Ver `lecturaDelCierre.js`.
+    const filasDelPapel = filasDelPapelPorDetalle(await cargarConciliacion(prisma, { grupoId, localId, pedidoId }));
+    // Las líneas del pedido que algún renglón trae, aunque sean dos.
+    const detallesConPapel = new Set(lineasDelPapel.map((l) => l.pedidoDetalleId).filter((d) => d != null));
+
     // ── CON PLATA PAGADA Y DEUDA, NO SE RECIBE SIN CONFIRMARLO ──────────────
     //
     // Lo pagado —desde la caja antes, o ahora en el cierre— no cubre lo que se
@@ -948,37 +959,21 @@ export async function POST(req, { params }) {
           // NO se mira cuando la persona declaró una diferencia: ahí está
           // diciendo a propósito que llegó otra cosa que la facturada, y eso es
           // exactamente lo que la recepción existe para registrar.
-          const delPapel = lineaDelPapelPorDetalle.get(det.id);
+          //
+          // ── CON LA LECTURA DE CORREGIR, NO CON UNA PROPIA ───────────────
+          //
+          // La fila del renglón en la conciliación trae la lectura que decidió
+          // `analizarPrecioDeLinea` —la ganadora de la menor diferencia, o la
+          // que eligió la persona—, y el control es la MISMA función que usa
+          // la hoja (`laCantidadCuadraDeLaFila`). Acá se armaba con su propia
+          // deducción y la hoja y el aviso contaban distinto (Marlboro Fuxi,
+          // 2026-11-07). Un producto que dos renglones traen no se controla:
+          // no hay un renglón solo con el que comparar.
+          const filasDeLaLinea = filasDelPapel.get(det.id) ?? [];
+          const filaDelPapel = filasDeLaLinea.length === 1 ? filasDeLaLinea[0] : null;
           const motivoDeclarado = motivosMap[det.id]?.principal;
-          if (delPapel && !motivoDeclarado) {
-            const r = laCantidadCuadraConElPrecio({
-              // Lo corregido manda: el control de escala tiene que mirar el
-              // importe que el papel cobra de verdad, no el dígito mal leído.
-              subtotal: delPapel.subtotalCorregido ?? delPapel.subtotalImpreso,
-              cantidad: delPapel.cantidad,
-              fisicas: incremento,
-              // Cuántas unidades trae un bulto: sin esto, un papel que factura
-              // POR BULTO —el Queso Rallado del 242 dice 6 y entran 120— se
-              // acusa como error de escala siendo perfecto.
-              factorPack,
-              // Y las proporciones que imprime el renglón: 5 bultos de 40
-              // sachets son 200, aunque el ERP los tenga por unidad.
-              unidadesPorFacturada: [
-                unidadesQueDiceElRenglon(delPapel.enQueViene),
-                ...unidadesQueDiceLaDescripcion(delPapel.textoCrudo),
-              ],
-              // Lo que el aviso dice que factura el papel, en la unidad en que el
-              // papel lo cuenta: la misma deducción que dice "la factura dice 1"
-              // en la pantalla (Mauro, 2026-11-06). Ver `papelEnUnidades`.
-              papelEnUnidades: elPapelCuentaUnidades({
-                subtotal: delPapel.subtotalCorregido ?? delPapel.subtotalImpreso,
-                cantidad: delPapel.cantidad,
-                costoDelProducto: base?.precio_costo,
-                factorPack,
-                enQueViene: delPapel.enQueViene,
-                descripcion: delPapel.textoCrudo,
-              }),
-            });
+          if (filaDelPapel && !motivoDeclarado) {
+            const r = laCantidadCuadraDeLaFila({ fila: filaDelPapel, fisicas: incremento });
             if (r.aplica && !r.cuadra) {
               throw new ErrorParaLaPersona(
                 `${base?.nombre || "Un producto"}: entrarían ${incremento} unidades al stock y el ` +
@@ -1109,10 +1104,39 @@ export async function POST(req, { params }) {
         // decisor y el mismo 35 % que la recepción —antes era un 50 % propio de
         // esta ruta—. Un costo aceptado en Corregir no se pregunta: es el
         // `precioAEscribir` de la recepción, que siempre está por bulto.
-        const aceptadoDelPapel = aceptadoEnElPapel(det.id, costoFinal, base);
-        const escala = aceptadoDelPapel
+        //
+        // ── CON PAPEL, EL COSTO ES EL DE LA LECTURA DEL RENGLÓN ─────────────
+        //
+        // Una línea que trajo papel escribe el precio de la lectura que vio
+        // Corregir —la ganadora de la menor diferencia, o la elegida—, ya en
+        // la unidad de la ficha, y solo si la persona lo aceptó. No se vuelve
+        // a preguntar en qué escala está el costo de la línea: desde e8749fc9
+        // "Aceptar" deja ese costo en la unidad de la línea (7.423,98 la
+        // unidad del Colon en una línea por unidad), y leerlo de nuevo con
+        // `escalaDelCosto` no lo reconocía como aceptado y frenaba el cierre.
+        // Sin aceptación no se escribe nada: el costo maestro no se mueve solo.
+        //
+        // Sin papel —una recepción sin factura— no hay renglón que leer: la
+        // escala del costo anotado en la línea la contesta la regla única.
+        const filasConPapel = filasDelPapel.get(det.id) ?? [];
+        const tienePapel = filasConPapel.length > 0 || detallesConPapel.has(det.id);
+        const deLaLectura = tienePapel
+          ? costoMaestroDeLaLectura({
+              filas: filasConPapel,
+              base,
+              aceptado: (precio) => aceptadoEnElPapel(det.id, precio, base),
+            })
+          : null;
+        const aceptadoDelPapel = deLaLectura !== null;
+        const escala = tienePapel
           ? { unidad: "BULTO", requiereDecision: false }
-          : escalaDelCosto({ costo: costoFinal, unidad: det.unidad, base, costoActual: base?.precio_costo ?? null });
+          : escalaDelCosto({
+              costo: costoFinal,
+              unidad: det.unidad,
+              base,
+              costoActual: base?.precio_costo ?? null,
+              variacionPct: variacionNormalPct,
+            });
 
         // ── Y SI NO SE SABE, SE PREGUNTA: NUNCA SE ESCRIBE UN COSTO SOLO ────
         //
@@ -1132,7 +1156,9 @@ export async function POST(req, { params }) {
         }
 
         // Reconfirmar el costo real/maestro del producto con el costo recibido (solo costo).
-        const costoMaestro = escala.requiereDecision
+        const costoMaestro = tienePapel
+          ? deLaLectura?.costoMaestro ?? null
+          : escala.requiereDecision
           ? null
           : costoLineaAMaestro({
               precioCosto: costoFinal,
@@ -1170,9 +1196,11 @@ export async function POST(req, { params }) {
         // —escribir— salvo que la línea esté excluida a mano. La clasificación
         // se calcula igual y viaja en la respuesta: es información gratis y sin
         // efecto, útil para ver qué pasaría antes de encender la regla.
+        // Sin costo que escribir —un renglón cuyo precio nadie aceptó— no se
+        // escribe con ninguna de las dos.
         const escribeCosto = fronteraCostoActiva
           ? decision.escribe
-          : !costosExcluidos.has(det.id);
+          : !costosExcluidos.has(det.id) && Number.isFinite(costoMaestro) && costoMaestro > 0;
 
         // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
         //

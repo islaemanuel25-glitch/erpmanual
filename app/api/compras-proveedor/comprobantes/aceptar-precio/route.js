@@ -45,15 +45,12 @@ import {
   cargarConciliacion,
   lineasSospechadasDeCorrimiento,
 } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
-import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
-import { cargosDelPapel } from "@/lib/compras-proveedor/comprobante/cargos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import {
   aplanarDetalles,
   analizarLineas,
   cargarContexto,
-  unidadesGuardadasDeLaLinea,
 } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { guardarDecisionDePrecio } from "@/lib/compras-proveedor/comprobante/guardarDecisionDePrecio";
 import {
@@ -258,35 +255,23 @@ export async function POST(req) {
       });
     }
 
-    // ── LA VARIACIÓN DEL PROVEEDOR, LA MISMA QUE USA LA HOJA ────────────
+    // ── LA LECTURA DEL RENGLÓN ES LA DE LA HOJA, NO UNA SEGUNDA ─────────
     //
-    // La regla de la menor diferencia (Emanuel, 2026-11-07) elige en qué viene
-    // el renglón con este umbral; con otro, esta ruta podría leer otra escala
-    // que la hoja que mandó la decisión. Sin receta, el de siempre.
-    const recetaVigente = await prisma.recetaProveedor.findFirst({
-      where: { grupoId, proveedorId: linea.comprobante.proveedor.id },
-      select: { variacionNormalPct: true },
-    });
-    const variacionDelProveedor =
-      recetaVigente?.variacionNormalPct != null ? Number(recetaVigente.variacionNormalPct) : VARIACION_POR_DEFECTO;
-
-    const analisis = analizarPrecioDeLinea({
-      linea,
-      producto: base,
-      variacionPct: variacionDelProveedor,
-      // ── LO QUE LE TOCA DE LOS CARGOS, IGUAL QUE EN LA HOJA ────────────
-      //
-      // El reparto es de la factura entera, por eso se le pasan todas sus
-      // líneas: es el MISMO `cargosDelPapel` que usa `analizarLineas`.
-      cargoDeLaLinea: cargosDelPapel(linea.comprobante.lineas).get(linea.orden) ?? 0,
-      // El pack ya confirmado en el vínculo, igual que la hoja: sin esto esta
-      // ruta escribiría el precio de un pack de 6 como si fuera el de la plancha.
-      unidadesGuardadas: unidadesGuardadasDeLaLinea({ linea, productoBaseId: base?.id, contexto }),
-      proveedor: linea.comprobante.proveedor,
-      // Lo que llegó ahora, o lo que alguien eligió antes: una decisión vieja
-      // sigue valiendo si nadie la cambió.
-      unidadElegida: body?.unidad ?? linea.unidadElegida ?? undefined,
-    });
+    // Una recepción lee cada renglón UNA sola vez (Emanuel, 2026-11-07). Acá
+    // se volvía a llamar a `analizarPrecioDeLinea` con datos propios —sin la
+    // propuesta de la IA, que este select no trae—, así que esta ruta podía
+    // escribir el precio de otra lectura que la que la hoja mostró. Ahora el
+    // análisis es el de la MISMA conciliación que dibuja la pantalla, cargada
+    // después de guardar la unidad elegida, con la variación del proveedor
+    // adentro. La elección de unidad de arriba ya quedó en el renglón.
+    const conciliacion = linea.comprobante.pedidoId
+      ? await cargarConciliacion(prisma, { grupoId, localId, pedidoId: linea.comprobante.pedidoId })
+      : null;
+    const analizadaDeLaHoja = (conciliacion?.analizados ?? [])
+      .flatMap((c) => c.lineas ?? [])
+      .find((l) => l.id === linea.id);
+    const analisis = analizadaDeLaHoja?.precio ?? analizada?.precio ?? null;
+    const variacionDelProveedor = conciliacion?.variacionNormalPct ?? VARIACION_POR_DEFECTO;
 
     // ── SIN LOS KILOS NO HAY PRECIO QUE ACEPTAR, Y SE DICE CUÁL FALTA ────
     //
@@ -337,16 +322,17 @@ export async function POST(req) {
 
     // ── LA MISMA CONCILIACIÓN QUE DIBUJA LA PANTALLA ─────────────────────
     //
-    // Se carga una vez y sirve para dos preguntas: si este renglón puede estar
-    // corrido, más abajo, y si lo que frena es un salto de PRECIO, acá. Esa
-    // segunda no se puede contestar con `comparacion`, que no trae ni la
-    // cantidad ni el importe del papel: sin ellos `loQueNoCuadra` dice siempre
-    // "escala". Se pregunta sobre la fila de la hoja, con la misma función.
-    const conciliacion =
-      decisionPedida !== DECISION_DE_PRECIO.DEJA_EL_MIO && linea.comprobante.pedidoId
-        ? await cargarConciliacion(prisma, { grupoId, localId, pedidoId: linea.comprobante.pedidoId })
-        : null;
-    const filaDeLaHoja = (conciliacion?.grupos ?? []).flatMap((g) => g.filas ?? []).find((f) => f.lineaId === linea.id);
+    // Cargada una vez, arriba, para la lectura del renglón; sirve además para
+    // dos preguntas: si este renglón puede estar corrido, más abajo, y si lo
+    // que frena es un salto de PRECIO, acá. Esa segunda no se puede contestar
+    // con `comparacion`, que no trae ni la cantidad ni el importe del papel:
+    // sin ellos `loQueNoCuadra` dice siempre "escala". Se pregunta sobre la
+    // fila de la hoja, con la misma función. "Dejo el mío" no escribe nada y
+    // no se le hacen esas dos preguntas.
+    const filaDeLaHoja =
+      decisionPedida !== DECISION_DE_PRECIO.DEJA_EL_MIO
+        ? (conciliacion?.grupos ?? []).flatMap((g) => g.filas ?? []).find((f) => f.lineaId === linea.id)
+        : undefined;
 
     // ── UN SALTO DE PRECIO GRANDE SE ACEPTA (Emanuel, 2026-10-29) ─────────
     //
@@ -439,7 +425,7 @@ export async function POST(req) {
     // #298). Se pregunta con la MISMA conciliación que dibuja la pantalla
     // (`cargarConciliacion`): si la tarjeta dice que no se propone, acá no se
     // acepta.
-    if (conciliacion) {
+    if (conciliacion && decisionPedida !== DECISION_DE_PRECIO.DEJA_EL_MIO) {
       if (lineasSospechadasDeCorrimiento(conciliacion).has(linea.id)) {
         return NextResponse.json(
           { ok: false, error: AVISO_PAPEL_CORRIDO, queHacer: AVISO_PAPEL_CORRIDO },
@@ -486,12 +472,7 @@ export async function POST(req) {
         costoMaestroHoy: costoDelCatalogoEnLaUnidadDelDeposito({ base, costo: base?.precio_costo }),
         factorPack: delPedido.detalle?.factorPack ?? null,
       },
-      {
-        variacionPct:
-          recetaVigente?.variacionNormalPct != null
-            ? Number(recetaVigente.variacionNormalPct)
-            : VARIACION_POR_DEFECTO,
-      }
+      { variacionPct: variacionDelProveedor }
     );
 
     const resultado = await prisma.$transaction(async (tx) => {
