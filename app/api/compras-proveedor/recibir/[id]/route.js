@@ -1198,7 +1198,19 @@ export async function POST(req, { params }) {
         // efecto, útil para ver qué pasaría antes de encender la regla.
         // Sin costo que escribir —un renglón cuyo precio nadie aceptó— no se
         // escribe con ninguna de las dos.
-        const escribeCosto = fronteraCostoActiva
+        // ── UN FIAMBRE POR PIEZA NO ESCRIBE COSTO DESDE LA RECEPCIÓN (2026-11-07) ──
+        //
+        // INCIDENTE: el cierre del pedido 530 escribió el costo de la Mortadela
+        // Paladini en $41.330,09 el kilo contra $8.888,89: el precio de la PIEZA
+        // de 4,5 kg guardado como precio del KILO, y la venta arrastrada ×4,6 en
+        // las cinco ubicaciones. La lectura del renglón de un fiambre está por
+        // pieza y la ficha guarda el costo por kilo; nada de este camino divide
+        // por el peso. Hasta que eso tenga su conversión, la mercadería entra y
+        // el costo de un fiambre no se toca desde acá: se corrige a mano.
+        const esFiambre = comoViene(base).naturaleza === "FIAMBRE";
+        const escribeCosto = esFiambre
+          ? false
+          : fronteraCostoActiva
           ? decision.escribe
           : !costosExcluidos.has(det.id) && Number.isFinite(costoMaestro) && costoMaestro > 0;
 
@@ -1245,7 +1257,7 @@ export async function POST(req, { params }) {
         decisionesDeCosto.push({
           detalleId: det.id,
           escribio: escribeCosto,
-          motivo: escribeCosto ? null : decision.motivo,
+          motivo: escribeCosto ? null : esFiambre ? "FIAMBRE_POR_PIEZA" : decision.motivo,
           clase: clasificacion.clase,
           diferenciaPct: clasificacion.diferenciaPct,
           gobernadaPorUmbrales: fronteraCostoActiva,
