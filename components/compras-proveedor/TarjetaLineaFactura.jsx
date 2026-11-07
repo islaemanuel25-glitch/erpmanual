@@ -258,8 +258,12 @@ export default function TarjetaLineaFactura({
               precio propio: no hay nada que resolver. Un salto de PRECIO no
               lleva frase (Emanuel, 2026-10-29): lo dicen el tono de la tarjeta
               y el porcentaje del renglón ERP. La escala sí, porque pide
-              revisar la cantidad. */}
-          {fila?.corridaSospechada !== true && loQueNoCuadra(fila)?.que === "ESCALA" && !frenoYaDecidido(fila) && (
+              revisar la cantidad. Y también el precio que, con la cantidad
+              del papel ya leída, no se parece al del producto (bebidas,
+              2026-11-07): pide revisar si es el producto correcto. */}
+          {fila?.corridaSospechada !== true &&
+            (loQueNoCuadra(fila)?.que === "ESCALA" || loQueNoCuadra(fila)?.otroProducto === true) &&
+            !frenoYaDecidido(fila) && (
             <p className="text-sm2 sunmi-text-warning break-words">{loQueNoCuadra(fila).texto}</p>
           )}
           {fila?.corridaSospechada !== true && !escalaSinDeducir(fila) && cuadraConElPapel(fila) === false && (

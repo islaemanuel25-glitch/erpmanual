@@ -99,6 +99,7 @@ import {
   enUnidadesDeLaFila,
   estadoDeLinea,
   hayDiferenciaDePrecio,
+  loQueNoCuadra,
   motivoSinComparacion,
   piezasContadasDeLaFila,
   piezasEstimadasDeLaFactura,
@@ -1373,7 +1374,15 @@ export default function HojaCorregirLinea({
                 {/* En el salto de precio no va la frase: van los dos precios de
                     una unidad con el porcentaje, igual que en la tarjeta. */}
                 {esSaltoDePrecio ? (
-                  losDosPrecios(deUnaUnidad.erp, deUnaUnidad.papel, "u")
+                  <>
+                    {losDosPrecios(deUnaUnidad.erp, deUnaUnidad.papel, "u")}
+                    {/* Salvo que, con la cantidad del papel ya leída, el precio
+                        no se parezca al del producto: ahí se dice, y el
+                        «Cambiar» de arriba es la salida (bebidas, 2026-11-07). */}
+                    {loQueNoCuadra(fila)?.otroProducto === true && (
+                      <span className="text-sm3 sunmi-text-warning break-words">{sinComparacion}</span>
+                    )}
+                  </>
                 ) : (
                   <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
                 )}
