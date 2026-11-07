@@ -34,7 +34,8 @@ import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDe
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import { UNIDAD } from "@/lib/compras-proveedor/comprobante/unidadPorPrecio";
 import { cantidadPorCajaEnNombre } from "@/lib/proveedores/listas/lectura/numeroDeLista";
-import { buscarCandidatos, unCodigoContieneAlOtro } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { buscarCandidatos } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { esCodigoDeBarras } from "@/lib/proveedores/listas/conciliarLista";
 import {
   AVISO_ESCALA,
   ESTADO_LINEA,
@@ -132,9 +133,10 @@ test("SCHNEIDER CONTRA 361: EL CARTEL DICE QUE PUEDE SER OTRO PRODUCTO, NO «REV
 // `permitirCodigoAproximado`, encendida en la recepción por Arcor el
 // 2026-09-22): el vínculo del proveedor con 361 guarda 2837737282828, el papel
 // de Schneider trae 2737378282828, y los dos terminan en "282828". Seis de
-// trece dígitos, y la escalera vinculaba sola con cuatro. Ahora una
-// terminación compartida solo sugiere; el código entero con un prefijo —Arcor:
-// 1999 contra 1001999— sigue vinculando.
+// trece dígitos, y la escalera vinculaba sola con cuatro. Desde la precisión
+// de Emanuel (2026-11-07): la terminación vale para los códigos INTERNOS
+// (Arcor: 1999 contra 1001999, sigue vinculando); un código de barras coincide
+// entero o es otro producto, y la terminación solo lo sugiere.
 const VINCULO_361 = { id: 1, productoBaseId: 361, codigoInterno: "2837737282828", descripcionProveedor: "361 473 x 24", activo: true, nombre: "361 LATA X24" };
 
 test("SCHNEIDER NO SE VINCULA SOLO A 361 POR COMPARTIR LA TERMINACIÓN DEL CÓDIGO: QUEDA COMO SUGERENCIA", () => {
@@ -146,7 +148,7 @@ test("SCHNEIDER NO SE VINCULA SOLO A 361 POR COMPARTIR LA TERMINACIÓN DEL CÓDI
   });
   assert.equal(r.vinculoAutomatico, null, "Schneider se ató solo a 361 por «282828»");
   assert.equal(r.candidatos[0]?.productoBaseId, 361, "se sugiere, para que alguien elija");
-  assert.equal(unCodigoContieneAlOtro("2737378282828", "2837737282828"), false);
+  assert.equal(esCodigoDeBarras("2737378282828"), true, "13 dígitos: un código de barras coincide entero o es otro producto");
 });
 
 test("CONTRAPRUEBA: EL CÓDIGO ENTERO CON UN PREFIJO (ARCOR, 1999 CONTRA 1001999) SIGUE VINCULANDO SOLO", () => {
