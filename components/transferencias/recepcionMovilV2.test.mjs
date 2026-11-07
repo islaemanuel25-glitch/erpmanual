@@ -697,7 +697,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 108 el 2026-11-05: `20261105220000_lista_machea_por_nombre_vinculado`,
   // un valor al final del enum `TipoCoincidenciaLista` (listas de precios). No
   // toca la recepción.
-  assert.equal(migraciones.length, 108,"aparecio una migracion que nadie declaro aca");
+  // Sube a 109 el 2026-11-07: `20261107025108_propuesta_ia_renglon`, una tabla
+  // nueva `PropuestaIaRenglon` (la IA propone en los renglones dudosos de la
+  // recepción de compras). No toca transferencias.
+  assert.equal(migraciones.length, 109,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

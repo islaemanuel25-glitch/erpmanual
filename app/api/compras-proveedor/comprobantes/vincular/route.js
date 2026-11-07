@@ -35,6 +35,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
   parDelTextoRechazado,
   parRechazado,
@@ -278,6 +279,23 @@ export async function POST(req) {
             : {}),
         },
       });
+
+      // ── SI LA IA HABÍA PROPUESTO ALGO, SE ANOTA QUÉ HIZO LA PERSONA ────
+      //
+      // Para medir cuánto acierta (Emanuel, 2026-11-07): "CONFIRMADA" si
+      // vinculó el producto propuesto, "OTRO" si eligió otro. Solo la primera
+      // decisión: cambiar después de nuevo no reescribe lo que se midió.
+      const propuestaIa = await tx.propuestaIaRenglon.findUnique({
+        where: { comprobanteLineaId: linea.id },
+        select: { id: true, productoBaseId: true, resultado: true },
+      });
+      const resultadoIa = propuestaIa && propuestaIa.resultado == null ? resultadoDeLaEleccion(propuestaIa, productoBaseId) : null;
+      if (resultadoIa) {
+        await tx.propuestaIaRenglon.update({
+          where: { id: propuestaIa.id },
+          data: { resultado: resultadoIa, resueltaEn: new Date(), productoElegidoId: productoBaseId },
+        });
+      }
 
       // ── QUÉ HACE QUE EL PRODUCTO APAREZCA LA PRÓXIMA VEZ ──────────────
       //

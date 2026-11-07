@@ -6178,6 +6178,9 @@ model ComprobanteLinea {
 
   comprobante ComprobanteProveedor @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
 
+  /// Lo que propuso la IA para este renglón dudoso, si se consultó.
+  propuestaIa PropuestaIaRenglon?
+
   @@index([comprobanteId, orden])
   @@index([productoLocalId])
   @@index([pedidoDetalleId])
@@ -6186,6 +6189,46 @@ model ComprobanteLinea {
   /// schema describa la estructura REAL: sin esto, una base construida desde el
   /// schema sale sin el índice y `migrate diff` propone borrarlo de producción.
   @@index([codigoProveedor])
+}
+
+/// LO QUE LA IA PROPUSO PARA UN RENGLÓN DUDOSO DE LA RECEPCIÓN (2026-11-07).
+///
+/// Emanuel: que la IA ENTIENDA los renglones dudosos —sin vincular, o
+/// vinculados con números que no cierran—, no solo los lea. Una llamada por
+/// recepción, con los candidatos del motor a la vista. La propuesta NUNCA
+/// vincula sola: el sistema la verifica con los números (`verificarPropuesta`)
+/// y, si cierra, la ofrece primera en "Qué producto es".
+///
+/// Se guarda también la descartada (`valida` en false) y lo que hizo después la
+/// persona (`resultado`), para medir cuánto acierta. Un hecho por columna:
+/// la propuesta de la IA, el veredicto de los números y la decisión de la
+/// persona no se pisan.
+model PropuestaIaRenglon {
+  id                 Int       @id @default(autoincrement())
+  grupoId            Int
+  comprobanteLineaId Int       @unique
+  /// El producto propuesto, o null si la IA dijo "ninguno".
+  productoBaseId     Int?
+  /// Cuántas unidades trae cada uno de lo que factura el renglón, según la IA.
+  unidadesPorPack    Int?
+  /// El motivo corto que dio la IA, en castellano.
+  motivo             String?
+  /// Si los números cerraron con el producto y el pack propuestos.
+  valida             Boolean   @default(false)
+  /// La variación que dio la verificación, en porcentaje. Null sin números.
+  variacionPct       Decimal?  @db.Decimal(9, 2)
+  modelo             String?
+  creadaEn           DateTime  @default(now())
+  /// "CONFIRMADA" si la persona vinculó el producto propuesto; "OTRO" si eligió
+  /// otro. Null mientras nadie decidió.
+  resultado          String?
+  resueltaEn         DateTime?
+  /// El producto que eligió la persona, sea el propuesto o no.
+  productoElegidoId  Int?
+
+  linea ComprobanteLinea @relation(fields: [comprobanteLineaId], references: [id], onDelete: Cascade)
+
+  @@index([grupoId])
 }
 
 /// Una fila por LLAMADA al modelo de lectura, haya salido bien o mal.

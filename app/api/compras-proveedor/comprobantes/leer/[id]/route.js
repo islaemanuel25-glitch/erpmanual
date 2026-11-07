@@ -51,6 +51,7 @@ import { agruparLasHojasDelPapel } from "@/lib/compras-proveedor/comprobante/fus
 import { vincularContraElPedido } from "@/lib/compras-proveedor/comprobante/vincularContraElPedido";
 import { acomodarFilasCorridas } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
+import { razonarRenglonesDudosos } from "@/lib/compras-proveedor/comprobante/razonarRenglones";
 import {
   estadoDeLaFalla,
   MOTIVO_LECTURA,
@@ -833,6 +834,22 @@ export async function POST(req, { params }) {
           console.error("No se pudieron armar las líneas del pedido desde la factura:", e?.message);
           siembra = { ok: false, motivo: "NO_SE_PUDO" };
         }
+      }
+
+      // ── LA IA ENTIENDE LOS RENGLONES DUDOSOS (Emanuel, 2026-11-07) ───────
+      //
+      // Una sola consulta por recepción, con los renglones que quedaron sin
+      // vincular o con números que no cierran. NO se espera: la lectura ya está
+      // guardada y la pantalla no tiene por qué demorar. Las propuestas
+      // aparecen en "Qué producto es" cuando la pantalla vuelve a cargar. Si la
+      // IA falla, no pasa nada: queda una línea en el log (`razonarRenglones`).
+      if (comprobante.pedidoId) {
+        void razonarRenglonesDudosos(prisma, {
+          grupoId,
+          localId: ctx.localId,
+          pedidoId: comprobante.pedidoId,
+          comprobanteId: comprobante.id,
+        });
       }
 
       return NextResponse.json({

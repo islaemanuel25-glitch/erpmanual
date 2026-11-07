@@ -16,8 +16,18 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **108 migraciones**, la última
-`20261105220000_lista_machea_por_nombre_vinculado`.
+Producción está en **108 migraciones**, la última
+`20261105220000_lista_machea_por_nombre_vinculado`. Falta **1**:
+
+- `20261107025108_propuesta_ia_renglon` — **ADITIVA.** Crea la tabla
+  `PropuestaIaRenglon` (lo que la IA propone para un renglón dudoso de la
+  recepción, si cerró con los números y qué hizo la persona), con su índice
+  único por `comprobanteLineaId`, un índice por `grupoId` y la clave foránea a
+  `ComprobanteLinea` con `ON DELETE CASCADE`. No toca ninguna tabla existente,
+  no rellena nada y no tiene `DO`. Sin ella, la ruta de leer igual guarda la
+  lectura —la consulta a la IA corre aparte y su falla solo deja una línea en el
+  log—, pero la conciliación pide la relación `propuestaIa` y se cae: hay que
+  aplicarla ANTES de levantar la imagen, como todas.
 
 ---
 

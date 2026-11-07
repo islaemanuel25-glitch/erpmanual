@@ -69,6 +69,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiPar from "@/components/sunmi/SunmiPar";
+import { ROTULO_PROPUESTA_IA, propuestaParaLaPantalla } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
@@ -277,7 +279,16 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   // Si la cascada no encontró nada en ningún escalón, una hoja con un solo
   // botón "Buscar" es un toque de más. Se abre buscando, con las palabras
   // significativas del papel ya escritas.
-  const sinCandidatos = fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length;
+  // Con una propuesta de la IA que cierra hay algo que ofrecer: no se abre buscando.
+  const hayPropuestaIa =
+    propuestaParaLaPantalla({
+      guardada: fila?.propuestaIa,
+      fila,
+      ficha: fila?.propuestaIa?.ficha,
+      variacionNormalPct: fila?.variacionNormalPct,
+    }) !== null;
+  const sinCandidatos =
+    fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length && !hayPropuestaIa;
   const [buscando, setBuscando] = useState(sinCandidatos);
   const [error, setError] = useState("");
   // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
@@ -294,7 +305,20 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   // No se pierden: se llega a ellos por "Buscar en todo el catálogo", que es
   // explícito y dice dónde está buscando.
   const deTodoElErp = fila?.origen === ORIGEN_VINCULO.ERP_COMPLETO;
-  const candidatos = deTodoElErp ? [] : fila?.candidatos ?? [];
+  // ── LA PROPUESTA DE LA IA, PRIMERA (Emanuel, 2026-11-07) ───────────────
+  //
+  // Solo si cerró con los números, vueltos a verificar con los de hoy
+  // (`propuestaParaLaPantalla`). No vincula: se elige con un toque, por el
+  // mismo `elegir` que cualquier otro, y eso guarda el vínculo confirmado.
+  const propuesta = propuestaParaLaPantalla({
+    guardada: fila?.propuestaIa,
+    fila,
+    ficha: fila?.propuestaIa?.ficha,
+    variacionNormalPct: fila?.variacionNormalPct,
+  });
+  const candidatos = (deTodoElErp ? [] : fila?.candidatos ?? []).filter(
+    (c) => Number(c.productoBaseId) !== Number(propuesta?.productoBaseId)
+  );
 
   // `extra`: lo que preguntó el alta —`{ precioEs }`—, que el vínculo recuerda.
   const elegir = async (productoBaseId, extra) => {
@@ -321,7 +345,20 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
         />
       ) : (
         <>
-          {candidatos.length === 0 && (
+          {propuesta && (
+            <SunmiButton
+              color="slate"
+              type="button"
+              disabled={guardando}
+              onClick={() => elegir(propuesta.productoBaseId)}
+              aria-label={`${ROTULO_PROPUESTA_IA}: ${propuesta.nombre}`}
+              className="w-full min-h-toque justify-start text-left text-sm3"
+            >
+              <SunmiPar arriba={`${ROTULO_PROPUESTA_IA} · ${propuesta.nombre}`} abajo={propuesta.cuenta} />
+            </SunmiButton>
+          )}
+
+          {candidatos.length === 0 && !propuesta && (
             <span className="text-sm3 sunmi-text-muted">
               {deTodoElErp
                 ? `No hay ninguno parecido entre lo que se le compra a ${
