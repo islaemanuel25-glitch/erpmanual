@@ -101,6 +101,7 @@ import {
   hayDiferenciaDePrecio,
   loQueNoCuadra,
   motivoSinComparacion,
+  packDelPapel,
   piezasContadasDeLaFila,
   piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
@@ -114,6 +115,7 @@ import {
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
 import {
+  esPackIntermedio,
   quedoEnBultos,
   renglonesDeLaTarjeta,
   unidadDeComparacion,
@@ -162,12 +164,27 @@ const limpio = (n) => {
   return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
 };
 
-/** El precio de la unidad que sale de lo puesto: importe ÷ cantidad. Se muestra, no se escribe. */
-function precioDeLaUnidad(cantidad, importe) {
+/**
+ * El precio que sale de lo puesto: importe ÷ cantidad. Se muestra, no se
+ * escribe.
+ *
+ * ── SI EL PAPEL TRAE PACK DE N, ES EL PRECIO DEL PACK (2026-11-07) ──────
+ *
+ * Colombres, "7UP LATA X 6", 8 × $ 5.900: decía "Precio de la unidad:
+ * $5.900,00", y $ 5.900 es el pack de 6. La regla de 8da36311 —nunca "unidad" a
+ * un precio de pack— no había llegado acá. Con pack (`packDelPapel`): "Precio
+ * del pack de 6: $5.900,00 · la unidad $983,33". Sin pack, como siempre.
+ */
+export function precioDeLaUnidad(cantidad, importe, pack = null) {
   const c = Number(cantidad);
   const i = Number(importe);
-  const precio = cantidad !== "" && importe !== "" && c > 0 && i >= 0 ? formatearMoneda(i / c) : "—";
-  return `Precio de la unidad: ${precio}`;
+  const hay = cantidad !== "" && importe !== "" && c > 0 && i >= 0;
+  if (Number.isInteger(pack) && pack > 1) {
+    return hay
+      ? `Precio del pack de ${pack}: ${formatearMoneda(i / c)} · la unidad ${formatearMoneda(i / c / pack)}`
+      : `Precio del pack de ${pack}: —`;
+  }
+  return `Precio de la unidad: ${hay ? formatearMoneda(i / c) : "—"}`;
 }
 
 /**
@@ -579,22 +596,28 @@ export default function HojaCorregirLinea({
   // factura por kilo —Das #255, "10,94 × 9.375,87"— son KILOS, con su
   // estimación de piezas al lado para cotejar contra lo pedido; nunca "10.94".
   const piezasEstimadas = piezasEstimadasDeLaFactura(fila);
-  const loQueDiceLaFactura =
-    fila?.cantidadEnKilos === true
-      ? `${formatearKgExacto(fila.peso)}${piezasEstimadas !== null ? ` (≈ ${limpio(Math.round(piezasEstimadas * 10) / 10)} piezas)` : ""}`
-      : limpio(cantidadDeLaFactura);
-  const convertida = cantidadFueConvertida(fila);
   // ── CUANDO EL PROVEEDOR FACTURA UN PACK DEL BULTO ─────────────────────
   //
   // La lectura y su frase salen de la deducción —`explicarVeredicto`—, no se
   // arman acá: "Dyssa lo trae por pack de 6: 8 packs = 2 bultos de 24". Y si
   // la deducción no pudo decidir entre packs, la frase dice cada resultado.
   const viaPack = fila?.unidad?.unidad === "POR_PRESENTACION" ? lecturaElegida(fila.unidad) : null;
+  // Con el pack elegido, lo que dice la factura es lo que factura y en qué
+  // entra —"8 packs de 6 = 2 bultos de 24"—, de la misma lectura. Decía "La
+  // factura dice 2", los bultos (Colombres, 7UP LATA X 6, 2026-11-07).
+  const loQueDiceLaFactura =
+    fila?.cantidadEnKilos === true
+      ? `${formatearKgExacto(fila.peso)}${piezasEstimadas !== null ? ` (≈ ${limpio(Math.round(piezasEstimadas * 10) / 10)} piezas)` : ""}`
+      : viaPack?.loQueDiceLaFactura ?? limpio(cantidadDeLaFactura);
+  const convertida = cantidadFueConvertida(fila);
   const explicacionDeLaUnidad = fila?.unidad?.explicacion ?? null;
+  // Esa cuenta ya dice el pack: la frase de la deducción la repetiría.
   const fraseDeLaUnidad =
-    viaPack || fila?.unidad?.requiereDecision || explicacionDeLaUnidad?.noCompletanPacks
-      ? explicacionDeLaUnidad?.frase ?? null
-      : null;
+    viaPack?.loQueDiceLaFactura
+      ? null
+      : viaPack || fila?.unidad?.requiereDecision || explicacionDeLaUnidad?.noCompletanPacks
+        ? explicacionDeLaUnidad?.frase ?? null
+        : null;
   // Pablo #337: cuando las unidades no completan packs la frase lo dice todo
   // —"El papel dice 30 unidades. No completan packs de 6: cargá cuántas
   // entraron."— y un "la factura dice 2.5" al lado volvería a hablar en packs
@@ -965,7 +988,13 @@ export default function HojaCorregirLinea({
       {formatearMoneda(trae)} / {unidad}
     </span>
   );
-  const losDosPreciosDeSiempre = losDosPrecios(tuPrecio, fila.costoFactura, unidadDelPrecio);
+  // Un pack intermedio —"7UP LATA X 6" contra el bulto de 24— se compara por
+  // unidad, como la tarjeta: "/ pack" al lado de 23.600 no decía de cuál pack
+  // (2026-11-07). El porcentaje es el mismo.
+  const losDosPreciosDeSiempre =
+    esPackIntermedio(fila) && deUnaUnidad
+      ? losDosPrecios(deUnaUnidad.erp, deUnaUnidad.papel, "u")
+      : losDosPrecios(tuPrecio, fila.costoFactura, unidadDelPrecio);
 
   return (
     <SunmiModalLayout
@@ -1138,7 +1167,7 @@ export default function HojaCorregirLinea({
                 </div>
               ))}
               <span className="text-sm3 sunmi-text-muted truncate">
-                {precioDeLaUnidad(papelCantidad, papelImporte)}
+                {precioDeLaUnidad(papelCantidad, papelImporte, packDelPapel(fila))}
               </span>
               <SunmiButton
                 color="slate"
@@ -1182,7 +1211,7 @@ export default function HojaCorregirLinea({
                   : sinPedidoPrevio
                     ? `La factura dice ${loQueDiceLaFactura}`
                     : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${loQueDiceLaFactura}`}
-              {soloLaFrase
+              {soloLaFrase || viaPack?.loQueDiceLaFactura
                 ? ""
                 : fraseDeLaUnidad
                 ? ` · ${fraseDeLaUnidad}`

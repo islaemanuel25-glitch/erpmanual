@@ -27,7 +27,7 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import HojaCorregirLinea from "./HojaCorregirLinea.jsx";
+import HojaCorregirLinea, { precioDeLaUnidad } from "./HojaCorregirLinea.jsx";
 import TarjetaLineaFactura from "./TarjetaLineaFactura.jsx";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
@@ -51,10 +51,10 @@ const SEVEN_UP = pack24(24000);
 const LATA_361 = pack24(24500);
 const BRAHMA = pack24(39800);
 
-function fila({ texto, cantidad, unitario, producto, pedidos = cantidad }) {
+function fila({ texto, cantidad, unitario, producto, pedidos = cantidad, unidadPedido = "BULTO", precioPedido = producto.precio_costo }) {
   const linea = { orden: 1, textoCrudo: texto, cantidad, netoUnitario: unitario, subtotalImpreso: cantidad * unitario, costoFinalRenglon: cantidad * unitario, enQueViene: null };
-  const precio = analizarPrecioDeLinea({ linea, producto, proveedor: { nombre: "Bebidas" } });
-  const det = { id: 7001, cantidad: pedidos, unidad: "BULTO", precioCosto: producto.precio_costo, costoMaestroHoy: producto.precio_costo, productoBaseId: 900, factorPack: 24, cantidadRecibida: null };
+  const precio = analizarPrecioDeLinea({ linea, producto, proveedor: { nombre: "Colombres" } });
+  const det = { id: 7001, cantidad: pedidos, unidad: unidadPedido, precioCosto: precioPedido, costoMaestroHoy: producto.precio_costo, productoBaseId: 900, factorPack: 24, cantidadRecibida: null };
   const [f] = filasDeConciliacion({
     comprobantes: [{ id: 80, estado: "CARGADO", lineas: [{ ...linea, id: 800, pedidoDetalleId: det.id, productoLocalId: 1, pedidoDetalle: det, precio, unidad: precio.unidad, decisionPrecio: null, costoMaestroCatalogo: producto.precio_costo }] }],
     detalles: [det],
@@ -165,4 +165,51 @@ test("BRAHMA 473 cc x 24 SIGUE «COINCIDE»", () => {
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.COINCIDE);
   assert.equal(motivoSinComparacion(f), null);
   assert.equal(renglonesDeLaTarjeta(f).cantidad, "3 PACK x24");
+});
+
+// ── COLOMBRES, DESPUÉS DE 8da36311 (Emanuel, 2026-11-07) ──────────────────
+//
+// El mismo "7UP LATA X 6", 8 × $ 5.900, sobre un pedido cargado por UNIDAD a
+// $ 1.000. La cuenta salía bien (2 bultos de 24, "El precio bajó 1,7 %") y
+// quedaban tres textos mal en Corregir: el aviso de producto equivocado sobre
+// un −1,7 %, "La factura dice 2" y "Precio de la unidad: $5.900,00".
+const COLOMBRES = () =>
+  fila({ texto: "3838299291 - 7UP LATA X 6", cantidad: 8, unitario: 5900, producto: SEVEN_UP, pedidos: 48, unidadPedido: "UNIDAD", precioPedido: 1000 });
+const hojaConPapel = (f) =>
+  renderToStaticMarkup(
+    React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {}, onGuardar() {}, onCorregirPapel() {} })
+  )
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ");
+
+test("COLOMBRES 7UP (−1,7 %): SIN EL AVISO DE PRODUCTO EQUIVOCADO, NI EN LA TARJETA NI EN CORREGIR", () => {
+  const f = COLOMBRES();
+  assert.doesNotMatch(motivoSinComparacion(f) ?? "", /no se parece al de este producto/);
+  assert.doesNotMatch(tarjeta(f), /no se parece al de este producto/);
+  const h = hoja(f);
+  assert.doesNotMatch(h, /no se parece al de este producto/, "un −1,7 % es una variación común");
+  assert.match(h, /El precio bajó 1,7 %/);
+  // Y Schneider, a +114 %, lo sigue teniendo (ver arriba).
+  assert.match(motivoSinComparacion(SCHNEIDER()), /^El precio no se parece al de este producto/);
+});
+
+test("COLOMBRES 7UP: «LA FACTURA DICE 8 PACKS DE 6 = 2 BULTOS DE 24», NO «LA FACTURA DICE 2»", () => {
+  const h = hoja(COLOMBRES());
+  assert.match(h, /la factura dice 8 packs de 6 = 2 bultos de 24/i);
+  assert.doesNotMatch(h, /la factura dice 2\b/i);
+  assert.doesNotMatch(h, /lo trae por pack de 6: 8 packs = 2 bultos de 24/, "la misma cuenta dicha dos veces");
+  // Sin pack del papel, como siempre: Brahma dice sus 3.
+  assert.match(hoja(BRAHMA_3()), /la factura dice 3\b/i);
+});
+
+test("COLOMBRES 7UP: «PRECIO DEL PACK DE 6: $5.900,00 · LA UNIDAD $983,33»; SIN PACK, «PRECIO DE LA UNIDAD»", () => {
+  assert.equal(precioDeLaUnidad("8", "47200", 6), "Precio del pack de 6: $5.900,00 · la unidad $983,33");
+  assert.equal(precioDeLaUnidad("3", "119400", null), "Precio de la unidad: $39.800,00");
+  // En la hoja, el bloque «Lo que dice el papel» del 7UP rotula el pack.
+  const h = hojaConPapel(COLOMBRES());
+  assert.match(h, /Lo que dice el papel/);
+  assert.match(h, /Precio del pack de 6:/);
+  assert.doesNotMatch(h, /Precio de la unidad:/);
+  // Y en «Tenías… / la factura trae…», la unidad de los dos lados.
+  assert.doesNotMatch(h, /5\.900,00 \/ u/);
 });

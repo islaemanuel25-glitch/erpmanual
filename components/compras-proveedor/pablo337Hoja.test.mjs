@@ -142,5 +142,8 @@ test("2 · LOS DOS PRECIOS JUNTOS VAN EN LA MISMA UNIDAD, DICHA AL LADO", () => 
   const codigo = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   // Con el porcentaje del renglón ERP al lado de lo que tenías (2026-10-29).
   assert.match(codigo, /Tenías \{formatearMoneda\(tenias\)\} \/ \{unidad\} <PorcentajeDelErp erp=\{erpDeLaTarjeta\} \/> · la factura trae\{" "\}\s*\{formatearMoneda\(trae\)\} \/ \{unidad\}/);
-  assert.match(codigo, /const losDosPreciosDeSiempre = losDosPrecios\(tuPrecio, fila\.costoFactura, unidadDelPrecio\);/);
+  // Los de siempre, salvo un pack intermedio, que va por unidad como la
+  // tarjeta (Colombres, 7UP LATA X 6, 2026-11-07).
+  assert.match(codigo, /: losDosPrecios\(tuPrecio, fila\.costoFactura, unidadDelPrecio\);/);
+  assert.match(codigo, /esPackIntermedio\(fila\) && deUnaUnidad\s*\? losDosPrecios\(deUnaUnidad\.erp, deUnaUnidad\.papel, "u"\)/);
 });
