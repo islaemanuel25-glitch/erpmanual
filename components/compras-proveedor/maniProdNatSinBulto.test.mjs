@@ -35,8 +35,10 @@ import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/preci
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 import { ACCION_PRECIO, MOTIVO_NO_ACEPTAR, puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { formatearMoneda } from "@/lib/moneda";
+// El cartel que frenaba, borrado el 2026-11-07. Se sigue afirmando que no aparece.
+const AVISO_ESCALA = "No se puede saber en qué viene: revisá la cantidad.";
 import {
-  AVISO_ESCALA,
+  TEXTO_ELEGI_EN_QUE_VIENE,
   loQueNoCuadra,
   productoSinBulto,
   saltoDePrecioAceptable,
@@ -127,16 +129,18 @@ test("EL SERVIDOR acepta el precio del papel con el freno levantado, y sin levan
   assert.deepEqual(puedeAceptarse(base), { ok: false, motivo: MOTIVO_NO_ACEPTAR.SALTO_BRUSCO });
 });
 
-test("CONTRAPRUEBA: un pack de 12 donde ninguna lectura explica el precio sigue con el cartel y sin opciones", () => {
-  // $1.600 lo facturado contra el pack de 12 a $38.400: el bulto sería 24
-  // veces más caro, la unidad suelta el doble, y ningún pack del bulto lo
-  // explica.
+test("CONTRAPRUEBA: un pack de 12 donde ninguna lectura gana clara se pregunta, sin freno y sin opciones de precio", () => {
+  // $1.600 lo facturado contra el pack de 12 a $38.400: por unidad −50 %, por
+  // el bulto −96 %. La segunda no le saca el triple a la primera: no hay
+  // ganadora (Emanuel, 2026-11-07) y se pregunta en qué viene. Hasta ese día
+  // frenaba con "No se puede saber en qué viene: revisá la cantidad.".
   const f = pack();
   assert.equal(f.unidad.requiereDecision, true);
   assert.equal(productoSinBulto(f), false);
-  assert.equal(loQueNoCuadra(f).que, "ESCALA");
+  assert.equal(loQueNoCuadra(f).que, "ELEGIR");
   assert.equal(saltoDePrecioAceptable(f), false);
   assert.equal(saltoSinBultoConOpciones(f), false);
-  assert.match(aLaVistaHtml(tarjeta(f)), new RegExp(literal(AVISO_ESCALA)));
+  assert.match(aLaVistaHtml(tarjeta(f)), new RegExp(literal(TEXTO_ELEGI_EN_QUE_VIENE)));
+  assert.doesNotMatch(aLaVistaHtml(tarjeta(f)), /No se puede saber en qué viene/);
   assert.doesNotMatch(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), /Aceptar el precio nuevo/);
 });

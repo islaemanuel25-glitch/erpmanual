@@ -128,7 +128,9 @@ test("lo que no es un precio sigue sin poder aceptarse: un papel corrido, una es
   const PACK = { ...PICNIC, factor_pack: 12, unidad_medida: "pack", precio_costo: 9008.4 };
   const escala = picnic({ producto: PACK, detalle: { ...DETALLE, precioCosto: 9008.4, unidad: "BULTO", factorPack: 12 } });
   assert.equal(escala.unidad.requiereDecision, true, "ninguna lectura explica el precio");
-  assert.equal(loQueNoCuadra(escala).que, "ESCALA");
+  // Desde el 2026-11-07 no frena con "no se puede saber en qué viene": se
+  // pregunta en qué viene (por unidad −50 %, por el bulto −96 %, sin triple).
+  assert.equal(loQueNoCuadra(escala).que, "ELEGIR");
   assert.equal(saltoDePrecioAceptable(escala), false);
   assert.doesNotMatch(abrir(escala), /Aceptar el precio nuevo/);
 });

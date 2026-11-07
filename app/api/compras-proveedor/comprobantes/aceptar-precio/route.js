@@ -70,6 +70,7 @@ import {
   saltoSinBultoConOpciones,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
+import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
 import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
@@ -257,9 +258,22 @@ export async function POST(req) {
       });
     }
 
+    // ── LA VARIACIÓN DEL PROVEEDOR, LA MISMA QUE USA LA HOJA ────────────
+    //
+    // La regla de la menor diferencia (Emanuel, 2026-11-07) elige en qué viene
+    // el renglón con este umbral; con otro, esta ruta podría leer otra escala
+    // que la hoja que mandó la decisión. Sin receta, el de siempre.
+    const recetaVigente = await prisma.recetaProveedor.findFirst({
+      where: { grupoId, proveedorId: linea.comprobante.proveedor.id },
+      select: { variacionNormalPct: true },
+    });
+    const variacionDelProveedor =
+      recetaVigente?.variacionNormalPct != null ? Number(recetaVigente.variacionNormalPct) : VARIACION_POR_DEFECTO;
+
     const analisis = analizarPrecioDeLinea({
       linea,
       producto: base,
+      variacionPct: variacionDelProveedor,
       // ── LO QUE LE TOCA DE LOS CARGOS, IGUAL QUE EN LA HOJA ────────────
       //
       // El reparto es de la factura entera, por eso se le pasan todas sus
@@ -465,10 +479,6 @@ export async function POST(req) {
     // preguntar sobre algo ya contestado. El costo maestro sale de `base`, el
     // producto que resolvió la cascada, que ya trae el costo y los campos de la
     // unidad del depósito.
-    const recetaVigente = await prisma.recetaProveedor.findFirst({
-      where: { grupoId, proveedorId: linea.comprobante.proveedor.id },
-      select: { variacionNormalPct: true },
-    });
     const catalogoMovido = elCatalogoSeMovio(
       {
         costoFactura: precioAEscribir,
@@ -487,9 +497,18 @@ export async function POST(req) {
     const resultado = await prisma.$transaction(async (tx) => {
       const detalle = await tx.pedidoProveedorDetalle.findUnique({
         where: { id: delPedido.detalle.id },
-        select: { id: true, precioCosto: true },
+        select: { id: true, precioCosto: true, unidad: true },
       });
       if (!detalle) throw new Error("El producto ya no está en el pedido.");
+      // ── EN LA UNIDAD DE LA LÍNEA DEL PEDIDO (2026-11-07) ────────────────
+      //
+      // `precioAEscribir` es el costo del BULTO de la ficha. Una línea pedida
+      // por UNIDAD guarda el de la unidad: el Colon tinto dulce, pedido por
+      // unidad a $ 6.666,67, habría quedado a $ 44.543,90 cada botella. La
+      // misma conversión que la siembra (`costoParaUnidad`); una línea por
+      // BULTO queda igual.
+      const precioEnLaLinea =
+        costoParaUnidad({ costoMaestro: precioAEscribir, unidad: detalle.unidad, producto: base }) ?? precioAEscribir;
 
       // EL PRECIO ANTERIOR SE GUARDA ANTES DE PISARLO, en su columna propia.
       // Sin esto no se puede ver a qué se pidió y a qué terminó facturando, que
@@ -507,7 +526,7 @@ export async function POST(req) {
 
       await tx.pedidoProveedorDetalle.update({
         where: { id: detalle.id },
-        data: { precioCosto: precioAEscribir },
+        data: { precioCosto: precioEnLaLinea },
       });
 
       // LA DECISIÓN, CON LOS DOS PRECIOS QUE SE COMPARARON. El propio es el de
@@ -524,7 +543,7 @@ export async function POST(req) {
       // ninguna pregunta que contestar, y la fila quedaría diciendo "antes
       // decidiste" sobre una comparación que nunca existió — salvo que la
       // pregunta haya sido por el catálogo movido, que sí existió.
-      if (!mismoPrecio(detalle.precioCosto, precioAEscribir) || catalogoMovido) {
+      if (!mismoPrecio(detalle.precioCosto, precioEnLaLinea) || catalogoMovido) {
         await guardarDecisionDePrecio(tx, {
           grupoId,
           proveedorId: linea.comprobante.proveedor.id,
@@ -538,7 +557,7 @@ export async function POST(req) {
         });
       }
 
-      return { anterior: detalle.precioCosto, nuevo: precioAEscribir };
+      return { anterior: detalle.precioCosto, nuevo: precioEnLaLinea };
     });
 
     return NextResponse.json({

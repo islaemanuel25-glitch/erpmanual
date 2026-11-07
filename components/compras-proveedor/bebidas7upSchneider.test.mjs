@@ -36,8 +36,10 @@ import { UNIDAD } from "@/lib/compras-proveedor/comprobante/unidadPorPrecio";
 import { cantidadPorCajaEnNombre } from "@/lib/proveedores/listas/lectura/numeroDeLista";
 import { buscarCandidatos } from "@/lib/compras-proveedor/comprobante/vinculo";
 import { esCodigoDeBarras } from "@/lib/proveedores/listas/conciliarLista";
+// El cartel que frenaba, borrado el 2026-11-07 (Colon tinto dulce: gana la
+// lectura que deja menos diferencia). Se sigue afirmando que no aparece.
+const AVISO_ESCALA = "No se puede saber en qué viene: revisá la cantidad.";
 import {
-  AVISO_ESCALA,
   ESTADO_LINEA,
   cuantoEntroAlAbrir,
   estadoDeLinea,

@@ -803,6 +803,36 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   }, [cargar]);
 
+  // ── "¿EN QUÉ VIENE?": LO ELEGIDO VA AL RENGLÓN Y SE RECUERDA (2026-11-07) ─
+  //
+  // Cuando ninguna lectura gana clara, Corregir pregunta. La elección va al
+  // renglón (`unidadElegida`) y, si es un pack, al vínculo del proveedor
+  // (`unidadesPorFacturada`); la ruta la recuerda también para el producto con
+  // el proveedor. Al volver se recarga la conciliación: la fila ya sabe en qué
+  // viene y "Cuánto entró" arranca con esa lectura.
+  const elegirLecturaDeLinea = useCallback(async (fila, opcion) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/recepcion/correccion", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedidoId: Number(id),
+          lineaId: fila?.lineaId ?? null,
+          textoCrudo: fila?.textoCrudo ?? null,
+          unidadElegida: opcion?.valor ?? null,
+          unidadesPorFacturada: Number(opcion?.k) > 1 ? Number(opcion.k) : null,
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar en qué viene." };
+      setRecargarConciliacion((n) => n + 1);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo guardar en qué viene." };
+    }
+  }, [id]);
+
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
     if (!id) return;
@@ -1772,6 +1802,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               onAceptarPrecio={aceptarPrecioDeLinea}
               onDejarMiPrecio={dejarMiPrecioDeLinea}
               onGuardar={guardarCorreccion}
+              onElegirLectura={elegirLecturaDeLinea}
               onCorregirPapel={corregirPapel}
               // «No vino»: lo saca del papel por la misma corrección, que lo
               // registra, y queda revisado —es una decisión sobre el producto—.

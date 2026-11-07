@@ -26,7 +26,7 @@ import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDe
 import { cuantoSeValoriza } from "@/lib/compras-proveedor/gananciaDelDeposito";
 import { formatearMoneda } from "@/lib/moneda";
 import {
-  AVISO_ESCALA,
+  TEXTO_ELEGI_EN_QUE_VIENE,
   contadoEnLaEscala,
   cuantoEntroAlAbrir,
   frenoYaDecidido,
@@ -87,24 +87,36 @@ test("1 · 5 BULTOS DE 6 QUE PASAN A UNIDADES SON 30, NO 5", () => {
   assert.match(hoja, /cuantoEntroAlAbrir\(fila\);[\s\S]*?: alAbrir\s*\? String\(alAbrir\.completos\)/);
 });
 
-test("2 · SANTA JULIA: LA CANTIDAD CIERRA CON EL IMPORTE, ASÍ QUE LO QUE NO CUADRA ES EL PRECIO", () => {
+// Del 2026-10-26 al 2026-11-07 esta fila decía que lo que no cuadraba era el
+// precio (−42 % por unidad). Con la regla de Emanuel del 2026-11-07 —gana la
+// lectura que deja menos diferencia, si la segunda le saca el triple—, por
+// unidad deja −41,9 % y por el pack de 6 −90,3 %: no hay ganadora clara y se
+// pregunta, con las dos cuentas. Nunca "revisá la cantidad".
+test("2 · SANTA JULIA: NINGUNA LECTURA GANA CLARA (−41,9 % CONTRA −90,3 %), ASÍ QUE SE PREGUNTA", () => {
   const f = santaJulia30();
+  assert.equal(f.unidad.requiereDecision, true);
   const nc = loQueNoCuadra(f);
-  assert.equal(nc.que, "PRECIO");
-  assert.equal(
-    nc.texto,
-    // Sin "Fijate si es este producto" desde el 2026-10-29: la alerta es visual.
-    `El papel cobra ${formatearMoneda(3890)} la unidad y vos la tenés a ${formatearMoneda(6690)} (42 % menos).`
+  assert.equal(nc.que, "ELEGIR");
+  assert.equal(motivoSinComparacion(f), TEXTO_ELEGI_EN_QUE_VIENE);
+  assert.doesNotMatch(motivoSinComparacion(f), /revisá la cantidad/);
+  assert.deepEqual(
+    f.unidad.lecturasCandidatas.map((l) => [l.unidadesPorFacturada, Math.round(l.diferenciaPct * 10) / 10]),
+    [[1, -41.9], [6, -90.3]]
   );
-  assert.equal(motivoSinComparacion(f), nc.texto, "no «revisá la cantidad», que es lo único que estaba bien");
+  void formatearMoneda;
 });
 
-test("2 · CHANDON: EL PAPEL COBRA LA MITAD DE LA BOTELLA, ASÍ QUE LO QUE NO CUADRA ES LA ESCALA", () => {
+// Hasta el 2026-11-07 decía "No se puede saber en qué viene: revisá la
+// cantidad" y frenaba. Con la regla de Emanuel de ese día: por unidad −48,7 %,
+// por el pack de 6 −91,4 %; la segunda no le saca el triple a la primera, así
+// que no hay ganadora y se pregunta en Corregir, sin frenar.
+test("2 · CHANDON: NINGUNA LECTURA GANA CLARA, ASÍ QUE SE PREGUNTA EN QUÉ VIENE", () => {
   const f = fila({
     texto: "chandon precio x2 15400", cantidad: 72, neto: 7700, importe: 554400, producto: CHANDON,
     detalle: { id: 3216, cantidad: 72, precioCosto: 90000, unidad: "UNIDAD", productoBaseId: 163, factorPack: 6, cantidadRecibida: 72 },
   });
-  assert.deepEqual(loQueNoCuadra(f), { que: "ESCALA", texto: AVISO_ESCALA });
+  assert.equal(f.unidad.requiereDecision, true);
+  assert.deepEqual(loQueNoCuadra(f), { que: "ELEGIR", texto: TEXTO_ELEGI_EN_QUE_VIENE });
 });
 
 test("2 · CON «DEJO MI PRECIO» YA DECIDIDO, EL FRENO NO ES UN AVISO NI BLOQUEA", () => {
@@ -141,7 +153,8 @@ test("2 · LOS DOS PRECIOS JUNTOS VAN EN LA MISMA UNIDAD, DICHA AL LADO", () => 
   assert.match(hoja, new RegExp(`Dejás tu precio · ${formatearMoneda(40140).replace(/\$/g, "\\$")} / pack`));
   const codigo = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   // Con el porcentaje del renglón ERP al lado de lo que tenías (2026-10-29).
-  assert.match(codigo, /Tenías \{formatearMoneda\(tenias\)\} \/ \{unidad\} <PorcentajeDelErp erp=\{erpDeLaTarjeta\} \/> · la factura trae\{" "\}\s*\{formatearMoneda\(trae\)\} \/ \{unidad\}/);
+  // Y con pack, el papel dice el pack y la unidad (2026-11-07).
+  assert.match(codigo, /Tenías \{formatearMoneda\(tenias\)\} \/ \{unidad\} <PorcentajeDelErp erp=\{erpDeLaTarjeta\} \/> · la factura trae\{" "\}\s*\{papelConPack \? papelConPack\.texto : `\$\{formatearMoneda\(trae\)\} \/ \$\{unidad\}`\}/);
   // Los de siempre, salvo un pack intermedio, que va por unidad como la
   // tarjeta (Colombres, 7UP LATA X 6, 2026-11-07).
   assert.match(codigo, /: losDosPrecios\(tuPrecio, fila\.costoFactura, unidadDelPrecio\);/);

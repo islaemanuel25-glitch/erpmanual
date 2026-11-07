@@ -65,14 +65,15 @@ const SANTA_JULIA = fila({
   decision: DEJA_EL_MIO(46680, 40140),
 });
 
-// El porcentaje del renglón ERP: Chandon es ESCALA —el papel cobra la mitad de
-// la botella— y no lleva; Santa Julia es un salto de PRECIO, cuya cantidad
-// cierra con el importe, y desde el 2026-10-29 sí lo lleva (Emanuel, PICNIC):
-// el papel $3.890 contra el ERP $6.690. Desde el 2026-11-06 dice cuánto varió
-// el precio, (papel − ERP) ÷ ERP: bajó, "−41,9 %". Pagás menos: color de éxito del tema (Emanuel, 2026-11-06).
+// El porcentaje del renglón ERP: hasta el 2026-11-07 Chandon era ESCALA y no
+// lo llevaba, y Santa Julia era un salto de PRECIO con su "−41,9 %". Con la
+// regla de Emanuel de ese día —gana la lectura que deja menos diferencia, si le
+// saca el triple a la segunda— ninguno de los dos tiene ganadora clara (Santa
+// Julia: −41,9 % por unidad contra −90,3 % por el pack), así que se pregunta en
+// qué viene y no hay porcentaje: sería el de una lectura que nadie eligió.
 for (const [nombre, f, porUnidad, papel, porcentaje] of [
   ["CHANDON DELICE XCAJA", CHANDON, 15000, 7700, null],
-  ["SANTA JULIA MALBEC", SANTA_JULIA, 6690, 3890, "−41,9 %"],
+  ["SANTA JULIA MALBEC", SANTA_JULIA, 6690, 3890, null],
 ]) {
   test(`2 · ${nombre}: CON «DEJO MI PRECIO» DICE LA DECISIÓN, NO «COINCIDE», Y LOS DOS PRECIOS POR UNIDAD`, () => {
     const html = renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f, sinPedidoPrevio: true }));

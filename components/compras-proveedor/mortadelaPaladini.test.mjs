@@ -46,7 +46,7 @@ import { DETALLE_SELECT } from "@/lib/compras-proveedor/comprobante/conciliacion
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import { estados } from "@/lib/unidades/tanda13Arnes.mjs";
 import {
-  AVISO_ESCALA,
+  TEXTO_ELEGI_EN_QUE_VIENE,
   escalaSinDeducir,
   hayDiferenciaDePrecio,
   loQueNoCuadra,
@@ -104,7 +104,9 @@ test("CONTRAPRUEBA: CON EL SELECT VIEJO DE LA RUTA, LA GUARDA FRENA CON EL CARTE
   const f = fila({ base: recortar(MORTADELA, SELECT_VIEJO) });
   assert.equal(f.costoCatalogo, 8888.89, "el kilo, comparado contra la pieza");
   assert.equal(escalaSinDeducir(f), true);
-  assert.equal(motivoSinComparacion(comparacionDeLaRuta(f)), AVISO_ESCALA, "el cartel que vio Emanuel");
+  // Sin cantidad ni importe, la guarda de la ruta no puede elegir en qué viene:
+  // decía "No se puede saber en qué viene"; desde el 2026-11-07 pide elegir.
+  assert.equal(motivoSinComparacion(comparacionDeLaRuta(f)), TEXTO_ELEGI_EN_QUE_VIENE, "la guarda vieja frenaba");
   // Y aun preguntando sobre la fila entera, frena: el arreglo es el select.
   assert.match(motivoSinComparacion(f), /\$8\.888,89 \(365 % más\)/);
 });
@@ -133,10 +135,13 @@ test("DOS PRECIOS POR UNIDAD A POCOS PUNTOS SON UN PRECIO, NO OTRA ESCALA (k = 1
   assert.match(f.motivoSinComparacion, /^El papel cobra \$3\.273,60 la unidad y vos la tenés a \$3\.200,00 \(2 % más\)\.$/);
 });
 
-test("CONTRAPRUEBA: UNA RELACIÓN DE ≈10 CON BULTO DE 10 SIGUE FRENANDO CON EL CARTEL", () => {
+// Hasta el 2026-11-07 este renglón frenaba con "No se puede saber en qué
+// viene": 10,2 veces la unidad era "otra escala". Con la regla de Emanuel de
+// ese día —gana la lectura que deja menos diferencia contra tu costo—, el pack
+// de 10 de la ficha deja +2 % y la unidad +920 %: gana el pack, sin cartel.
+test("LIVERPOOL, ≈10 VECES LA UNIDAD CON BULTO DE 10: GANA EL PACK DE 10 (+2 %), SIN CARTEL", () => {
   // Liverpool, pack de 10 a $13.200: se pidieron 160 por unidad y el papel
-  // factura 16 a $13.464 "por unidad". $13.464 contra $1.320 la unidad es 10,2
-  // veces: puede ser el pack cobrado como unidad, y no se adivina.
+  // factura 16 a $13.464 "por unidad".
   const producto = { precio_costo: 13200, factor_pack: 10, unidad_medida: "pack", modoCompraProveedor: "BULTO" };
   const linea = { orden: 1, textoCrudo: "LIVERPOOL ROJO", cantidad: 16, netoUnitario: 13464, subtotalImpreso: 215424, costoFinalRenglon: 215424, enQueViene: "unidad" };
   const precio = analizarPrecioDeLinea({ linea, producto, proveedor: { nombre: "Proveedor" } });
@@ -147,10 +152,10 @@ test("CONTRAPRUEBA: UNA RELACIÓN DE ≈10 CON BULTO DE 10 SIGUE FRENANDO CON EL
     nacidoDeFactura: true,
   }).grupos[0].filas;
   const f = { ...f0, variacionNormalPct: 10 };
-  assert.equal(escalaSinDeducir(f), true);
-  assert.equal(loQueNoCuadra(f)?.que, "ESCALA");
-  assert.equal(motivoSinComparacion(f), AVISO_ESCALA);
-  assert.equal(hayDiferenciaDePrecio(f), false, "no propone costo");
+  assert.equal(f.unidad.unidad, "POR_BULTO", "16 packs de 10");
+  assert.equal(loQueNoCuadra(f)?.que, "PRECIO");
+  assert.match(motivoSinComparacion(f), /^El papel cobra \$1\.346,40 la unidad y vos la tenés a \$1\.320,00 \(2 % más\)\.$/);
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+2,0 %");
 });
 
 // ── PUNTO 2: EL SIGNO ───────────────────────────────────────────────────

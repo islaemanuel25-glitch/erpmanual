@@ -114,7 +114,10 @@ test("LA RUTA GUARDA LAS SEIS COSAS, Y NINGUNA MUEVE STOCK", () => {
   ]) {
     assert.match(ruta, new RegExp(`"${campo}" in body`), `la ruta no guarda ${campo}`);
   }
-  assert.match(ruta, /unidadElegida: String\(body\.unidadElegida\)/);
+  // La elección de unidad del renglón, y desde el 2026-11-07 también un pack
+  // del papel ("PACK_6") elegido en "¿En qué viene?".
+  assert.match(ruta, /const elegida = String\(body\.unidadElegida\);/);
+  assert.match(ruta, /data: \{ unidadElegida: elegida \}/);
 
   // ── LO QUE ESTA RUTA NO PUEDE HACER ────────────────────────────────
   //

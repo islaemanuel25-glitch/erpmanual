@@ -35,6 +35,7 @@ import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resol
 import { filasDeIdentidad, METODO_DETECCION } from "@/lib/proveedores/identidad/servicioIdentidad";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
+import { lecturaRecordadaDeLaEleccion } from "@/lib/compras-proveedor/comprobante/preguntaDeLectura";
 
 /** Un número que llegó de la pantalla, o null. Vacío es null, no cero. */
 function numeroONull(v) {
@@ -134,12 +135,46 @@ export async function POST(req) {
         lineaId: body?.lineaId,
         pedidoId,
         textoCrudo: body?.textoCrudo,
-        select: { id: true },
+        select: { id: true, productoLocalId: true, comprobante: { select: { proveedorId: true } } },
       });
       if (linea) {
-        await prisma.comprobanteLinea.update({
-          where: { id: linea.id },
-          data: { unidadElegida: String(body.unidadElegida) },
+        // ── LO ELEGIDO EN "¿EN QUÉ VIENE?" SE RECUERDA (2026-11-07) ──────
+        //
+        // Para el producto con el proveedor, con el mismo mecanismo que el
+        // alta (`LecturaProductoProveedor`): la próxima factura lo lee igual
+        // (`unidadesGuardadasDeLaLinea`). Va en la misma transacción que el
+        // renglón: que quede uno sin el otro sería preguntar de nuevo lo que
+        // ya se contestó, o recordar algo que el renglón no dice.
+        const base = linea.productoLocalId
+          ? (await prisma.productoLocal.findUnique({
+              where: { id: linea.productoLocalId },
+              select: { baseId: true, base: { select: { factor_pack: true } } },
+            })) ?? null
+          : null;
+        const factor = Number(base?.base?.factor_pack) || null;
+        const elegida = String(body.unidadElegida);
+        const pack = /^PACK_(\d+)$/.exec(elegida);
+        const k = elegida === "POR_UNIDAD" ? 1 : elegida === "POR_BULTO" ? factor : pack ? Number(pack[1]) : null;
+        const lectura = base?.baseId && k ? lecturaRecordadaDeLaEleccion({ k, factor }) : null;
+        const proveedorId = linea.comprobante?.proveedorId ?? null;
+        await prisma.$transaction(async (tx) => {
+          await tx.comprobanteLinea.update({ where: { id: linea.id }, data: { unidadElegida: elegida } });
+          if (lectura && proveedorId) {
+            await tx.lecturaProductoProveedor.upsert({
+              where: {
+                lectura_unica_por_producto_y_proveedor: { grupoId, proveedorId, productoBaseId: base.baseId },
+              },
+              create: {
+                grupoId,
+                proveedorId,
+                productoBaseId: base.baseId,
+                ...lectura,
+                confirmadaPorUsuarioId: session?.id ?? null,
+                confirmadaEn: new Date(),
+              },
+              update: { ...lectura, confirmadaPorUsuarioId: session?.id ?? null, confirmadaEn: new Date() },
+            });
+          }
         });
         unidadGuardadaEn = linea.id;
       }

@@ -70,6 +70,8 @@ import { Pencil } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiPar from "@/components/sunmi/SunmiPar";
+import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
+import { preguntaDeLectura } from "@/lib/compras-proveedor/comprobante/preguntaDeLectura";
 import { ROTULO_PROPUESTA_IA, propuestaParaLaPantalla } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -103,8 +105,9 @@ import {
   hayDiferenciaDePrecio,
   loQueNoCuadra,
   motivoSinComparacion,
-  packDelPapel,
+  packDelRenglon,
   piezasContadasDeLaFila,
+  precioDelPapelConPack,
   piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
   saltoDePrecioAceptable,
@@ -174,7 +177,7 @@ const limpio = (n) => {
  *
  * Colombres, "7UP LATA X 6", 8 × $ 5.900: decía "Precio de la unidad:
  * $5.900,00", y $ 5.900 es el pack de 6. La regla de 8da36311 —nunca "unidad" a
- * un precio de pack— no había llegado acá. Con pack (`packDelPapel`): "Precio
+ * un precio de pack— no había llegado acá. Con pack (`packDelRenglon`): "Precio
  * del pack de 6: $5.900,00 · la unidad $983,33". Sin pack, como siempre.
  */
 export function precioDeLaUnidad(cantidad, importe, pack = null) {
@@ -431,6 +434,8 @@ export default function HojaCorregirLinea({
   abierta,
   onCerrar,
   onGuardar,
+  /** Guarda lo elegido en "¿En qué viene?": `(fila, opcion)` → `{ ok, error? }`. */
+  onElegirLectura,
   onAceptarPrecio,
   /** Guarda "dejo el mío" para que no se vuelva a preguntar. No escribe costo. */
   onDejarMiPrecio,
@@ -595,6 +600,8 @@ export default function HojaCorregirLinea({
   // cambiarlo. Esto es el toque de "Cambiar", no una segunda decisión.
   const [cambiandoPrecio, setCambiandoPrecio] = useState(false);
   const [error, setError] = useState("");
+  // Lo tocado en "¿En qué viene?" mientras se guarda (ver `preguntaDeLectura`).
+  const [lecturaTocada, setLecturaTocada] = useState(null);
   // ── CAMBIAR EL PRODUCTO DE UNA LÍNEA YA VINCULADA ──────────────────────
   //
   // Una vez vinculada, no había forma de corregirla: la hoja dejaba de ofrecer
@@ -862,6 +869,20 @@ export default function HojaCorregirLinea({
   // tarjeta las mostraba comparadas y listas para contar. Dos criterios para la
   // misma pregunta, y la hoja contradiciendo a la tarjeta que la abrió.
   const sinProducto = estadoDeLinea(fila) === ESTADO_LINEA.SIN_VINCULAR;
+  // ── "¿EN QUÉ VIENE?", CUANDO NINGUNA LECTURA GANA CLARA (2026-11-07) ──
+  //
+  // Sin ninguna elegida al abrir; elegir guarda y la pantalla recarga la fila,
+  // que ya sabe en qué viene (`preguntaDeLectura`).
+  const preguntaLectura = sinProducto ? null : preguntaDeLectura(fila);
+  const elegirLectura = async (opcion) => {
+    setLecturaTocada(opcion.valor);
+    setError("");
+    const r = await onElegirLectura?.(fila, opcion);
+    if (r && r.ok === false) {
+      setLecturaTocada(null);
+      setError(r.error || "No se pudo guardar en qué viene.");
+    }
+  };
   const eligiendoProducto = sinProducto || cambiandoProducto;
 
   /** El rótulo del campo dice en qué escala está el número: no es opcional. */
@@ -1017,12 +1038,15 @@ export default function HojaCorregirLinea({
    * del renglón ERP de la tarjeta (Emanuel, 2026-10-29). En el salto de precio
    * van los de UNA unidad, que son los que la tarjeta compara.
    */
+  const papelConPack = precioDelPapelConPack(fila);
   const losDosPrecios = (tenias, trae, unidad) => (
     <span className="text-sm3 sunmi-text-muted">
       {/* Los dos en la misma unidad, dicha al lado de cada uno (Emanuel,
           2026-10-26): un precio por pack al lado de uno por unidad no se lee. */}
       Tenías {formatearMoneda(tenias)} / {unidad} <PorcentajeDelErp erp={erpDeLaTarjeta} /> · la factura trae{" "}
-      {formatearMoneda(trae)} / {unidad}
+      {/* Con pack, el pack y la unidad: nunca "/ u" a un precio de pack
+          (Emanuel, 2026-11-07). */}
+      {papelConPack ? papelConPack.texto : `${formatearMoneda(trae)} / ${unidad}`}
     </span>
   );
   // Un pack intermedio —"7UP LATA X 6" contra el bulto de 24— se compara por
@@ -1204,7 +1228,7 @@ export default function HojaCorregirLinea({
                 </div>
               ))}
               <span className="text-sm3 sunmi-text-muted truncate">
-                {precioDeLaUnidad(papelCantidad, papelImporte, packDelPapel(fila))}
+                {precioDeLaUnidad(papelCantidad, papelImporte, packDelRenglon(fila))}
               </span>
               <SunmiButton
                 color="slate"
@@ -1217,6 +1241,27 @@ export default function HojaCorregirLinea({
                 {fila.noVino ? "Vino: deshacer «No vino»" : "No vino"}
               </SunmiButton>
             </Bloque>
+          )}
+
+          {/* ── ¿EN QUÉ VIENE? (Emanuel, 2026-11-07) ────────────────────────
+              Cuando ninguna lectura gana clara no se frena: se pregunta, con
+              cada lectura y su cuenta, sin ninguna elegida. Es el bloque de la
+              pregunta del alta (`AltaDesdeLaLista`), copiado tal cual, con la
+              misma pieza del kit. */}
+          {preguntaLectura && (
+            <div role="radiogroup" aria-label={preguntaLectura.titulo} className="flex flex-col gap-renglon">
+              <p className="text-sm3 font-semibold sunmi-text-strong break-words">{preguntaLectura.titulo}</p>
+              <p className="text-xs2 sunmi-text-muted tabular-nums break-words">{preguntaLectura.detalle}</p>
+              {preguntaLectura.opciones.map((o) => (
+                <SunmiOpcionElegible
+                  key={o.valor}
+                  titulo={o.texto}
+                  subtitulo={o.cuenta}
+                  elegida={lecturaTocada === o.valor}
+                  onElegir={() => elegirLectura(o)}
+                />
+              ))}
+            </div>
           )}
 
           {/* ── 2 · CUÁNTO ENTRÓ ─────────────────────────────────────────── */}

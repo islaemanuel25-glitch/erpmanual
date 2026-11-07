@@ -205,10 +205,12 @@ test("SI LA IA FALLA —ERROR, TIEMPO AGOTADO O JSON QUE NO SIRVE—, TODO SIGUE
 });
 
 test("EL PACK DE UNA PROPUESTA QUE CIERRA SE USA EN «CUÁNTO ENTRÓ», Y DICE DE DÓNDE SALE", () => {
-  // "7UP LATA" sin el X 6: el precio deja dos packs —de 6 y de 8— y sin la IA no se sabe.
+  // "7UP LATA" sin el X 6: el pack de 6 no es una lectura (no lo imprime el
+  // papel), así que gana el bulto de 24 con −75,5 % —un salto que no cierra—
+  // (regla de la menor diferencia, 2026-11-07). Sin la IA no se sabe que es de a 6.
   const sinIa = vinculado({ id: 5, texto: "7UP LATA", cantidad: 8, unitario: 5900, producto: SEVEN_UP });
-  assert.equal(sinIa.unidad.unidad, UNIDAD.NO_SE_PUEDE_DECIDIR);
-  assert.equal(esRenglonDudoso(sinIa), true, "pack sin deducir: se consulta");
+  assert.equal(sinIa.unidad.unidad, UNIDAD.POR_BULTO);
+  assert.equal(esRenglonDudoso(sinIa), true, "los números no cierran: se consulta");
   const conIa = vinculado({ id: 5, texto: "7UP LATA", cantidad: 8, unitario: 5900, producto: SEVEN_UP, packPropuesto: 6 });
   assert.equal(conIa.unidad.unidad, UNIDAD.POR_PRESENTACION);
   assert.equal(conIa.unidad.unidadesPorFacturada, 6);
@@ -217,7 +219,8 @@ test("EL PACK DE UNA PROPUESTA QUE CIERRA SE USA EN «CUÁNTO ENTRÓ», Y DICE D
   assert.match(hoja(conIa), /la factura dice 8 packs de 6 = 2 bultos de 24/i);
   // Un pack que el precio no explica no se fuerza.
   const forzado = vinculado({ id: 5, texto: "7UP LATA", cantidad: 8, unitario: 5900, producto: SEVEN_UP, packPropuesto: 12 });
-  assert.equal(forzado.unidad.unidad, UNIDAD.NO_SE_PUEDE_DECIDIR);
+  assert.notEqual(forzado.unidad.unidadesPorFacturada, 12);
+  assert.equal(forzado.unidad.origen, "PRECIO", "queda la regla de siempre, no la propuesta");
 });
 
 test("LO QUE HACE LA PERSONA SE ANOTA: CONFIRMADA SI ELIGE LO PROPUESTO, OTRO SI NO", () => {

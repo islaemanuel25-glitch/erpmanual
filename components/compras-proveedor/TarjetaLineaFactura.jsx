@@ -262,7 +262,7 @@ export default function TarjetaLineaFactura({
               del papel ya leída, no se parece al del producto (bebidas,
               2026-11-07): pide revisar si es el producto correcto. */}
           {fila?.corridaSospechada !== true &&
-            (loQueNoCuadra(fila)?.que === "ESCALA" || loQueNoCuadra(fila)?.otroProducto === true) &&
+            (loQueNoCuadra(fila)?.que === "ELEGIR" || loQueNoCuadra(fila)?.otroProducto === true) &&
             !frenoYaDecidido(fila) && (
             <p className="text-sm2 sunmi-text-warning break-words">{loQueNoCuadra(fila).texto}</p>
           )}
@@ -354,14 +354,23 @@ export default function TarjetaLineaFactura({
               {renglones.papel && (
                 <p className="flex items-baseline gap-x-2 flex-wrap break-words">
                   <span className="text-xs sunmi-text-muted shrink-0">Papel</span>
-                  <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
-                    {renglones.papel.bonificado ? "bonificado" : formatearMoneda(renglones.papel.importe)}
-                    {!renglones.papel.bonificado && (
-                      <span className="text-xs font-normal sunmi-text-muted">
-                        {" "}/ {renglones.papel.unidad}
-                      </span>
-                    )}
-                  </span>
+                  {/* Con pack —de la ficha o del papel— se dice el pack y la
+                      unidad: nunca "/ u" a un precio de pack (Emanuel,
+                      2026-11-07, Colon tinto dulce). */}
+                  {renglones.papel.pack ? (
+                    <span className="min-w-0 text-base2 font-semibold tabular-nums sunmi-text-strong break-words">
+                      {renglones.papel.pack.texto}
+                    </span>
+                  ) : (
+                    <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
+                      {renglones.papel.bonificado ? "bonificado" : formatearMoneda(renglones.papel.importe)}
+                      {!renglones.papel.bonificado && (
+                        <span className="text-xs font-normal sunmi-text-muted">
+                          {" "}/ {renglones.papel.unidad}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </p>
               )}
 
