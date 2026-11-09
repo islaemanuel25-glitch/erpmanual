@@ -56,6 +56,7 @@ import {
   loQueNoCuadra,
   precioDistintoDentroDeLaVariacion,
   ESTADO_LINEA,
+  bultoDelPapelSinBultoEnLaFicha,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
   diferenciaDeCantidad,
@@ -150,7 +151,9 @@ export default function TarjetaLineaFactura({
   // La cantidad SIEMPRE en la escala del pedido. Lo crudo se muestra al lado
   // cuando se convirtió, para que se pueda cotejar con el papel sin dudar.
   const cantidad = cantidadEnEscalaDelPedido(fila);
-  const convertida = cantidadFueConvertida(fila);
+  // Con "3 bultos de 18 = 54 unidades" la cantidad ya dice lo que trae el
+  // papel: el "el papel dice 3 u" de al lado repetía el número sin la unidad.
+  const convertida = cantidadFueConvertida(fila) && !bultoDelPapelSinBultoEnLaFicha(fila);
   // ── LLEGÓ SIN FACTURA: LA MISMA TARJETA, OTRO RÓTULO ─────────────────────
   //
   // La fila la arma `filaSinPapel` y su cantidad es LO CONTADO, no lo que dice

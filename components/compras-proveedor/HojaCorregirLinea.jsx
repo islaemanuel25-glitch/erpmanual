@@ -92,6 +92,7 @@ import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/acepta
 import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
   ESTADO_LINEA,
+  bultoDelPapelSinBultoEnLaFicha,
   cantidadEnEscalaDelPedido,
   cuantoEntroAlAbrir,
   frenoYaDecidido,
@@ -577,6 +578,13 @@ export default function HojaCorregirLinea({
   // unidades". Tres hamburguesas en vez de noventa. Medido sobre los pedidos
   // abiertos, es el único renglón en esa situación de los once que hay.
   const vaPorPack = quedoEnBultos(fila) && Number(fila?.factorPack) > 1;
+  // ── O EL BULTO DEL PAPEL, SI LA FICHA NO TIENE (2026-11-09) ───────────
+  //
+  // Cheddar Feta Tonadita: ficha por unidad, el papel "3 bultos de 18". El
+  // casillero cuenta esos bultos —3— y abajo dice que entran 54 unidades; la
+  // línea del pedido, que va por unidad, sigue guardando las 54.
+  const bultoDelPapel = bultoDelPapelSinBultoEnLaFicha(fila);
+  const factorDelCasillero = vaPorPack ? Number(fila?.factorPack) || 1 : bultoDelPapel ?? 1;
 
   const [bultos, setBultos] = useState("");
   const [sueltas, setSueltas] = useState("");
@@ -692,7 +700,7 @@ export default function HojaCorregirLinea({
           ? String(contadasDelFiambre)
           : ""
         : alAbrir
-          ? String(alAbrir.completos)
+          ? String(bultoDelPapel ? alAbrir.completos / bultoDelPapel : alAbrir.completos)
           : ""
     );
     setSueltas(alAbrir && alAbrir.sueltas > 0 ? String(alAbrir.sueltas) : "");
@@ -729,7 +737,7 @@ export default function HojaCorregirLinea({
     setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
-  }, [abierta, fila, sugerida.marcado, saltoAceptable, deUnaUnidad?.papel, deUnaUnidad?.erp]);
+  }, [abierta, fila, sugerida.marcado, saltoAceptable, deUnaUnidad?.papel, deUnaUnidad?.erp, bultoDelPapel]);
 
   // ── ¿ESTE PRODUCTO ENTRA AL STOCK EN KILOS? ───────────────────────────
   //
@@ -743,10 +751,10 @@ export default function HojaCorregirLinea({
   const unidadesContadas = useMemo(() => {
     const b = Number(bultos) || 0;
     const s = Number(sueltas) || 0;
-    const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
-    // Bultos a unidades con la pieza única (tanda 13), con el factor de la fila.
-    return enUnidadesDeLaFila(b, factor) + s;
-  }, [bultos, sueltas, vaPorPack, fila?.factorPack]);
+    // Bultos a unidades con la pieza única (tanda 13): el factor de la fila, o
+    // el bulto del papel cuando la ficha no tiene.
+    return enUnidadesDeLaFila(b, factorDelCasillero) + s;
+  }, [bultos, sueltas, factorDelCasillero]);
 
   // Y lo que entra al stock: kilos si el depósito lo cuenta por peso, y las
   // piezas si no. Son dos preguntas distintas sobre el mismo renglón.
@@ -867,7 +875,9 @@ export default function HojaCorregirLinea({
   /** El rótulo del campo dice en qué escala está el número: no es opcional. */
   const rotuloDeCompletos = vaPorPack
     ? `Bultos de ${limpio(fila.factorPack)}`
-    : quedoEnBultos(fila)
+    : bultoDelPapel
+      ? `Bultos de ${limpio(bultoDelPapel)}`
+      : quedoEnBultos(fila)
       ? "Bultos"
       : "Unidades";
 
@@ -952,7 +962,9 @@ export default function HojaCorregirLinea({
       // Sin papel no hay renglón que marcar: la página marca la línea del
       // pedido en su eco en vez de pedírselo al servidor.
       sinPapel,
-      cantidadRecibida: bultos === "" ? null : Number(bultos),
+      // Con el bulto del papel el casillero cuenta bultos de 18 y la línea del
+      // pedido va por unidad: se guardan las unidades.
+      cantidadRecibida: bultos === "" ? null : bultoDelPapel ? unidadesContadas : Number(bultos),
       unidadesSueltas: vaPorPack && sueltas !== "" ? Number(sueltas) : null,
       // ── CUÁNTAS UNIDADES ENTRAN AL STOCK, DICHO Y NO DEDUCIDO ─────────
       //

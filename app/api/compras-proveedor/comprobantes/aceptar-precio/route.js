@@ -73,6 +73,7 @@ import {
   costoDelDepositoEnLaUnidadDelCatalogo,
 } from "@/lib/conversiones/stock";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import { formatearMoneda } from "@/lib/moneda";
 
 export async function POST(req) {
   try {
@@ -273,7 +274,18 @@ export async function POST(req) {
     const analizadaDeLaHoja = (conciliacion?.analizados ?? [])
       .flatMap((c) => c.lineas ?? [])
       .find((l) => l.id === linea.id);
-    const analisis = analizadaDeLaHoja?.precio ?? analizada?.precio ?? null;
+    // ── EL PRECIO Y EN QUÉ VIENE, DEL MISMO RENGLÓN (2026-11-09) ─────────
+    //
+    // `precio` es el resumen que viaja a la pantalla: no trae `unidad` —que el
+    // renglón lleva aparte— y hasta hoy tampoco `clasificacion`. Desde que
+    // esta ruta lee el precio de la conciliación (298011f8, 2026-11-07) cada
+    // "Aceptar" se caía al guardar la clasificación: el Cheddar Feta Tonadita
+    // del pedido 564, +0,7 %, decía "falla del sistema". Se arma con las dos
+    // partes del mismo renglón.
+    const renglonDeLaHoja = analizadaDeLaHoja ?? analizada ?? null;
+    const analisis = renglonDeLaHoja?.precio
+      ? { ...renglonDeLaHoja.precio, unidad: renglonDeLaHoja.unidad ?? null }
+      : null;
     const variacionDelProveedor = conciliacion?.variacionNormalPct ?? VARIACION_POR_DEFECTO;
 
     // ── SIN LOS KILOS NO HAY PRECIO QUE ACEPTAR, Y SE DICE CUÁL FALTA ────
@@ -457,6 +469,14 @@ export async function POST(req) {
     }
     const precioAEscribir = analisis.precioAEscribir;
     const clasificacion = analisis.clasificacion;
+    // Sin la comparación no se escribe nada, y se dice con los dos números en
+    // vez de caerse con "falla del sistema".
+    if (!clasificacion) {
+      const sinClasificar =
+        `No se pudo comparar el precio de la factura (${formatearMoneda(precioAEscribir)}) contra tu costo ` +
+        `(${formatearMoneda(delPedido.detalle?.precioCosto)}). No se escribió nada: volvé a abrir el producto.`;
+      return NextResponse.json({ ok: false, error: sinClasificar, queHacer: sinClasificar }, { status: 409 });
+    }
 
     // ── LA PREGUNTA TAMBIÉN EXISTE CUANDO SE MOVIÓ EL CATÁLOGO ──────────
     //

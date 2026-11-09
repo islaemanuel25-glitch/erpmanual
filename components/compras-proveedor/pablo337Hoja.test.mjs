@@ -84,7 +84,9 @@ test("1 · 5 BULTOS DE 6 QUE PASAN A UNIDADES SON 30, NO 5", () => {
   assert.deepEqual(cuantoEntroAlAbrir({ ...enUnidades, revisada: true }), { completos: 30, sueltas: 0 });
   assert.deepEqual(cuantoEntroAlAbrir({ ...enBultos, revisada: true }), { completos: 5, sueltas: 0 });
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
-  assert.match(hoja, /cuantoEntroAlAbrir\(fila\);[\s\S]*?: alAbrir\s*\? String\(alAbrir\.completos\)/);
+  // Con el bulto que trae el papel y la ficha no tiene (Cheddar, 2026-11-09)
+  // el casillero cuenta bultos: los completos se dividen por ese bulto.
+  assert.match(hoja, /cuantoEntroAlAbrir\(fila\);[\s\S]*?: alAbrir\s*\? String\(bultoDelPapel \? alAbrir\.completos \/ bultoDelPapel : alAbrir\.completos\)/);
 });
 
 // Del 2026-10-26 al 2026-11-07 esta fila decía que lo que no cuadraba era el

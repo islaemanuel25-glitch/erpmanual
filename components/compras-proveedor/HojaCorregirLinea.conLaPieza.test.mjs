@@ -32,7 +32,9 @@ test("los casos de la tanda: 2 bultos y 6 sueltas de 12 son 30; 2 de 24, 48; el 
 
 test("la hoja cuenta con la función compartida, no a mano, y sigue sin escribir el factor del producto", () => {
   const fuente = fs.readFileSync(new URL("./HojaCorregirLinea.jsx", import.meta.url), "utf8").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.match(fuente, /return enUnidadesDeLaFila\(b, factor\) \+ s;/);
+  // El factor del casillero es el de la ficha, o el bulto del papel cuando la
+  // ficha no tiene (Cheddar, 2026-11-09). Sigue contando con la compartida.
+  assert.match(fuente, /return enUnidadesDeLaFila\(b, factorDelCasillero\) \+ s;/);
   assert.match(fuente, /const ofrecidas = enUnidadesDeLaFila\(Number\(cantidadDeLaFactura\) \|\| 0, factor\);/);
   assert.ok(!/b \* factor|\) \* factor/.test(fuente), "volvió a multiplicar a mano");
   assert.ok(!/factor_pack:\s/.test(fuente));
