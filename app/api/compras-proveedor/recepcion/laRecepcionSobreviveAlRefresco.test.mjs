@@ -171,7 +171,10 @@ test("Y LA ELECCIÓN DE UNIDAD SE GUARDA Y SE VUELVE A LEER", () => {
   const guarda = aceptar.indexOf("data: { unidadElegida: String(body.unidad) }");
   const lee = aceptar.indexOf("await cargarConciliacion(");
   assert.ok(guarda > 0 && lee > guarda, "la conciliación se carga antes de guardar la elección");
-  assert.match(aceptar, /const analisis = analizadaDeLaHoja\?\.precio \?\? analizada\?\.precio \?\? null;/);
+  // El renglón de la hoja primero; su precio, con la unidad del mismo renglón
+  // (2026-11-09, Cheddar).
+  assert.match(aceptar, /const renglonDeLaHoja = analizadaDeLaHoja \?\? analizada \?\? null;/);
+  assert.match(aceptar, /const analisis = renglonDeLaHoja\?\.precio\s*\?\s*\{ \.\.\.renglonDeLaHoja\.precio,/);
   // La conciliación la trae y el análisis la usa, así que sobrevive al refresco
   // para las dos pantallas y no solo para la que la eligió.
   // La carga de la conciliación vive en `conciliacionDelPedido.js` desde Mauro #298.
