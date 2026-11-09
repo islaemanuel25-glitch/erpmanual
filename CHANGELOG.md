@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-09] - Actualización: productos, transferencias
+
+### Modificado
+- **productos**: fix: la recepción lee el fiambre por pieza en piezas y escribe el kilo; se va el freno de los 64 productos — SIN VERIFICAR en pantalla
+- **transferencias**: feat: la IA propone producto y pack en los renglones dudosos de la recepción, y los números la verifican — SIN VERIFICAR en pantalla ni con la IA real
+
+
 ## [2026-11-07] - Actualización: productos, proveedores
 
 ### Modificado
