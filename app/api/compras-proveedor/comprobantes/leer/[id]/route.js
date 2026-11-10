@@ -32,7 +32,10 @@ import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
-import { renglonesQueFaltan } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
+import { renglonesQueFaltan, verificarLecturaInterpretada } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
+import { textoDelPdf } from "@/lib/compras-proveedor/comprobante/lector/textoDelPapel";
+import { esPdf, partirPdfEnHojas } from "@/lib/compras-proveedor/comprobante/hojasDelPdf";
+import { separarHojasDelPdf } from "@/lib/compras-proveedor/comprobante/separarHojasDelPdf";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes, crearDetectorDeOrientacion } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 import { orientarTodas } from "@/lib/compras-proveedor/comprobante/lector/orientacion";
@@ -122,12 +125,18 @@ export async function POST(req, { params }) {
         // A qué pedido pertenece: lo necesita la siembra de abajo, que solo
         // corre cuando ese pedido nació de esta misma factura.
         pedidoId: true,
+        // Para partir un PDF de varias páginas en hojas hermanas, con los mismos
+        // datos de subida (`separarHojasDelPdf`).
+        localOperativoId: true,
+        usuarioId: true,
+        venceEn: true,
+        createdAt: true,
         // TODAS las fotos, en orden: se leen juntas como el papel que son.
         archivos: {
           orderBy: { orden: "asc" },
           // `giroGrados`: el giro que eligió la persona en el visor. La foto
           // viaja enderezada (`achicarParaLeer`).
-          select: { orden: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
+          select: { id: true, orden: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
         },
         intentosLectura: true,
         lecturaEnCursoDesde: true,
@@ -281,6 +290,41 @@ export async function POST(req, { params }) {
           { status: 503 }
         );
       }
+
+      // ── UN PDF DE VARIAS PÁGINAS SON VARIAS HOJAS (Arcor #582) ───────────
+      //
+      // Cuatro facturas en un PDF se leían como un papel y volvían con cero
+      // productos. Cada página pasa a ser una hoja: ésta se queda con la
+      // primera y las demás quedan como comprobantes de la misma recepción,
+      // que la pantalla lee a continuación. Después de leer, la agrupación de
+      // siempre junta las hojas sin total con la que sigue (`hojasDelPdf.js`).
+      let hojasNuevas = [];
+      if (archivosLeidos.length === 1 && esPdf(archivosLeidos[0].mime)) {
+        const hojas = await partirPdfEnHojas(archivosLeidos[0].bytes);
+        if (hojas) {
+          try {
+            ({ hojasNuevas } = await separarHojasDelPdf(prisma, {
+              comprobante: { ...comprobante, grupoId },
+              archivo: fotos[0],
+              hojas,
+              proveedorNombre: comprobante.proveedor?.nombre ?? null,
+            }));
+            archivosLeidos = [{ ...archivosLeidos[0], bytes: hojas[0] }];
+            console.log(`[comprobante ${comprobante.id}] PDF de ${hojas.length} páginas: hojas nuevas ${hojasNuevas.join(", ")}`);
+          } catch (e) {
+            // Si no se pudo partir, se lee entero, como antes.
+            console.error(`[comprobante ${comprobante.id}] no se pudo partir el PDF:`, e?.message);
+          }
+        }
+      }
+
+      // ── SI EL PDF TRAE TEXTO, SE LEE EL TEXTO (Arcor #582) ───────────────
+      //
+      // El texto de un PDF es exacto; la imagen, de respaldo (más abajo).
+      for (const a of archivosLeidos) {
+        if (esPdf(a.mime)) a.texto = await textoDelPdf(a.bytes);
+      }
+      const seLeyoPorTexto = archivosLeidos.some((a) => a.texto);
 
       // ── ACHICAR ANTES DE MANDAR ──────────────────────────────────────────
       //
@@ -443,6 +487,29 @@ export async function POST(req, { params }) {
         }
       }
 
+      // ── LA IMAGEN, DE RESPALDO DEL TEXTO (Arcor #582) ────────────────────
+      //
+      // Si se leyó por el texto del PDF y no cerró —o no trajo nada—, se lee
+      // una vez la imagen. Se queda la que cierra; si ninguna, la del texto.
+      const noAlcanzo = (r) => {
+        if (r?.ok !== true || !cuantasTrajo(r)) return true;
+        const v = verificarLecturaInterpretada(r.lectura);
+        return v.hayTotal && !v.cierra;
+      };
+      let respaldoConImagen = null;
+      if (seLeyoPorTexto && noAlcanzo(resultado)) {
+        console.log(`[comprobante ${comprobante.id}] con el texto del PDF no cerró: se lee la imagen`);
+        respaldoConImagen = await leerConCadena({
+          cadena,
+          archivos: paraLeer.map(({ texto, ...a }) => a),
+          receta,
+          proveedorNombre: comprobante.proveedor?.nombre ?? null,
+        });
+        if (respaldoConImagen?.ok === true && (!noAlcanzo(respaldoConImagen) || resultado.ok !== true)) {
+          resultado = respaldoConImagen;
+        }
+      }
+
       // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
       //
       // La cadena informa cuántas hubo: pasar al respaldo son DOS, y la del
@@ -462,6 +529,10 @@ export async function POST(req, { params }) {
           ...(Array.isArray(resultado.intentos) ? resultado.intentos : []),
           ...(reintento && reintento !== resultado && Array.isArray(reintento.intentos)
             ? reintento.intentos
+            : []),
+          // La de la imagen de respaldo, si hubo.
+          ...(respaldoConImagen && respaldoConImagen !== resultado && Array.isArray(respaldoConImagen.intentos)
+            ? respaldoConImagen.intentos
             : []),
           // Las del modelo grande —el titular, y el respaldo si hubo que
           // pasar—, con POR QUÉ se lo llamó. Se cuentan aparte: su modelo dice
@@ -533,6 +604,8 @@ export async function POST(req, { params }) {
             // El detalle crudo también viaja a la pantalla: es lo que deja
             // avisar con precisión en vez de "probá de nuevo".
             detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
+            // Las páginas de un PDF que quedaron como hojas aparte: se leen igual.
+            hojasNuevas,
           },
           // ── EL ESTADO TAMBIÉN TIENE QUE DECIR LO QUE ES ──────────────────
           //
@@ -865,6 +938,9 @@ export async function POST(req, { params }) {
         // en qué comprobante quedó: la pantalla tiene que poder señalar la
         // factura entera y no la foto suelta que ya no existe.
         agrupacion: agrupacion?.fusiones?.length ? agrupacion.fusiones : null,
+        // Las páginas de un PDF que quedaron como hojas aparte (Arcor #582): la
+        // pantalla las lee a continuación, una por una.
+        hojasNuevas,
         cierra: puerta.cierra,
         // ── EL CONTEO VIAJA, PARA QUE EL BOTÓN NO TERMINE EN SILENCIO ────
         //
