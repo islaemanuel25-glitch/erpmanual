@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-11-05 10:44
+**Última actualización:** 2026-11-10 01:32
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-11-10: refactor: tanda 17 de la regla de unidades — bultos y sueltas, la pieza de fiambre y el menor % salen de la pieza única — SIN VERIFICAR en pantalla
 - 2026-11-05: fix: preparados lee el bulto con la pieza única; el maní 1881 deja de partirse (regla de unidades, tanda 10)
 - 2026-11-05: refactor: pedidos y pos-transferencias cuentan con la pieza única (regla de unidades, tanda 9)
 - 2026-11-05: fix: stock lee el peso fijo con la pieza única (regla de unidades, tanda 7)
