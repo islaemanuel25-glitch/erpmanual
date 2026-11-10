@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-10 11:46
+**Fecha:** 2026-11-10 12:13
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- test: los conteos de migraciones declaran la de la Mortadela y el Liverpool sigue la regla del ERP
+- fix: un renglón con importe negativo es un descuento y baja el costo de los productos que nombra — SIN VERIFICAR en pantalla, test: los conteos de migraciones declaran la de la Mortadela y el Liverpool sigue la regla del ERP
 - Archivos: 1 modificados (1 total)
 
 ### pos-ventas

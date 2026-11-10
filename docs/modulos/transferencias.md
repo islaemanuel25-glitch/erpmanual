@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-11-10 11:46
+**Última actualización:** 2026-11-10 12:13
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-11-10: fix: un renglón con importe negativo es un descuento y baja el costo de los productos que nombra — SIN VERIFICAR en pantalla
 - 2026-11-10: test: los conteos de migraciones declaran la de la Mortadela y el Liverpool sigue la regla del ERP
 - 2026-11-07: feat: la IA propone producto y pack en los renglones dudosos de la recepción, y los números la verifican — SIN VERIFICAR en pantalla ni con la IA real
 - 2026-11-05: fix: la lista de precios ve lo que la recepción ya vinculó por nombre, y «Tus productos» muestra solo lo que la lista trae — SIN VERIFICAR en pantalla
