@@ -16,17 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **110 migraciones**, la última
-`20261107180000_mortadela_paladini_vuelve_a_su_precio`. Pendiente, 1:
-
-- `20261110120000_descuento_aplica_a` — de esquema, aditiva: una columna JSONB
-  nula `descuentoAplicaA` en `ComprobanteLinea` (a qué productos del papel
-  aplica un renglón de descuento, SL22-5181). Sin relleno: lo guardado queda en
-  null. El quinto chequeo del backup no aplica: no toca datos.
+Ninguna. Producción está en **111 migraciones**, la última
+`20261110120000_descuento_aplica_a`.
 
 ---
 
 ## Historial reciente
+
+`20261110120000_descuento_aplica_a` —de esquema: una columna JSONB nula
+`descuentoAplicaA` en `ComprobanteLinea`, a qué productos del papel aplica un
+renglón de descuento (SL22-5181)— se aplicó con el despliegue de `6999064b`
+(2026-11-10 12:2x UTC), antes de levantar la imagen. El clasificador (`--vps
+--hasta`) la dio aditiva y salió con 0, sin autorización manual. El contenedor
+informó las **111** del árbol e imprimió "Applying migration". Comprobada
+contra la base, en solo lectura: la columna existe, jsonb y nula, con cero
+filas escritas; y la consulta de Prisma con `descuentoAplicaA` en el `select`
+corrió contra Postgres en un contenedor descartable de la imagen nueva.
 
 `20261107180000_mortadela_paladini_vuelve_a_su_precio` —de datos, incidente del
 2026-11-07: el cierre del pedido 530 había guardado el precio de la pieza de la
