@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-11-10] - Actualización: 
+
+### Modificado
+
+
 ## [2026-11-09] - Actualización: productos, transferencias
 
 ### Modificado
