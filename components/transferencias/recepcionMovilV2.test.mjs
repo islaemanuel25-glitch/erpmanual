@@ -700,7 +700,13 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 109 el 2026-11-07: `20261107025108_propuesta_ia_renglon`, una tabla
   // nueva `PropuestaIaRenglon` (la IA propone en los renglones dudosos de la
   // recepción de compras). No toca transferencias.
-  assert.equal(migraciones.length, 109,"aparecio una migracion que nadie declaro aca");
+  // Sube a 110 el 2026-11-07: `20261107180000_mortadela_paladini_vuelve_a_su_precio`,
+  // un paso de datos que devuelve el costo de la Mortadela Paladini a su precio
+  // de antes del pedido 530, autorizado por Emanuel. No toca transferencias.
+  // No se lee el número de las carpetas: contarlas contra sí mismas no atajaría
+  // una migración de contrabando, que es lo único que este conteo afirma.
+  assert.equal(migraciones.length, 110,"aparecio una migracion que nadie declaro aca");
+  assert.ok(migraciones.includes("20261107180000_mortadela_paladini_vuelve_a_su_precio"));
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

@@ -100,14 +100,14 @@ test("1 · CONTRAPRUEBA: SIN DIFERENCIA EL RENGLÓN QUEDA APAGADO", async () => 
   assert.match(cuantoEntro(html), /class="text-sm3 sunmi-text-muted">Pediste 16/);
 });
 
-// Desde el 2026-11-06 el porcentaje es cuánto varió el precio (papel − ERP) ÷
-// ERP: el papel 12,1 % más barato es una baja, "−12,1 %". Pagás menos: color
-// de éxito del tema (Emanuel, 2026-11-06; la historia en
-// `porcentajeDelErpReglaDel26.test.mjs`).
-test("2 · EL PAPEL 12,1 % MÁS BARATO DICE −12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
+// El ERP contra el papel (regla de Emanuel del 2026-10-26, vuelta el
+// 2026-11-10): el ERP $13.200 queda 12,1 % arriba del papel $11.600, "+12,1 %"
+// en el color de éxito del tema. Del 06/11 al 09/11 decía "−12,1 %" (la
+// historia en `porcentajeDelErpReglaDel26.test.mjs`).
+test("2 · EL PAPEL 12,1 % MÁS BARATO DICE +12,1 % EN VERDE, EN LA TARJETA Y EN LA HOJA", async () => {
   const f = liverpool();
   for (const html of [renderToStaticMarkup(React.createElement(TarjetaLineaFactura, { fila: f })), await hojaMontada(f)]) {
-    assert.match(html, /sunmi-text-success">−12,1 %</);
-    assert.doesNotMatch(html, /\+12,1 %/);
+    assert.match(html, /sunmi-text-success">\+12,1 %</);
+    assert.doesNotMatch(html, /−12,1 %/);
   }
 });
