@@ -41,6 +41,11 @@ const nextConfig = {
   // VPS con la lista de un proveedor adelante.
   outputFileTracingIncludes: {
     "/api/proveedores/listas/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    // La lectura de comprobantes saca el texto de un PDF con la misma pieza
+    // (Arcor #582, `textoDelPapel.js`). Hoy el worker ya viaja por la ruta de
+    // arriba y la carpeta de paquetes es una sola; se declara igual, para que
+    // no dependa de que la otra ruta siga existiendo.
+    "/api/compras-proveedor/comprobantes/leer/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
   },
 
   output: "standalone",
