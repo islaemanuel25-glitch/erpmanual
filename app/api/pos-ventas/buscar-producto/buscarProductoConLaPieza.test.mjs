@@ -40,7 +40,9 @@ test("los casos de la tanda: pack de 12 a $50.000 son $4.166,67 la unidad; a cos
 
 test("la ruta divide con la pieza, no a mano, y solo en un pack o cajón", () => {
   const fuente = fs.readFileSync(new URL("./route.js", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.match(fuente, /import \{ unidadDelBulto \} from "@\/lib\/unidades\/reglaDeUnidades";/);
+  // Desde la tanda 17 también pide a la pieza el precio de la pieza de fiambre.
+  assert.match(fuente, /import \{ precioDeLaPieza, unidadDelBulto \} from "@\/lib\/unidades\/reglaDeUnidades";/);
+  assert.equal((fuente.match(/precioDeLaPieza\(\{ precioPorKilo: (precioDB|precioCosto), pesoKg: pesoReferenciaKg \}\)/g) || []).length, 2);
   assert.equal((fuente.match(/unidadDelBulto\(\{ precio: (precioDB|precioCosto), factor: factorPack \}\)/g) || []).length, 4);
   assert.ok(!/(precioDB|precioCosto) \/ factorPack/.test(fuente), "volvió a dividir a mano");
   assert.match(fuente, /\["pack", "cajon"\]\.includes\(unidadMedida\)/);

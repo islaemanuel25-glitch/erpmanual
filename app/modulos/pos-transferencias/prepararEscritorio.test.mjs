@@ -86,10 +86,16 @@ const enter = async (campo) => {
 // aprobado en Figma. En el celular: el botón entre "Corregir" y "No hay", el
 // renglón cambiado y la hoja `HojaCambiarPorOtro`, compartida con esta pantalla
 // pero no hecha para ella. Lo afirma `cambiarPorOtro.test.mjs`.
+//
+// Cambió a propósito el 2026-11-10 (tanda 17 de la regla de unidades): los
+// bultos y sueltas con que arranca "Corregir" y la vuelta a unidades al
+// guardar se piden a la pieza única (`bultosYSueltas`, `enUnidades`) en vez de
+// la cuenta a mano. Mismos números; la pantalla no cambió. Lo afirma
+// `lib/unidades/piezaUnicaCasosReales.test.mjs`.
 test("la pantalla del celular está igual, byte por byte", () => {
   const contenido = readFileSync("components/pos-transferencias/PrepararPedidoCelular.jsx");
   const huella = createHash("sha1").update(`blob ${contenido.length}\0`).update(contenido).digest("hex");
-  assert.equal(huella, "38b13e18c995e22c9bf1e8b2ab3fd0238bc9ad9c", "se tocó PrepararPedidoCelular.jsx");
+  assert.equal(huella, "ae1bead721ce36533bf7dc0fd267781ea1d61bab", "se tocó PrepararPedidoCelular.jsx");
 });
 
 test("la barra fija: Volver, buscador, categoría, Falta revisar, Enviar; filtros, el pedido, Agregar y ⋯; el avance", async () => {

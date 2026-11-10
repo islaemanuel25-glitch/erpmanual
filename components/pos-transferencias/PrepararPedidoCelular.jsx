@@ -75,6 +75,7 @@ import FilaCatalogoRecepcion from "@/components/transferencias/FilaCatalogoRecep
 import HojaCambiarPorOtro from "@/components/pos-transferencias/HojaCambiarPorOtro";
 import { TEXTO_CAMBIAR, TEXTO_DESHACER_CAMBIO, TEXTO_REEMPLAZO, textoPidioProducto } from "@/lib/pedidos/cambiarPorOtro";
 import { cuandoDelPedido } from "@/lib/pedidos/cuandoDelPedido";
+import { bultosYSueltas } from "@/lib/unidades/reglaDeUnidades";
 import { NO_HAY, cantidadQueViaja, estaRevisada, loPedido, vaCompleto } from "@/lib/pedidos/revisionDeLinea";
 import {
   ESTADO_PREPARACION,
@@ -158,8 +159,10 @@ function HojaCorregir({ linea, guardando, onGuardar, onNoHay, onVolverAPendiente
   const unidadesIniciales = estaRevisada(linea)
     ? enUnidades(linea.preparado, linea.unidadPreparada || linea.unidadSugerida, linea.factorPack)
     : enUnidades(linea.sugerido, linea.unidadSugerida, linea.factorPack);
-  const [bultos, setBultos] = useState(() => String(porBulto ? Math.floor(unidadesIniciales / pedido.factorPack) : unidadesIniciales));
-  const [sueltas, setSueltas] = useState(() => String(porBulto ? unidadesIniciales % pedido.factorPack : 0));
+  // Bultos y sueltas, con la partición de la pieza única de unidades.
+  const partidas = bultosYSueltas({ unidades: unidadesIniciales, factor: porBulto ? pedido.factorPack : null });
+  const [bultos, setBultos] = useState(() => String(partidas.completos));
+  const [sueltas, setSueltas] = useState(() => String(partidas.sueltas));
 
   const guardar = () => {
     // Kilos: `UNIDAD` de un producto en kg, que es como viaja y mueve stock.
@@ -169,7 +172,7 @@ function HojaCorregir({ linea, guardando, onGuardar, onNoHay, onVolverAPendiente
     if (!porBulto) return onGuardar({ preparado: b, unidadPreparada: "UNIDAD" });
     // Con sueltas, en unidades: un solo número con una sola unidad es lo que
     // guarda la línea (`preparado`, `unidadPreparada`).
-    if (s > 0) return onGuardar({ preparado: b * pedido.factorPack + s, unidadPreparada: "UNIDAD" });
+    if (s > 0) return onGuardar({ preparado: enUnidades(b, "BULTO", pedido.factorPack) + s, unidadPreparada: "UNIDAD" });
     return onGuardar({ preparado: b, unidadPreparada: "BULTO" });
   };
 

@@ -5,6 +5,7 @@ import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { checkPerm } from "@/lib/authorize";
+import { bultosYSueltas } from "@/lib/unidades/reglaDeUnidades";
 import {
   condicionesDeNombre,
   esBusquedaPorCodigo,
@@ -250,10 +251,12 @@ export async function GET(req) {
       } else {
         // BULTO (pack/cajón): DB tiene cantidad/stockMin/stockMax en UNIDADES.
         // Convertir a bultos para mostrar y calcular (igual que en reposición).
+        // Los bultos completos, con la partición de la pieza única (tanda 17).
         if (factorPack > 1) {
-          stockActual = Math.floor(cantidadRaw / factorPack);
-          stockMin = stockMinRaw != null ? Math.floor(stockMinRaw / factorPack) : null;
-          stockMax = stockMaxRaw != null ? Math.floor(stockMaxRaw / factorPack) : null;
+          const completos = (u) => bultosYSueltas({ unidades: u, factor: factorPack }).completos;
+          stockActual = completos(cantidadRaw);
+          stockMin = stockMinRaw != null ? completos(stockMinRaw) : null;
+          stockMax = stockMaxRaw != null ? completos(stockMaxRaw) : null;
         }
         faltante = sinParametros ? 0 : Math.max(0, (stockMax ?? 0) - stockActual);
         sugerido = faltante;

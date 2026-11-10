@@ -6,7 +6,7 @@ import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
-import { unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
+import { precioDeLaPieza, unidadDelBulto } from "@/lib/unidades/reglaDeUnidades";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -303,8 +303,9 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
 
       if (fiambreFijo) {
         // Fiambre fijo en depósito: precio/costo por pieza = valor por kg × pesoRef.
-        const precioPorPieza = Number((precioDB * pesoReferenciaKg).toFixed(2));
-        const costoPorPieza = Number((precioCosto * pesoReferenciaKg).toFixed(2));
+        // La pieza desde el kilo, con la pieza única de unidades (tanda 17).
+        const precioPorPieza = precioDeLaPieza({ precioPorKilo: precioDB, pesoKg: pesoReferenciaKg }) ?? 0;
+        const costoPorPieza = precioDeLaPieza({ precioPorKilo: precioCosto, pesoKg: pesoReferenciaKg }) ?? 0;
         precioVentaUnitario = precioPorPieza;
         precioVentaBulto = precioPorPieza;
         precioCostoUnitario = costoPorPieza;
