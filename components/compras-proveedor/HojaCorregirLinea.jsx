@@ -123,6 +123,7 @@ import {
   esPackIntermedio,
   quedoEnBultos,
   renglonesDeLaTarjeta,
+  textoDelBonificado,
   textoDelCostoQueQueda,
   textoDelDescuentoAplicado,
   unidadDeComparacion,
@@ -1439,7 +1440,14 @@ export default function HojaCorregirLinea({
               SIN PAPEL el bloque sigue estando, en el mismo lugar, y dice el
               costo del pedido y nada que elegir: no hay factura que traiga
               otro precio, así que no se ofrece aceptar ningún aumento. */}
-          {sinPapel ? (
+          {/* ── UN REGALO NO TIENE PRECIO QUE DECIDIR (Arcor #582) ──────────
+              Vino bonificado: se dice qué entra y en cuánto queda el costo, y
+              no se ofrece aceptar el precio simbólico del papel. */}
+          {fila.bonificado === true ? (
+            <Bloque titulo="Vino bonificado">
+              <span className="text-sm3 sunmi-text-muted break-words">{textoDelBonificado(fila)}</span>
+            </Bloque>
+          ) : sinPapel ? (
             <Bloque titulo="Costo del pedido">
               <span className="text-sm3 sunmi-text-strong tabular-nums">
                 {formatearMoneda(fila.costoCatalogo)}

@@ -398,6 +398,12 @@ export default function TarjetaLineaFactura({
                   <PorcentajeDelErp erp={renglones.erp} />
                 </p>
               )}
+
+              {/* Un regalo: qué entra y en cuánto queda el costo, sin
+                  porcentaje contra el ERP (Arcor #582, 2026-11-10). */}
+              {renglones.bonificado && (
+                <p className="text-sm3 sunmi-text-muted break-words">{renglones.bonificado}</p>
+              )}
             </>
           )}
         </div>

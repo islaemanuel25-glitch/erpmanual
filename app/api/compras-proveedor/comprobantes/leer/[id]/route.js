@@ -33,7 +33,7 @@ import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/compr
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
 import { renglonesQueFaltan, verificarLecturaInterpretada } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
-import { textoDelPdf } from "@/lib/compras-proveedor/comprobante/lector/textoDelPapel";
+import { identidadDelTexto, textoDelPdf } from "@/lib/compras-proveedor/comprobante/lector/textoDelPapel";
 import { esPdf, partirPdfEnHojas } from "@/lib/compras-proveedor/comprobante/hojasDelPdf";
 import { separarHojasDelPdf } from "@/lib/compras-proveedor/comprobante/separarHojasDelPdf";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
@@ -57,6 +57,7 @@ import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedido
 import { razonarRenglonesDudosos } from "@/lib/compras-proveedor/comprobante/razonarRenglones";
 import {
   estadoDeLaFalla,
+  identidadDelComprobante,
   MOTIVO_LECTURA,
 } from "@/lib/compras-proveedor/comprobante/lector/contrato";
 // El MISMO contador que usa el importador: la cuota es una sola.
@@ -78,6 +79,35 @@ import {
   TEXTO_TURNO,
 } from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
 import { proponerRecetaConLoDelPie } from "@/lib/compras-proveedor/comprobante/percepcionEnLaReceta";
+
+/** Lo que hace falta de un comprobante para leerlo: el del pedido y cada hoja de un PDF partido. */
+const SELECT_DEL_COMPROBANTE = {
+  id: true,
+  proveedorId: true,
+  estado: true,
+  imagenBorradaEn: true,
+  cerroEnIntento: true,
+  // A qué pedido pertenece: lo necesita la siembra de abajo, que solo
+  // corre cuando ese pedido nació de esta misma factura.
+  pedidoId: true,
+  // Para partir un PDF de varias páginas en hojas hermanas, con los mismos
+  // datos de subida (`separarHojasDelPdf`).
+  localOperativoId: true,
+  usuarioId: true,
+  venceEn: true,
+  createdAt: true,
+  // TODAS las fotos, en orden: se leen juntas como el papel que son.
+  archivos: {
+    orderBy: { orden: "asc" },
+    // `giroGrados`: el giro que eligió la persona en el visor. La foto
+    // viaja enderezada (`achicarParaLeer`).
+    select: { id: true, orden: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
+  },
+  intentosLectura: true,
+  lecturaEnCursoDesde: true,
+  ultimaLectura: true,
+  proveedor: { select: { nombre: true } },
+};
 
 export async function POST(req, { params }) {
   // ── QUIÉN PIDIÓ ESTA LECTURA ─────────────────────────────────────────
@@ -115,34 +145,7 @@ export async function POST(req, { params }) {
     // otro grupo no existe, en vez de existir y estar prohibido.
     const comprobante = await prisma.comprobanteProveedor.findFirst({
       where: { id: comprobanteId, grupoId },
-      select: {
-        id: true,
-        proveedorId: true,
-        estado: true,
-        imagenBorradaEn: true,
-        estado: true,
-        cerroEnIntento: true,
-        // A qué pedido pertenece: lo necesita la siembra de abajo, que solo
-        // corre cuando ese pedido nació de esta misma factura.
-        pedidoId: true,
-        // Para partir un PDF de varias páginas en hojas hermanas, con los mismos
-        // datos de subida (`separarHojasDelPdf`).
-        localOperativoId: true,
-        usuarioId: true,
-        venceEn: true,
-        createdAt: true,
-        // TODAS las fotos, en orden: se leen juntas como el papel que son.
-        archivos: {
-          orderBy: { orden: "asc" },
-          // `giroGrados`: el giro que eligió la persona en el visor. La foto
-          // viaja enderezada (`achicarParaLeer`).
-          select: { id: true, orden: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
-        },
-        intentosLectura: true,
-        lecturaEnCursoDesde: true,
-        ultimaLectura: true,
-        proveedor: { select: { nombre: true } },
-      },
+      select: SELECT_DEL_COMPROBANTE,
     });
     if (!comprobante) {
       return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
@@ -258,7 +261,12 @@ export async function POST(req, { params }) {
     //
     // Lo que el trabajo devuelve es la MISMA respuesta que antes se devolvía
     // acá: no hay un segundo formato que pueda quedar desfasado del primero.
-    const hacerLaLectura = async () => {
+    // Las páginas 2 en adelante de un PDF partido al leer: las lee el mismo
+    // trabajo, a continuación (`leerLasHojasDelPdf`).
+    let hojasDelPdf = [];
+    // La lectura de UN comprobante con sus fotos. La del pedido es la de
+    // `comprobante`; las hojas de un PDF partido pasan por acá con las suyas.
+    const leerUno = async (comprobante, fotos) => {
       // ── La receta del proveedor: es lo que guía qué buscar ───────────────
       // Una por tipo de comprobante (`explicacionPorTipo.js`): Flash lee con
       // todas y la letra que lea dice cuál correspondía.
@@ -310,6 +318,7 @@ export async function POST(req, { params }) {
               proveedorNombre: comprobante.proveedor?.nombre ?? null,
             }));
             archivosLeidos = [{ ...archivosLeidos[0], bytes: hojas[0] }];
+            hojasDelPdf = hojasNuevas;
             console.log(`[comprobante ${comprobante.id}] PDF de ${hojas.length} páginas: hojas nuevas ${hojasNuevas.join(", ")}`);
           } catch (e) {
             // Si no se pudo partir, se lee entero, como antes.
@@ -622,6 +631,18 @@ export async function POST(req, { params }) {
       // Con la receta con que se LEYÓ: la del proveedor, o la que propuso el
       // modelo grande si fue su lectura la que cerró. Queda copiada en
       // `recetaUsada`, que es de donde sale el costo.
+      // ── EL NÚMERO DEL PAPEL SALE DEL TEXTO DEL PDF (Arcor #582) ──────────
+      //
+      // Si el PDF trae texto, el punto de venta y el número impresos mandan
+      // sobre lo que haya leído el modelo, que en dos de cuatro hojas no lo trajo.
+      const delTexto = identidadDelTexto(paraLeer.map((a) => a.texto).filter(Boolean).join("\n"));
+      if (delTexto && resultado.lectura) {
+        resultado = {
+          ...resultado,
+          lectura: { ...resultado.lectura, identidad: identidadDelComprobante({ ...resultado.lectura.identidad, ...delTexto }) },
+        };
+      }
+
       const puerta = pasarPorLaPuerta({
         lectura: resultado.lectura,
         receta: recetaDeLaLectura,
@@ -975,6 +996,44 @@ export async function POST(req, { params }) {
           : null,
       });
     };
+    const hacerLaLectura = () => leerUno(comprobante, fotos);
+
+    // ── LAS OTRAS HOJAS DEL PDF, EN EL MISMO TRABAJO (Arcor #582) ────────
+    //
+    // Partir y leer es un solo paso: las hojas nacen tomadas
+    // (`separarHojasDelPdf`), así que la pantalla las muestra leyendo y un
+    // «Leer» de alguien se engancha en vez de lanzar otra; acá se leen de a
+    // una, en orden, y cada una deja su respuesta como cualquier lectura. Ya no
+    // depende de que la pantalla siga abierta ni de que tenga el código nuevo:
+    // el 2026-11-10 la Factura 1 se leyó y las otras tres quedaron sin leer.
+    const leerLasHojasDelPdf = async () => {
+      for (const hojaId of hojasDelPdf) {
+        let respuesta;
+        try {
+          const hoja = await prisma.comprobanteProveedor.findFirst({
+            where: { id: hojaId, grupoId },
+            select: SELECT_DEL_COMPROBANTE,
+          });
+          if (!hoja) continue;
+          // La ventana de diez minutos corre desde que empieza ESTA hoja.
+          await prisma.comprobanteProveedor.update({ where: { id: hojaId }, data: { lecturaEnCursoDesde: new Date() } });
+          respuesta = await respuestaParaGuardar(await leerUno(hoja, (hoja.archivos || []).filter((a) => a.ubicacion)));
+        } catch (e) {
+          console.error(`Falló la lectura de la hoja ${hojaId} del PDF:`, e?.message ?? e);
+          respuesta = {
+            status: 500,
+            cuerpo: {
+              ok: false,
+              error: errorInesperado({
+                operacion: "leer una hoja del PDF",
+                quedo: "La hoja quedó guardada: se puede leer con «Leer».",
+              }),
+            },
+          };
+        }
+        await terminarLaLectura(prisma, { comprobanteId: hojaId, respuesta });
+      }
+    };
 
     // ── LA LECTURA SE TOMA EN LA BASE, Y RECIÉN AHÍ ARRANCA ──────────────
     //
@@ -1009,6 +1068,7 @@ export async function POST(req, { params }) {
           };
         }
         await terminarLaLectura(prisma, { comprobanteId: comprobante.id, respuesta });
+        await leerLasHojasDelPdf();
       },
     });
 
