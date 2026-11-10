@@ -16,8 +16,13 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **110 migraciones**, la última
-`20261107180000_mortadela_paladini_vuelve_a_su_precio`.
+Producción está en **110 migraciones**, la última
+`20261107180000_mortadela_paladini_vuelve_a_su_precio`. Pendiente, 1:
+
+- `20261110120000_descuento_aplica_a` — de esquema, aditiva: una columna JSONB
+  nula `descuentoAplicaA` en `ComprobanteLinea` (a qué productos del papel
+  aplica un renglón de descuento, SL22-5181). Sin relleno: lo guardado queda en
+  null. El quinto chequeo del backup no aplica: no toca datos.
 
 ---
 

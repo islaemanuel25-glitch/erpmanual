@@ -111,7 +111,8 @@ export async function GET(req) {
     const lineasDeLosPapeles = items.length
       ? await prisma.comprobanteLinea.findMany({
           where: { comprobanteId: { in: items.map((c) => c.id) } },
-          select: { comprobanteId: true, tipoRenglon: true, productoLocalId: true },
+          // Con el importe y el costo: un renglón negativo es un descuento.
+          select: { comprobanteId: true, tipoRenglon: true, subtotalImpreso: true, costoFinalRenglon: true, productoLocalId: true },
         })
       : [];
     const delPapel = productosDelPapel(lineasDeLosPapeles);

@@ -124,6 +124,7 @@ import {
   quedoEnBultos,
   renglonesDeLaTarjeta,
   textoDelCostoQueQueda,
+  textoDelDescuentoAplicado,
   unidadDeComparacion,
 } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
@@ -1031,7 +1032,8 @@ export default function HojaCorregirLinea({
    * van los de UNA unidad, que son los que la tarjeta compara.
    */
   const papelConPack = precioDelPapelConPack(fila);
-  const losDosPrecios = (tenias, trae, unidad) => (
+  const descuentoAplicado = textoDelDescuentoAplicado(fila);
+  const losDosPrecios =(tenias, trae, unidad) => (
     <span className="text-sm3 sunmi-text-muted">
       {/* Los dos en la misma unidad, dicha al lado de cada uno (Emanuel,
           2026-10-26): un precio por pack al lado de uno por unidad no se lee. */}
@@ -1039,6 +1041,9 @@ export default function HojaCorregirLinea({
       {/* Con pack, el pack y la unidad: nunca "/ u" a un precio de pack
           (Emanuel, 2026-11-07). */}
       {papelConPack ? papelConPack.texto : `${formatearMoneda(trae)} / ${unidad}`}
+      {/* Un descuento del papel ya bajó ese precio: se dice cuál y cuánto
+          (SL22-5181, 2026-11-10). */}
+      {descuentoAplicado && <> · {descuentoAplicado}</>}
     </span>
   );
   // Un pack intermedio —"7UP LATA X 6" contra el bulto de 24— se compara por

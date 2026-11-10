@@ -706,6 +706,9 @@ export async function POST(req, { params }) {
               costoFinalRenglon: l.costoFinal ?? null,
               enQueViene: l.enQueViene ?? null,
               tipoRenglon: l.tipo ?? null,
+              // A qué productos de este papel aplica, si es un descuento que
+              // los nombra. Null es "a todos" (`descuentosDelPapel`).
+              descuentoAplicaA: l.aplicaA ?? null,
             })),
           });
         }

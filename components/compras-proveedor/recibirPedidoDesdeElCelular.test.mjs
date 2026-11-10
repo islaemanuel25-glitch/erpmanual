@@ -190,7 +190,9 @@ test("3 · LA TARJETA CUENTA PRODUCTOS DEL PAPEL, Y EL PEDIDO NACIDO DE FACTURA 
   // Y la ruta lo arma con la función probada arriba, sin envases.
   const r = codigoDe(LISTAR);
   assert.match(r, /const delPapel = productosDelPapel\(lineasDeLosPapeles\)/);
-  assert.match(r, /select: \{ comprobanteId: true, tipoRenglon: true, productoLocalId: true \}/);
+  // Con el importe y el costo desde el 2026-11-10: un renglón negativo es un
+  // descuento y no se cuenta como producto (`tipoDelRenglon`).
+  assert.match(r, /select: \{ comprobanteId: true, tipoRenglon: true, subtotalImpreso: true, costoFinalRenglon: true, productoLocalId: true \}/);
   assert.match(r, /nacidoDeFactura: pedido\?\.nacidoDeFactura === true/);
   // `_count.lineas` se queda: es lo que se lleva un borrado.
   assert.match(r, /_count: \{ select: \{ lineas: true \} \}/);

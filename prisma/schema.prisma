@@ -6155,8 +6155,14 @@ model ComprobanteLinea {
   costoFinalRenglon Decimal? @db.Decimal(14, 2)
   /// En qué viene la cantidad, como lo dice el papel: "unidad", "pack de 6", "kg".
   enQueViene        String?
-  /// MERCADERIA o ENVASE (`TIPO_RENGLON` en `lector/lecturaInterpretada.js`).
+  /// MERCADERIA, ENVASE, CARGO o DESCUENTO (`TIPO_RENGLON` en `lector/lecturaInterpretada.js`).
   tipoRenglon       String?
+  /// A QUÉ PRODUCTOS DEL MISMO PAPEL APLICA UN DESCUENTO, como lo dijo el lector
+  /// mirando el papel: códigos o descripciones de esos renglones (SL22-5181,
+  /// 2026-11-10: «Desc x 24u Pegamentos» → La Gotita y La Gotita Gel). Null si
+  /// el renglón no es un descuento o el papel no dice a qué aplica: entonces se
+  /// reparte entre todos (`descuentosDelPapel` en `comprobante/cargos.js`).
+  descuentoAplicaA  Json?
 
   /// SI EL SISTEMA ACOMODÓ ESTA FILA PORQUE EL PAPEL SE LEYÓ CORRIDO (Mauro #298).
   ///

@@ -705,8 +705,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // de antes del pedido 530, autorizado por Emanuel. No toca transferencias.
   // No se lee el número de las carpetas: contarlas contra sí mismas no atajaría
   // una migración de contrabando, que es lo único que este conteo afirma.
-  assert.equal(migraciones.length, 110,"aparecio una migracion que nadie declaro aca");
+  // Sube a 111 el 2026-11-10: `20261110120000_descuento_aplica_a`, una columna
+  // nula en `ComprobanteLinea` (a qué productos aplica un descuento del papel).
+  // No toca transferencias.
+  assert.equal(migraciones.length, 111,"aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261107180000_mortadela_paladini_vuelve_a_su_precio"));
+  assert.ok(migraciones.includes("20261110120000_descuento_aplica_a"));
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

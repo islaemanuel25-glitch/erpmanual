@@ -373,10 +373,24 @@ export default function ListaDeLaFactura({
               ))}
             </>
           )}
-          {envases.some((f) => !f.cargo) && (
+          {envases.some((f) => f.descuento) && (
+            <>
+              {/* Un descuento del papel: no es producto, y su importe ya bajó
+                  el costo de los productos que nombra (`descuentosDelPapel`). */}
+              <SunmiSeparator label="Descuentos repartidos en el costo" />
+              {envases.filter((f) => f.descuento).map((f) => (
+                <RenglonDeImporte
+                  key={claveDeFila(f)}
+                  rotulo={`${f.textoCrudo ?? "Descuento"} · ${f.cantidad ?? "—"}`}
+                  valor={f.subtotal}
+                />
+              ))}
+            </>
+          )}
+          {envases.some((f) => !f.cargo && !f.descuento) && (
             <>
               <SunmiSeparator label="Envases" />
-              {envases.filter((f) => !f.cargo).map((f) => (
+              {envases.filter((f) => !f.cargo && !f.descuento).map((f) => (
                 <RenglonDeImporte
                   key={claveDeFila(f)}
                   rotulo={`${f.textoCrudo ?? "Envase"} · ${f.cantidad ?? "—"}`}

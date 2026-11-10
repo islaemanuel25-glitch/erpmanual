@@ -123,7 +123,7 @@ export async function POST(req) {
         // ellos esta ruta escribía un costo distinto del que muestra la hoja.
         orden: true, ivaPct: true, bonificacionPct: true,
         // El costo que interpretó el modelo: es el que se acepta.
-        costoFinalRenglon: true, enQueViene: true, tipoRenglon: true,
+        costoFinalRenglon: true, enQueViene: true, tipoRenglon: true, descuentoAplicaA: true,
         // EL TEXTO DEL PAPEL Y EL CÓDIGO DEL PROVEEDOR son lo que la cascada de
         // vínculo machea. Sin ellos, una línea que la pantalla resuelve por
         // alias acá quedaría sin producto, que es exactamente el defecto que
@@ -166,6 +166,8 @@ export async function POST(req) {
               select: {
                 orden: true, cantidad: true, textoCrudo: true, codigoProveedor: true,
                 costoFinalRenglon: true, tipoRenglon: true,
+                // El descuento se reparte por importe entre los que nombra.
+                subtotalImpreso: true, descuentoAplicaA: true,
               },
             },
             proveedor: { select: { id: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
