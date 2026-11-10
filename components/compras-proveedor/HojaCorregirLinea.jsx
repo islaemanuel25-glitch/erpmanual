@@ -1001,10 +1001,11 @@ export default function HojaCorregirLinea({
   //
   // ── EL NÚMERO DEL TÍTULO ES EL DE LA TARJETA (Emanuel, 2026-11-06) ──────
   //
-  // Un solo cálculo para el título, el "Tenías…" y la tarjeta: el `pct` del
-  // renglón ERP de la tarjeta (`variacionDelPrecioPct`). Sin él —la tarjeta no
-  // compara—, lo de antes.
-  const pctDeLaTarjeta = Number.isFinite(erpDeLaTarjeta?.pct) ? erpDeLaTarjeta.pct : null;
+  // El título dice cuánto varió el precio, de los mismos dos precios que el
+  // renglón ERP de la tarjeta: `variacion` (`variacionDelPrecioPct`). El % del
+  // "Tenías…" es el otro, el ERP contra el papel (2026-11-10). Sin comparación
+  // en la tarjeta, lo de antes.
+  const pctDeLaTarjeta = Number.isFinite(erpDeLaTarjeta?.variacion) ? erpDeLaTarjeta.variacion : null;
   const pctDelSalto = esSaltoDePrecio
     ? pctDeLaTarjeta ?? ((deUnaUnidad.papel - deUnaUnidad.erp) / deUnaUnidad.erp) * 100
     : null;

@@ -133,7 +133,9 @@ test("COLON (pedido por BULTO): GANA EL PACK DE 6, +11,4 %, SIN PREGUNTA Y SIN C
   assert.equal(preguntaDeLectura(f), null);
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.PRECIO_DISTINTO);
   assert.equal(hayDiferenciaDePrecio(f), true);
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+11,4 %");
+  // El ERP contra el papel (2026-11-10): $6.666,67 contra $7.423,98, el ERP
+  // 11,4 % abajo. Decía "+11,4 %" (lo vio Emanuel recibiendo, 2026-11-09).
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−11,4 %");
   const t = tarjeta(f);
   assert.ok(!t.includes(AVISO_BORRADO), t);
   assert.ok(!t.includes(TEXTO_ELEGI_EN_QUE_VIENE), t);
@@ -147,7 +149,7 @@ test("COLON (pedido por UNIDAD): SALTO DE PRECIO +11,4 % CON «ACEPTAR» / «DEJ
   assert.notEqual(f.unidad.requiereDecision, true);
   assert.equal(loQueNoCuadra(f)?.que, "PRECIO");
   assert.equal(saltoDePrecioAceptable(f), true);
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+11,4 %");
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−11,4 %", "el ERP contra el papel (2026-11-10)");
   const t = tarjeta(f);
   assert.ok(!t.includes(AVISO_BORRADO), t);
   assert.ok(t.includes(PACK_COLON), t);
@@ -169,7 +171,7 @@ test("7UP LATA X 6 CONTRA FICHA x24: GANA EL PACK DE 6 DEL PAPEL, −1,7 %, «CO
   assert.equal(f.unidad.unidadesPorFacturada, 6);
   assert.deepEqual(f.unidad.lecturasCandidatas.map((l) => l.unidadesPorFacturada), [6, 24, 1]);
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.COINCIDE);
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−1,7 %");
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+1,7 %", "el ERP 1,7 % arriba del papel (2026-11-10)");
   assert.equal(renglonesDeLaTarjeta(f).papel.pack.texto, "$5.900,00 el pack de 6 · $983,33 la unidad");
 });
 

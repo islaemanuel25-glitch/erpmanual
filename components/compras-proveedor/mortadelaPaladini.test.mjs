@@ -97,7 +97,7 @@ test("LA MORTADELA, COMO LA ARMA LA RUTA AHORA: se compara por pieza y no frena"
   assert.equal(motivoSinComparacion(f), null, "la hoja: sin «No se puede saber en qué viene»");
   assert.equal(motivoSinComparacion(comparacionDeLaRuta(f)), null, "la guarda de la ruta tampoco frena");
   assert.equal(hayDiferenciaDePrecio(f), true, "se ofrece Aceptar / Dejar");
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+3,3 %");
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−3,3 %", "el ERP 3,3 % abajo del papel (2026-11-10)");
 });
 
 test("CONTRAPRUEBA: CON EL SELECT VIEJO DE LA RUTA, LA GUARDA FRENA CON EL CARTEL DE PRODUCCIÓN", () => {
@@ -155,33 +155,35 @@ test("LIVERPOOL, ≈10 VECES LA UNIDAD CON BULTO DE 10: GANA EL PACK DE 10 (+2 %
   assert.equal(f.unidad.unidad, "POR_BULTO", "16 packs de 10");
   assert.equal(loQueNoCuadra(f)?.que, "PRECIO");
   assert.match(motivoSinComparacion(f), /^El papel cobra \$1\.346,40 la unidad y vos la tenés a \$1\.320,00 \(2 % más\)\.$/);
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+2,0 %");
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−2,0 %", "el ERP 2 % abajo del papel (2026-11-10)");
 });
 
 // ── PUNTO 2: EL SIGNO ───────────────────────────────────────────────────
 
-// El color dice si es bueno para Emanuel (su regla del 26/10, mantenida el
-// 2026-11-06): subió, pagás más, rojo del tema; bajó, verde.
-test("SUBIÓ: +3,3 % EN ROJO EN LA TARJETA Y EN EL «TENÍAS…», Y EL TÍTULO DICE SUBIÓ 3,3 %", () => {
+// La regla de Emanuel del 26/10, vuelta el 2026-11-10: el % del renglón ERP
+// es el ERP contra el papel —más barato, "−" y rojo; más caro, "+" y verde—.
+// El título de Corregir sigue diciendo cuánto varió el precio. Del 06/11 al
+// 09/11 la tarjeta y el «Tenías…» decían el número del título ("+3,3 %").
+test("SUBIÓ: −3,3 % EN ROJO EN LA TARJETA Y EN EL «TENÍAS…», Y EL TÍTULO DICE SUBIÓ 3,3 %", () => {
   const f = fila();
   assert.equal(Math.round(variacionDelPrecioPct({ papel: 41330.09, erp: 40000.01 }) * 10) / 10, 3.3);
-  assert.match(tarjeta(f), /sunmi-text-danger">\+3,3 %</);
-  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-danger">\+3,3 %</, "el «Tenías…» con el mismo color");
+  assert.match(tarjeta(f), /sunmi-text-danger">−3,3 %</);
+  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-danger">−3,3 %</, "el «Tenías…» con el mismo número y color");
   const h = hoja(f);
   assert.match(h, / El precio subió 3,3 % /);
-  assert.match(h, /Tenías [^%]*\+3,3 %/);
-  assert.ok(!/−3,3 %/.test(h), "ningún «−3,3 %» en la hoja");
+  assert.match(h, /Tenías [^%]*−3,3 %/);
+  assert.ok(!/\+3,3 %/.test(h), "ningún «+3,3 %» en la hoja");
 });
 
-test("BAJÓ: «−» EN LOS TRES LUGARES, EN VERDE", () => {
+test("BAJÓ: EL ERP QUEDA ARRIBA, «+» Y VERDE; EL TÍTULO DICE BAJÓ", () => {
   const f = fila({ neto: 38000 });
-  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "−5,0 %");
-  assert.match(tarjeta(f), /sunmi-text-success">−5,0 %</);
-  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-success">−5,0 %</);
+  assert.equal(renglonesDeLaTarjeta(f).erp.texto, "+5,0 %");
+  assert.match(tarjeta(f), /sunmi-text-success">\+5,0 %</);
+  assert.match(hojaHtml(f), /Tenías[\s\S]*?sunmi-text-success">\+5,0 %</);
   const h = hoja(f);
   assert.match(h, / El precio bajó 5,0 % /);
-  assert.match(h, /Tenías [^%]*−5,0 %/);
-  assert.ok(!/\+5,0 %/.test(h));
+  assert.match(h, /Tenías [^%]*\+5,0 %/);
+  assert.ok(!/−5,0 %/.test(h));
 });
 
 // ── PUNTO 3: "ANTES DECIDISTE…" ─────────────────────────────────────────

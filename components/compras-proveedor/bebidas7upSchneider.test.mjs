@@ -93,7 +93,9 @@ test("7UP LATA X 6: PACK DE 6, −1,7 % POR UNIDAD, SIN CARTEL, «8 PACK x6»", 
   assert.equal(r.papel.unidad, "u");
   assert.equal(Math.round(r.papel.importe * 100) / 100, 983.33, "5.900 ÷ 6");
   assert.equal(r.erp.importe, 1000);
-  assert.equal(r.erp.texto, "−1,7 %");
+  // El ERP contra el papel (regla del 2026-10-26, vuelta el 2026-11-10): el
+  // ERP a $1.000 está 1,7 % arriba del papel. Del 06/11 al 09/11 decía "−1,7 %".
+  assert.equal(r.erp.texto, "+1,7 %");
   assert.equal(estadoDeLinea(f), ESTADO_LINEA.COINCIDE);
   const t = tarjeta(f);
   assert.doesNotMatch(t, new RegExp(AVISO_ESCALA));

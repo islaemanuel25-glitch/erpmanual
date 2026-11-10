@@ -46,7 +46,6 @@ import SunmiAccionRapida, { TEXTO_COINCIDE } from "@/components/sunmi/SunmiAccio
 import { formatearMoneda } from "@/lib/moneda";
 import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import { DECISION_DE_PRECIO, decisionVigente, textoDeDecision } from "@/lib/compras-proveedor/decisionDePrecio";
-import { tonoDelPorcentaje } from "@/components/proveedores/listas/PiezasPantallas";
 import {
   AVISO_NO_DA_EL_PAPEL,
   AVISO_PAPEL_CORRIDO,
@@ -79,9 +78,10 @@ export { TEXTO_COINCIDE };
 export const TEXTO_CORREGIR = "Corregir";
 
 /**
- * CUÁNTO VARIÓ EL PRECIO, AL LADO DEL RENGLÓN ERP: "+3,3 %" con el color de
- * suba cuando el papel cobra más, "−2,9 %" con el de baja cuando cobra menos
- * (`variacionDelPrecioPct`, Emanuel, 2026-11-06: el mismo número del título).
+ * CÓMO ESTÁ EL ERP CONTRA EL PAPEL, AL LADO DEL RENGLÓN ERP: "+2,9 %" en el
+ * color de éxito cuando el ERP está más caro, "−11,4 %" en el de peligro
+ * cuando está más barato (Emanuel, regla del 2026-10-26, vuelta el
+ * 2026-11-10). Texto y tono llegan resueltos en `erp`.
  *
  * Es el renglón ERP de esta tarjeta, sacado tal cual para que la hoja de
  * Corregir lo muestre con la misma pieza (Emanuel, 2026-10-29). Recibe el `erp`
@@ -91,7 +91,7 @@ export function PorcentajeDelErp({ erp }) {
   if (!erp?.texto) return null;
   return (
     <span
-      className={`text-sm2 font-semibold tabular-nums shrink-0 ${tonoDelPorcentaje(erp.pct)}`}
+      className={`text-sm2 font-semibold tabular-nums shrink-0 ${erp.tono}`}
     >
       {erp.texto}
     </span>
@@ -378,10 +378,10 @@ export default function TarjetaLineaFactura({
               )}
 
               {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
-                  El precio interno y cuánto varió el precio: "+" y rojo si
-                  subió —pagás más—, "−" y verde si bajó, gris si es el mismo
-                  (`variacionDelPrecioPct` y `tonoDelPorcentaje`, 2026-11-06).
-                  El signo dice para dónde va; el color, si te conviene.
+                  El precio interno y cómo está contra el papel: "+" y verde
+                  si el ERP está más caro, "−" y rojo si está más barato, gris
+                  si es el mismo (`erpContraElPapelPct` y
+                  `tonoDelErpContraElPapel`, regla del 2026-10-26).
 
                   No se dibuja si no hay con qué comparar —renglón sin vincular,
                   producto sin costo—. Una comparación contra nada es peor que
