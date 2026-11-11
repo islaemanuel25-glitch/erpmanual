@@ -62,8 +62,11 @@ Las cuentas pasadas dan los mismos números que antes. El candado está en
 **Verificado en código y con candado** (`lib/unidades/piezaUnicaTanda18.test.mjs`,
 con contraprueba: se rompió la pieza a propósito y se puso en rojo). No queda
 ninguna cuenta a mano de las 23 relevadas. Sigue valiendo que el patrón es un
-piso: `lib/proveedores/identidad/servicioIdentidad.js` divide el factor del
-ERP por el del proveedor y no estaba en la lista; se anota sin tocar.
+piso: `lib/proveedores/identidad/servicioIdentidad.js` dividía el factor del
+ERP por el del proveedor y no estaba en la lista. Se pasó a la pieza
+(`presentacionesEnElBulto`) sin cambiar ningún número: los 18 vínculos de
+producción dan lo mismo con las dos cuentas (leído el 2026-11-11), y el
+candado lo comprueba en todos los pares enteros de 1 a 48.
 
 Piezas nuevas en `reglaDeUnidades.js`:
 
