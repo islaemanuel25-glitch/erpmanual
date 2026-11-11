@@ -79,6 +79,10 @@ export async function GET(req) {
         // Si se está leyendo ahora: la pantalla se engancha a esa lectura en
         // vez de lanzar otra. Viaja como booleano, no la fecha.
         lecturaEnCursoDesde: true,
+        // Sin total impreso: cuántos renglones dijo ver el lector y en qué hoja
+        // dice estar el papel, para avisar y ofrecer la siguiente (Mauro #590).
+        lineasEnElPapel: true,
+        hojaImpresa: true,
         proveedor: { select: { id: true, nombre: true } },
         _count: { select: { lineas: true } },
         archivos: {

@@ -30,7 +30,7 @@ import TarjetaLineaFactura from "./TarjetaLineaFactura";
 import { formatearMoneda } from "@/lib/moneda";
 // El catálogo que dice el estado del papel en castellano. Sin esto, el último
 // `||` devolvía el nombre crudo del enum —"MAL_LEIDO"— al celular.
-import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { comoSeDice, textoDelPapelSinTotal } from "@/lib/compras-proveedor/comprobante/pantalla";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import {
   FILTRO,
@@ -175,8 +175,14 @@ export default function ListaDeLaFactura({
   // pantalla no lo estaba usando: tenía dos casos escritos a mano y el resto
   // caía al enum.
   const avisoDelComprobante =
+    // Sin total impreso nunca dice "verificada": la suma de los productos se
+    // compara contra sí misma (Mauro #590, 1 de 31 "verificado").
     comprobante?.estado === "SIN_TOTAL"
-      ? "Sin total impreso: verificada con la suma de los productos."
+      ? textoDelPapelSinTotal({
+          leidos: filasDelPapel.filter((f) => f.envase !== true).length,
+          vistos: comprobante?.lineasEnElPapel ?? null,
+          hojaImpresa: comprobante?.hojaImpresa ?? null,
+        })
       : comprobante?.estado === "CARGADO"
         ? "Lectura verificada contra el total del papel."
         : comprobante?.estado
@@ -272,7 +278,17 @@ export default function ListaDeLaFactura({
 
           {/* El estado del papel en criollo, que es lo que hay que saber antes
               de empezar a controlar. */}
-          <p className="text-sm2 sunmi-text-muted truncate">{avisoDelComprobante}</p>
+          {/* Sin total es para revisar, y con los números: entero y en ámbar
+              (Mauro #590). Los demás estados, una línea gris. */}
+          <p
+            className={
+              comprobante?.estado === "SIN_TOTAL"
+                ? "text-sm2 sunmi-text-warning break-words"
+                : "text-sm2 sunmi-text-muted truncate"
+            }
+          >
+            {avisoDelComprobante}
+          </p>
           {/* Un papel sin impuestos de un proveedor que suele traerlos: se
               costea igual con el importe, y se dice (`avisoDeImpuestos`). */}
           {avisoDeImpuestos && <p className="text-sm2 sunmi-text-warning break-words">{avisoDeImpuestos}</p>}

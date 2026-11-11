@@ -428,7 +428,15 @@ export async function POST(req, { params }) {
       });
       let recetaDeLaLectura = escalada.recetaDeFlash;
       let versionDeLaLectura = escalada.versionDeFlash;
-      if (escalada.cerro || (escalada.lectura && resultado.ok !== true)) {
+      // ── Y SI EL GRANDE TAMPOCO CERRÓ, PERO TRAJO MÁS RENGLONES, GANA ÉL ───
+      //
+      // Mauro #590: un papel sin total con 31 renglones, Flash trajo 1. Si el
+      // grande trae 30, quedarse con el de Flash por ser el primero sería
+      // tirar la lectura buena. Con más renglones, la del grande.
+      const renglonesDe = (l) => (Array.isArray(l?.lineas) ? l.lineas.length : 0);
+      const elGrandeTrajoMas =
+        !escalada.cerro && escalada.lectura && resultado.ok === true && renglonesDe(escalada.lectura) > renglonesDe(resultado.lectura);
+      if (escalada.cerro || elGrandeTrajoMas || (escalada.lectura && resultado.ok !== true)) {
         // `ok: true` porque puede venir sin lectura de Flash —sin explicación,
         // o Flash que no contestó—: ahí la del grande es la ÚNICA. Si cerró es
         // buena porque la cuenta la verificó el código; si no cerró, se guarda
@@ -971,6 +979,8 @@ export async function POST(req, { params }) {
         // veces seguidas.
         lineasEnElPapel: puerta.aGuardar?.lineasEnElPapel ?? null,
         lineasTranscriptas: puerta.aGuardar?.lineasTranscriptas ?? null,
+        // En qué hoja dice estar: sin total, «Hoja 1» avisa que puede haber más.
+        hojaImpresa: puerta.aGuardar?.hojaImpresa ?? null,
         // Si quedó corta, con la MISMA pregunta que la puerta: la pantalla no
         // vuelve a comparar los dos números por su cuenta.
         faltanRenglones: puerta.faltanLineas != null,

@@ -42,7 +42,9 @@ import {
   chipDeFactura,
   comoSeDice,
   resumenDeLista,
+  textoDelPapelSinTotal,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { hayMasHojasProbables } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
 import { pedirLaLectura, esperarLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
@@ -546,9 +548,14 @@ export default function PanelComprobantes({
         // decirlo: la fila que se tocó desaparece de la lista, y sin una
         // palabra eso se lee como que se borró algo.
         const juntadas = (d.agrupacion || []).reduce((n, f) => n + (f.absorbidos?.length || 0), 0);
+        // Sin total impreso no hay "verificado": la suma de lo leído se compara
+        // contra sí misma (Mauro #590, 1 producto de 31 "leído y verificado").
+        const sinTotal = d.estado === "SIN_TOTAL";
         setMensaje({
-          tipo: d.cierra ? "ok" : "aviso",
-          texto: d.cierra
+          tipo: d.cierra && !sinTotal ? "ok" : "aviso",
+          texto: sinTotal
+            ? textoDelPapelSinTotal({ leidos: d.lineas, vistos: d.lineasEnElPapel, hojaImpresa: d.hojaImpresa })
+            : d.cierra
             ? `Leído y verificado: ${d.lineas} ${d.lineas === 1 ? "producto" : "productos"}.`
             : "Leído, pero la cuenta no cierra. Está señalado abajo, con la foto al lado.",
           detalles: [
@@ -962,6 +969,30 @@ export default function PanelComprobantes({
                 </div>
               );
             })}
+            {/* ── SIN TOTAL Y CON «HOJA 1»: PUEDE HABER MÁS HOJAS (Mauro #590) ──
+                La foto siguiente se sube como cualquier otra y la agrupación la
+                junta con ésta (`agruparHojas`). La frase sale del mismo lugar
+                que la de la factura (`textoDelPapelSinTotal`). */}
+            {items
+              .filter((c) => c.estado === "SIN_TOTAL" && hayMasHojasProbables(c.hojaImpresa))
+              .map((c) => (
+                <div key={`hojas-${c.id}`} className="flex flex-col gap-1">
+                  <p className="text-sm2 sunmi-text-warning break-words">
+                    {textoDelPapelSinTotal({ leidos: c.productosDelPapel, vistos: c.lineasEnElPapel, hojaImpresa: c.hojaImpresa })}
+                  </p>
+                  {puedeRecibir && (
+                    <SunmiButton
+                      color="slate"
+                      type="button"
+                      disabled={subiendo}
+                      onClick={() => (inputCamaraRef.current ?? inputRef.current)?.click()}
+                      className="w-full min-h-toque justify-center text-sm3 font-bold"
+                    >
+                      {subiendo ? "Subiendo…" : "+ Agregar la hoja siguiente"}
+                    </SunmiButton>
+                  )}
+                </div>
+              ))}
           </div>
 
           {botonAgregar}

@@ -82,11 +82,15 @@ test("2 · «N de M llegaron» sale de la conciliación, la misma cuenta que la 
   assert.doesNotMatch(conc, /l\.pedidoDetalleId != null \|\| l\.productoLocalId != null/);
 });
 
-test("3 · un papel sin total no se ve como «no cierra»: tilde y tono de verificado", () => {
+// Del 2026-10-26 al 2026-11-11 llevaba tilde y tono de verificado. Mauro #590:
+// la suma de lo leído se compara contra sí misma y un papel con 1 renglón de 31
+// salía "verificado". Sigue sin decir "no cierra", pero ya no dice verificado.
+test("3 · un papel sin total no se ve como «no cierra», ni como verificado", () => {
   const chip = chipDeFactura("SIN_TOTAL");
-  assert.match(chip.texto, /✓/);
-  assert.equal(chip.tono, "ok");
-  assert.doesNotMatch(comoSeDice("SIN_TOTAL").titulo, /no cierra/i);
+  assert.equal(chip.texto, "sin total");
+  assert.doesNotMatch(chip.texto, /✓/);
+  assert.notEqual(chip.tono, "ok");
+  assert.doesNotMatch(comoSeDice("SIN_TOTAL").titulo, /no cierra|verific/i);
   // CONTRAPRUEBA: el que no se pudo leer sigue diciendo que no cierra.
   assert.equal(chipDeFactura("MAL_LEIDO").texto, "no cierra");
 });

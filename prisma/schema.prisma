@@ -5826,6 +5826,11 @@ model ComprobanteProveedor {
   /// dentro de veinte facturas se ve si alguna vez difirieron. Si nunca
   /// difieren, el prompt no está funcionando y el control es decorativo.
   lineasTranscriptas Int?
+  /// EN QUÉ HOJA DICE ESTAR EL PAPEL, como lo imprime: «Hoja 1», «1 de 3».
+  /// Mauro #590 (2026-11-11): una planilla sin total con «Hoja 1» al pie puede
+  /// tener más hojas, y la pantalla ofrece agregar la siguiente
+  /// (`hayMasHojasProbables`). Null si el papel no lo dice.
+  hojaImpresa     String?
   modeloLectura   String?
   leidoEn         DateTime?
   /// Cuántos intentos de lectura lleva. Un reintento no borra el anterior:

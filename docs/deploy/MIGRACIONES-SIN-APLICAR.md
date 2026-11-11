@@ -16,8 +16,12 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **111 migraciones**, la última
-`20261110120000_descuento_aplica_a`.
+Producción está en **111 migraciones**, la última
+`20261110120000_descuento_aplica_a`. Pendiente, 1:
+
+- `20261111120000_hoja_impresa` — de esquema, aditiva: una columna TEXT nula
+  `hojaImpresa` en `ComprobanteProveedor` (en qué hoja dice estar el papel,
+  Mauro #590). Sin relleno. El quinto chequeo del backup no aplica.
 
 ---
 

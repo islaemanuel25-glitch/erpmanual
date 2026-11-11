@@ -708,7 +708,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 111 el 2026-11-10: `20261110120000_descuento_aplica_a`, una columna
   // nula en `ComprobanteLinea` (a qué productos aplica un descuento del papel).
   // No toca transferencias.
-  assert.equal(migraciones.length, 111,"aparecio una migracion que nadie declaro aca");
+  // Sube a 112 el 2026-11-11: `20261111120000_hoja_impresa`, una columna nula
+  // en `ComprobanteProveedor` (en qué hoja dice estar el papel). No toca
+  // transferencias.
+  assert.equal(migraciones.length, 112,"aparecio una migracion que nadie declaro aca");
+  assert.ok(migraciones.includes("20261111120000_hoja_impresa"));
   assert.ok(migraciones.includes("20261107180000_mortadela_paladini_vuelve_a_su_precio"));
   assert.ok(migraciones.includes("20261110120000_descuento_aplica_a"));
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
