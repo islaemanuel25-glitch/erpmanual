@@ -40,7 +40,7 @@ import {
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import {
   gananciaDelDeposito,
-  textoDeLaCuenta,
+  textoDeLaGanancia,
 } from "@/lib/compras-proveedor/gananciaDelDeposito";
 import { claveDeFila } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 
@@ -325,7 +325,10 @@ export default function ListaDeLaFactura({
                 papel y no lo encuentra, porque no puede estar. */}
             <RenglonDeImporte
               rotulo="Factura"
-              valor={totalDelPapel != null ? totalDelPapel : cuenta.facturado}
+              // Sin total impreso, la suma de TODOS los renglones del papel, no
+              // la de los que tienen tu precio (Mauro #590: $4.844.300, no
+              // $4.113.800).
+              valor={totalDelPapel != null ? totalDelPapel : cuenta.delPapel ?? cuenta.facturado}
             />
 
             {/* ── Y LA GANANCIA DICE SOBRE CUÁNTOS SE CALCULÓ ────────────
@@ -339,13 +342,12 @@ export default function ListaDeLaFactura({
               porcentaje={cuenta.porcentaje}
               fuerte
             />
+            {/* SOBRE QUÉ SE CALCULÓ, CON LA PLATA DE CADA PARTE (Mauro #590):
+                la factura de los que entran y lo que facturan los que no. */}
+            <span className="text-xs2 sunmi-text-muted break-words tabular-nums">{textoDeLaGanancia(cuenta)}</span>
             <span className="text-xs2 sunmi-text-muted break-words tabular-nums">
-              {`Factura de esos ${cuenta.enLaCuenta}: ${formatearMoneda(cuenta.facturado)} · A tus precios: ${formatearMoneda(cuenta.interno)}`}
+              {`A tus precios: ${formatearMoneda(cuenta.interno)}`}
             </span>
-            {/* CUÁNTAS LÍNEAS RESPALDAN EL NÚMERO. Sin esto, una factura con la
-                mitad de las líneas sin vincular muestra una ganancia a media
-                asta que se lee como el total. */}
-            <span className="text-xs2 sunmi-text-muted break-words">{textoDeLaCuenta(cuenta)}</span>
           </div>
         </>
         )

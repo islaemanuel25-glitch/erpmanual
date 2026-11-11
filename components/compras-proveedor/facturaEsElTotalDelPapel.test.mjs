@@ -53,10 +53,12 @@ test("LA CUENTA SIGUE SIENDO PARCIAL, Y LO DICE", () => {
 test("EL RÓTULO «Factura» MUESTRA EL TOTAL DEL PAPEL, NO ESA SUMA", () => {
   const lista = codigoDe("components/compras-proveedor/ListaDeLaFactura.jsx");
   assert.match(lista, /rotulo="Factura"/);
-  assert.match(lista, /valor=\{totalDelPapel != null \? totalDelPapel : cuenta\.facturado\}/);
-  // La suma parcial no desaparece: baja a la línea chica, donde se dice de
-  // cuántos productos es.
-  assert.match(lista, /Factura de esos \$\{cuenta\.enLaCuenta\}/);
+  // Sin total impreso, la suma de TODOS los renglones del papel (Mauro #590,
+  // 2026-11-11); antes caía a la de los comparables.
+  assert.match(lista, /valor=\{totalDelPapel != null \? totalDelPapel : cuenta\.delPapel \?\? cuenta\.facturado\}/);
+  // La suma parcial no desaparece: baja a la línea chica, que dice de cuántos
+  // productos es y cuánto facturan los que quedan afuera (`textoDeLaGanancia`).
+  assert.match(lista, /\{textoDeLaGanancia\(cuenta\)\}/);
   assert.match(lista, /A tus precios: \$\{formatearMoneda\(cuenta\.interno\)\}/);
 });
 
@@ -84,10 +86,15 @@ test("EL TOTAL DEL PAPEL VIAJA DESDE EL COMPROBANTE, NO SE SUMA", () => {
 });
 
 test("SIN TOTAL IMPRESO NO SE INVENTA UNO", () => {
-  // El papel de Mauro no trae total. Ahí el rótulo cae a la suma de lo
-  // comparable, que es lo único que hay, y no a un cero ni a un guion.
+  // El papel de Mauro no trae total. Ahí el rótulo cae a la suma de todos los
+  // renglones leídos —lo que factura el papel—, no a un cero ni a un guion, y
+  // desde Mauro #590 tampoco a la de los comparables.
   const lista = codigoDe("components/compras-proveedor/ListaDeLaFactura.jsx");
-  assert.match(lista, /totalDelPapel != null \? totalDelPapel : cuenta\.facturado/);
+  assert.match(lista, /totalDelPapel != null \? totalDelPapel : cuenta\.delPapel \?\? cuenta\.facturado/);
+  // Y la suma es de los importes del papel, renglón por renglón: sin ninguno
+  // (estas filas no los traen) queda en null y no se inventa un cero. El caso
+  // con importes, el real, está en `mauro590Resumen.test.mjs`.
+  assert.equal(gananciaDelDeposito(FILAS).delPapel, null);
 });
 
 test("Y NULL NO ES CERO: EL QUE NO TRAE TOTAL LLEGA EN NULL A LA PANTALLA", () => {
