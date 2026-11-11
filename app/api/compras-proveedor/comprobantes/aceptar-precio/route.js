@@ -45,6 +45,7 @@ import {
   cargarConciliacion,
   lineasSospechadasDeCorrimiento,
 } from "@/lib/compras-proveedor/comprobante/conciliacionDelPedido";
+import { hermanosDelRenglon } from "@/lib/compras-proveedor/comprobante/hermanosDelRenglon";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import {
@@ -254,9 +255,12 @@ export async function POST(req) {
     // se perdía. Refrescar la pantalla la borraba y el renglón volvía a
     // preguntar por unidad o por bulto sobre algo que alguien ya había
     // contestado. Es una decisión de una persona sobre ESTE renglón.
+    // Y en los renglones del mismo producto de los otros papeles de la entrega:
+    // la pantalla los muestra juntos (`hermanosDelRenglon`, vinos 2026-11-11).
+    const hermanos = await hermanosDelRenglon(prisma, linea);
     if (body?.unidad && linea.unidadElegida !== body.unidad) {
-      await prisma.comprobanteLinea.update({
-        where: { id: linea.id },
+      await prisma.comprobanteLinea.updateMany({
+        where: { id: { in: hermanos } },
         data: { unidadElegida: String(body.unidad) },
       });
     }
@@ -529,8 +533,10 @@ export async function POST(req) {
       // Sin esto no se puede ver a qué se pidió y a qué terminó facturando, que
       // es una pregunta comercial y no de reversión — por eso no comparte
       // columna con `costoPrevioAplicacion`.
-      await tx.comprobanteLinea.update({
-        where: { id: linea.id },
+      // En todos los renglones del producto de la entrega: el precio aceptado
+      // es el promediado, y el cierre lo busca en cualquiera de ellos.
+      await tx.comprobanteLinea.updateMany({
+        where: { id: { in: hermanos } },
         data: {
           precioPedidoPrevio: detalle.precioCosto,
           costoFinalUnitario: precioAEscribir,

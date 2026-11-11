@@ -36,6 +36,7 @@ import { filasDeIdentidad, METODO_DETECCION } from "@/lib/proveedores/identidad/
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import { lecturaRecordadaDeLaEleccion } from "@/lib/compras-proveedor/comprobante/preguntaDeLectura";
+import { hermanosDelRenglon } from "@/lib/compras-proveedor/comprobante/hermanosDelRenglon";
 
 /** Un número que llegó de la pantalla, o null. Vacío es null, no cero. */
 function numeroONull(v) {
@@ -135,7 +136,7 @@ export async function POST(req) {
         lineaId: body?.lineaId,
         pedidoId,
         textoCrudo: body?.textoCrudo,
-        select: { id: true, productoLocalId: true, comprobante: { select: { proveedorId: true } } },
+        select: { id: true, productoLocalId: true, pedidoDetalleId: true, comprobante: { select: { proveedorId: true, pedidoId: true } } },
       });
       if (linea) {
         // ── LO ELEGIDO EN "¿EN QUÉ VIENE?" SE RECUERDA (2026-11-07) ──────
@@ -157,8 +158,11 @@ export async function POST(req) {
         const k = elegida === "POR_UNIDAD" ? 1 : elegida === "POR_BULTO" ? factor : pack ? Number(pack[1]) : null;
         const lectura = base?.baseId && k ? lecturaRecordadaDeLaEleccion({ k, factor }) : null;
         const proveedorId = linea.comprobante?.proveedorId ?? null;
+        // En todos los renglones del producto de la entrega: van juntos en una
+        // fila y se leen en la misma escala (vinos, 2026-11-11).
+        const hermanos = await hermanosDelRenglon(prisma, linea);
         await prisma.$transaction(async (tx) => {
-          await tx.comprobanteLinea.update({ where: { id: linea.id }, data: { unidadElegida: elegida } });
+          await tx.comprobanteLinea.updateMany({ where: { id: { in: hermanos } }, data: { unidadElegida: elegida } });
           if (lectura && proveedorId) {
             await tx.lecturaProductoProveedor.upsert({
               where: {

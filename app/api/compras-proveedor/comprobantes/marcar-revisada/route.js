@@ -35,6 +35,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import { hermanosDelRenglon } from "@/lib/compras-proveedor/comprobante/hermanosDelRenglon";
 import { aliasAEscribir } from "@/lib/compras-proveedor/comprobante/vinculo";
 
 export async function POST(req) {
@@ -72,7 +73,10 @@ export async function POST(req) {
         codigoProveedor: true,
         textoCrudo: true,
         productoLocalId: true,
-        comprobante: { select: { id: true, confirmadoEn: true, grupoId: true, proveedorId: true } },
+        // Para marcar también los renglones del mismo producto en los otros
+        // papeles de la entrega (`hermanosDelRenglon`).
+        pedidoDetalleId: true,
+        comprobante: { select: { id: true, confirmadoEn: true, grupoId: true, proveedorId: true, pedidoId: true } },
       },
     });
     if (!linea) {
@@ -95,13 +99,19 @@ export async function POST(req) {
       );
     }
 
+    // El mismo producto en los otros papeles de la entrega va junto en una fila
+    // (vinos, 2026-11-11): revisar la fila es revisar todos sus renglones.
+    const hermanos = await hermanosDelRenglon(prisma, linea);
+    const marca = {
+      revisadoEnRecepcion: revisada,
+      revisadoEnRecepcionPorId: revisada ? session?.id ?? null : null,
+      revisadoEnRecepcionAt: revisada ? new Date() : null,
+    };
+    const otros = hermanos.filter((id) => id !== linea.id);
+    if (otros.length) await prisma.comprobanteLinea.updateMany({ where: { id: { in: otros } }, data: marca });
     const actualizada = await prisma.comprobanteLinea.update({
       where: { id: linea.id },
-      data: {
-        revisadoEnRecepcion: revisada,
-        revisadoEnRecepcionPorId: revisada ? session?.id ?? null : null,
-        revisadoEnRecepcionAt: revisada ? new Date() : null,
-      },
+      data: marca,
       select: { id: true, revisadoEnRecepcion: true, revisadoEnRecepcionAt: true },
     });
 
