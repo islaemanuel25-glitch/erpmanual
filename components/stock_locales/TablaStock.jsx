@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { kgToPiezas } from "@/lib/conversiones/stock";
+import { kilosDeLasPiezas } from "@/lib/unidades/reglaDeUnidades";
 import { useStockData } from "@/hooks/useStockData";
 import { useColumnasVisibles } from "@/hooks/useColumnasVisibles";
 import ColumnPicker from "@/components/stock_locales/ColumnPicker";
@@ -145,7 +146,7 @@ export default function TablaStock({
         )}
         {isFiambreFijo && localEsDeposito && (
           <span className="block text-[10px] sunmi-text-muted">
-            = {(Number(p.stock || 0) * p.pesoReferenciaKg).toFixed(3)} kg
+            = {kilosDeLasPiezas({ piezas: p.stock, pesoKg: p.pesoReferenciaKg }).toFixed(3)} kg
           </span>
         )}
         {isFiambreFijo && !localEsDeposito && (

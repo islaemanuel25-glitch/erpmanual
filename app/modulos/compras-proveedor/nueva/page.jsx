@@ -44,6 +44,7 @@ import {
 // LA CONVERSIÓN DE ESCALA YA EXISTÍA, en el módulo de importación: sabe además
 // que un fiambre o un producto por kilo NO se divide por el pack.
 import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
+import { unidadDelBulto, costoDelBulto, toUnidades } from "@/lib/unidades/reglaDeUnidades";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -1984,7 +1985,11 @@ export default function NuevaCompraProveedorPage() {
     const costoNum = Number(rv.costoActual) || 0;
     const mostrar = rv.factor > 1 && rv.costoUnidad !== "kg" && costoNum > 0;
     if (!mostrar) return null;
-    const val = rv.disp === "BULTO" ? costoNum / rv.factor : costoNum * rv.factor;
+    // La otra unidad con la pieza única (tanda 18): del bulto a la unidad, o al revés.
+    const val =
+      rv.disp === "BULTO"
+        ? unidadDelBulto({ precio: costoNum, factor: rv.factor })
+        : costoDelBulto({ precio: costoNum, unidades: 1, bulto: rv.factor }) ?? costoNum * rv.factor;
     const label = rv.disp === "BULTO" ? "u" : rv.bultoNombre.toLowerCase();
     return `≈ $${val.toFixed(2)}/${label}`;
   };
@@ -2247,7 +2252,7 @@ export default function NuevaCompraProveedorPage() {
             Mantener en unidades ({convModal.units} un)
           </SunmiButton>
           <SunmiButton color="amber" className="w-full" onClick={() => resolverConversion("redondear")}>
-            Redondear a {convModal.packs} {convModal.packs === 1 ? "pack" : "packs"} ({convModal.packs * convModal.factor} un)
+            Redondear a {convModal.packs} {convModal.packs === 1 ? "pack" : "packs"} ({toUnidades({ cantidad: convModal.packs, unidad: "BULTO", factorPack: convModal.factor })} un)
           </SunmiButton>
           <SunmiButton color="slate" className="w-full" onClick={() => resolverConversion("cancelar")}>
             Cancelar
@@ -2358,7 +2363,7 @@ export default function NuevaCompraProveedorPage() {
           )}
           {rv.esPack && rv.disp === "BULTO" && rv.cantNum > 0 && (
             <div className="text-[9.5px] sunmi-text-accent text-center mt-0.5 leading-none">
-              = {rv.cantNum * rv.factor} un
+              = {toUnidades({ cantidad: rv.cantNum, unidad: "BULTO", factorPack: rv.factor })} un
             </div>
           )}
         </div>

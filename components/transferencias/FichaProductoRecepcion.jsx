@@ -47,6 +47,7 @@ import { BadgeAgregado, fmtCantidad, fmtDiferencia } from "./detallePresentacion
 // y que NO se puede cambiar sin mover esa tabla.
 import { formatearMoneda } from "@/lib/moneda";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
+import { toUnidades } from "@/lib/unidades/reglaDeUnidades";
 // `resultadoDeConteo` se importaba acá para el renglón teñido. Se dio de baja
 // con el V26: sin ese renglón y sin el aviso de la tarjeta quedó sin un solo
 // consumidor, que es el patrón del `conImporte`.
@@ -292,9 +293,10 @@ export default function FichaProductoRecepcion({
     // que es exactamente lo que hoy escriben los dos campos con los packs en cero.
     // Ver `revisar`.
     if (enHoja && seCuentaPorUnidad(env)) {
+      // Los packs en unidades, con la pieza única (tanda 18).
       const fisicas = sinContar
         ? Number(env.sueltas) || 0
-        : (Number(d?.cantidadRecibida) || 0) * (Number(env.factor) || 1) +
+        : toUnidades({ cantidad: Number(d?.cantidadRecibida) || 0, unidad: "BULTO", factorPack: Number(env.factor) || 1 }) +
           (Number(d?.recibidoUnidadesSueltas) || 0);
       return {
         // La escala sale del propio descriptor mostrado y no de una constante

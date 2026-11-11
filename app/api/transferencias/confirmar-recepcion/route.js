@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { piezasToKg } from "@/lib/conversiones/stock";
+import { unidadesDeStockPorEscalon } from "@/lib/unidades/reglaDeUnidades";
 import { esComboBase } from "@/lib/combos/guards";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import {
@@ -443,7 +444,11 @@ export async function POST(req) {
           // Con tercer nivel de empaque, las físicas cuentan sueltos: una
           // presentación son factor × N unidades de stock, con el N congelado
           // en la línea. Null = 1, el factor de siempre.
-          factor: (Number(escalaDeRecepcion(d).factorPack) || 1) * (d.sueltosPorUnidadCongelado > 1 ? d.sueltosPorUnidadCongelado : 1),
+          // El embudo de la pieza única (tanda 18): bulto × sueltos.
+          factor: unidadesDeStockPorEscalon({
+            factor_pack: escalaDeRecepcion(d).factorPack,
+            sueltos_por_unidad: d.sueltosPorUnidadCongelado,
+          }).bulto,
           sueltosPorUnidad: d.sueltosPorUnidadCongelado ?? null,
           // ── EL PRODUCTO QUE APARECIÓ AL ABRIR LOS BULTOS ────────────────
           //
