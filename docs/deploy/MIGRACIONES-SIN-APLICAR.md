@@ -16,16 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **111 migraciones**, la última
-`20261110120000_descuento_aplica_a`. Pendiente, 1:
-
-- `20261111120000_hoja_impresa` — de esquema, aditiva: una columna TEXT nula
-  `hojaImpresa` en `ComprobanteProveedor` (en qué hoja dice estar el papel,
-  Mauro #590). Sin relleno. El quinto chequeo del backup no aplica.
+Ninguna. Producción está en **112 migraciones**, la última
+`20261111120000_hoja_impresa`.
 
 ---
 
 ## Historial reciente
+
+`20261111120000_hoja_impresa` —de esquema: una columna TEXT nula `hojaImpresa`
+en `ComprobanteProveedor`, en qué hoja dice estar el papel (Mauro #590)— se
+aplicó con el despliegue de `cf922c9e` (2026-11-11), antes de levantar la
+imagen. El clasificador la dio aditiva y salió con 0, sin autorización manual.
+El contenedor informó las **112** del árbol e imprimió "Applying migration".
+Comprobada contra la base en solo lectura: la columna existe, text y nula; y la
+consulta de Prisma con `hojaImpresa` en el `select` corrió contra Postgres en un
+contenedor descartable de la imagen nueva.
 
 `20261110120000_descuento_aplica_a` —de esquema: una columna JSONB nula
 `descuentoAplicaA` en `ComprobanteLinea`, a qué productos del papel aplica un
