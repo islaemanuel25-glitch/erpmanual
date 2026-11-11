@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-11] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: fix: un papel sin total no se da por verificado, lo lee el lector grande y se dice cuántos productos se leyeron — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-10] - Actualización: 
 
 ### Modificado
