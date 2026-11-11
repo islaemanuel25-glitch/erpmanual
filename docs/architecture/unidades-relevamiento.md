@@ -57,7 +57,46 @@ Las piezas nuevas son dos:
 Las cuentas pasadas dan los mismos números que antes. El candado está en
 `lib/unidades/piezaUnicaCasosReales.test.mjs`.
 
-## Las que quedan (8 cuentas, 8 archivos)
+## Pasadas a la pieza en la tanda 18 (las 8 que quedaban)
+
+**Verificado en código y con candado** (`lib/unidades/piezaUnicaTanda18.test.mjs`,
+con contraprueba: se rompió la pieza a propósito y se puso en rojo). No queda
+ninguna cuenta a mano de las 23 relevadas. Sigue valiendo que el patrón es un
+piso: `lib/proveedores/identidad/servicioIdentidad.js` divide el factor del
+ERP por el del proveedor y no estaba en la lista; se anota sin tocar.
+
+Piezas nuevas en `reglaDeUnidades.js`:
+
+- `kilosDeLasPiezas`, para la tabla de stock. Conserva el signo del stock.
+- `factorDeCambioDeEscala`, el aviso de cambio de escala de precios, mudado tal
+  cual. Recibe el predicado de pieza fija desde el aviso.
+- Reexporta `unidadesDeStockPorEscalon` (transferencias y ventas internas),
+  `ganadoraDeMenorDiferencia` y `cantidadPorPackDelPapel` (listas).
+
+## Listas al menor % (tanda 18)
+
+**Verificado en código y medido.** La lectura de una lista la elige ahora la
+regla de la recepción: gana la de menor % contra el costo de hoy, para arriba o
+para abajo, si gana clara (la única dentro de la variación de 10 %, o la
+segunda le saca el triple). Si ninguna gana clara, se pregunta con las lecturas
+como opciones. El pack que dice el renglón ("473MLX6X4" → 6) es una lectura
+candidata más, como en la recepción.
+
+El rango del proveedor ya no elige. Sirve para una sola cosa: el permiso de
+aplicar sin que una persona mire. Si la ganadora cae fuera del rango, o no hay
+rango cargado, la fila va a revisar mostrando la ganadora y su %. Es el mismo
+control que ya hacía `aplicacion.js` al escribir. También siguen saliendo de él
+la etiqueta "fuera de rango", el resumen de la lista y la auditoría de costos.
+
+Medido en lectura contra producción el 2026-11-11, con el código anterior y el
+nuevo, sobre las 2.057 filas de las 18 importaciones de los últimos 60 días. Se
+usó el costo que cada producto tenía al subir la lista y no lo que una persona
+ya había contestado. Cambian **5 filas**, todas de DYSSA (#28), que pasan de
+"fuera de rango" a lista con × 4: FERNET CON COLA, tres DR LEMON y DR LEMON
+TROPICAL GIN, todos 473MLX6X4. Son las mismas que Emanuel había resuelto a mano,
+con el mismo costo. Con lo que ya se contestó, no cambia ninguna.
+
+## Las 8 que quedaban (tanda 17, ya pasadas)
 
 - Transferencias: `app/api/transferencias/confirmar-recepcion/route.js:446`
   (factor por sueltos).
@@ -72,8 +111,5 @@ Las cuentas pasadas dan los mismos números que antes. El candado está en
 - Precios: `lib/precios/avisoCambioDeEscala.js:249`.
 - Listas: `lib/proveedores/listas/explicarLectura.js:116`.
 
-**Listas no elige todavía con el menor %.** La lectura de una lista la elige el
-rango de aumento del proveedor (`configuraciones/generico.js`,
-`aplicacion.js`). Pasarla al menor % cambia qué lectura se aplica y qué costo
-se escribe. Es la tanda que sigue en listas, con DR LEMON 473 (ficha por pack
-de 24, DYSSA por pack de 6) como candado.
+(Hasta la tanda 17 las listas elegían la lectura con el rango del proveedor.
+Desde la 18 eligen con el menor %: ver arriba.)
