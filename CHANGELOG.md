@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-11-14] - Actualización: pos-ventas, transferencias, stock
+
+### Modificado
+- **pos-ventas**: fix: el lector escribiendo en la cantidad del carrito no cambia la línea
+- **transferencias**: refactor: las 8 cuentas de unidades que quedaban a mano piden a la pieza única — SIN VERIFICAR en pantalla
+- **transferencias**: fix: un papel sin total no se da por verificado, lo lee el lector grande y se dice cuántos productos se leyeron — SIN VERIFICAR en pantalla
+- **stock**: refactor: las 8 cuentas de unidades que quedaban a mano piden a la pieza única — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-11] - Actualización: transferencias
 
 ### Modificado
