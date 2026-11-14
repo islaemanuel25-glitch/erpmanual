@@ -14,6 +14,8 @@ import {
   decidirLectura,
   sumarCodigoNoEncontrado,
   avisarErrorDeLectura,
+  crearManejadorDeRafaga,
+  MENSAJE_CURSOR_EN_CANTIDAD,
 } from "@/lib/pos-ventas/lecturaEscaner";
 import AvisoProductoNoEncontrado from "@/components/pos-ventas/AvisoProductoNoEncontrado";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
@@ -58,8 +60,13 @@ function BuscadorProductos({
   // ref espeja el estado para `handleKeyDown`, que decide al leer.
   const [codigosNoEncontrados, setCodigosNoEncontrados] = useState([]);
   const avisoAbiertoRef = useRef(false);
+  // El renglón del aviso cuando no es "no encontrado": null es el de siempre.
+  const [mensajeAviso, setMensajeAviso] = useState(null);
 
-  const abrirAvisoNoEncontrado = (codigo) => {
+  const abrirAvisoNoEncontrado = (codigo, mensaje = null) => {
+    // El texto es el de quien ABRE el aviso: un "no encontrado" que llega en
+    // vuelo con el aviso abierto se suma a los códigos y no le cambia el texto.
+    if (!avisoAbiertoRef.current) setMensajeAviso(mensaje);
     avisoAbiertoRef.current = true;
     scanBuffer.current = "";
     setQuery("");
@@ -73,6 +80,7 @@ function BuscadorProductos({
     avisoAbiertoRef.current = false;
     scanBuffer.current = "";
     setCodigosNoEncontrados([]);
+    setMensajeAviso(null);
     inputRef.current?.focus();
   };
 
@@ -80,6 +88,35 @@ function BuscadorProductos({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // ── EL LECTOR EN CUALQUIER CAMPO DE LA PANTALLA QUE NO SEA ESTE ──────────
+  //
+  // Con el cursor en la cantidad de un renglón, el lector escribía el código
+  // ahí adentro. Se escucha la pantalla entera —`window`, en captura— y el
+  // Enter que cierra una ráfaga del lector en otro campo no agrega nada: el
+  // campo vuelve a lo que tenía, sale el mismo aviso de "no encontrado" con el
+  // texto de la cantidad, y el foco vuelve acá para el próximo escaneo. El
+  // criterio y el porqué están en `lib/pos-ventas/lecturaEscaner.js`.
+  //
+  // Solo con `avisarNoEncontrado`, que es el POS de venta: ofertas y combos
+  // usan este buscador y siguen como estaban. El foco va en la tarea siguiente
+  // para que el campo pierda el foco con su valor ya devuelto: su `onBlur`
+  // normaliza con el valor del último dibujo.
+  useEffect(() => {
+    if (!avisarNoEncontrado) return undefined;
+    const alTeclear = crearManejadorDeRafaga({
+      buscador: () => inputRef.current,
+      avisoAbierto: () => avisoAbiertoRef.current,
+      alEscanearFueraDelBuscador: ({ codigo }) => {
+        abrirAvisoNoEncontrado(codigo, MENSAJE_CURSOR_EN_CANTIDAD);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      },
+    });
+    window.addEventListener("keydown", alTeclear, true);
+    return () => window.removeEventListener("keydown", alTeclear, true);
+    // `abrirAvisoNoEncontrado` solo usa setters y refs: la del primer dibujo sirve.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avisarNoEncontrado]);
 
   // Buscar productos
   const buscar = useCallback(
@@ -352,7 +389,7 @@ function BuscadorProductos({
         </div>
       )}
 
-      <AvisoProductoNoEncontrado codigos={codigosNoEncontrados} onEntendido={alEntenderAviso} />
+      <AvisoProductoNoEncontrado codigos={codigosNoEncontrados} onEntendido={alEntenderAviso} mensaje={mensajeAviso} />
     </>
   );
 

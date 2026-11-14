@@ -27,8 +27,13 @@ export const TITULO_NO_ENCONTRADO = "Producto no encontrado";
 /**
  * `codigos`: los leídos sin producto. Casi siempre uno; más de uno solo si una
  * búsqueda en vuelo vuelve vacía con el aviso ya abierto. Vacío es cerrado.
+ *
+ * `mensaje`: el renglón de arriba del código, cuando el aviso es por otra causa.
+ * Lo pide el POS cuando el lector escribió adentro de la cantidad: es el mismo
+ * aviso —mismo sonido, mismo bloqueo, mismo «Entendido»— y solo cambia el texto.
+ * Sin él, el de siempre.
  */
-export default function AvisoProductoNoEncontrado({ codigos = [], onEntendido }) {
+export default function AvisoProductoNoEncontrado({ codigos = [], onEntendido, mensaje = null }) {
   const abierto = codigos.length > 0;
 
   useEffect(() => {
@@ -63,9 +68,10 @@ export default function AvisoProductoNoEncontrado({ codigos = [], onEntendido })
     >
       <div className="sunmi-state-danger rounded-xl p-4 text-center">
         <div className="text-sm3 sunmi-text-danger font-semibold">
-          {codigos.length > 1
-            ? "Estos códigos no corresponden a ningún producto"
-            : "Este código no corresponde a ningún producto"}
+          {mensaje ??
+            (codigos.length > 1
+              ? "Estos códigos no corresponden a ningún producto"
+              : "Este código no corresponde a ningún producto")}
         </div>
         {codigos.map((codigo) => (
           <div key={codigo} className="text-xl3 sunmi-text-danger font-bold break-all mt-2" data-codigo-leido>

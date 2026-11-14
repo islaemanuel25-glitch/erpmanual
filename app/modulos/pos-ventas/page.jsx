@@ -881,11 +881,17 @@ export default function PosVentasPage() {
     dispatch({ type: ActionTypes.REMOVE_ITEM, payload: { idx } });
   }, [state.carrito]);
 
+  // Después de agregar desde un modal —peso o importe de servicio— el foco
+  // vuelve al buscador, como cuando se agrega desde él. Sin esto quedaba en la
+  // nada al cerrarse el modal, y el próximo escaneo no entraba a ningún lado.
+  const volverAlBuscador = () => document.getElementById("buscar-producto")?.focus();
+
   // Confirmar el importe de un servicio → agregar línea única al carrito.
   const handleConfirmarServicio = useCallback((servicio) => {
     setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.ADD_SERVICIO, payload: { servicio } });
     setServicioPendiente(null);
+    volverAlBuscador();
   }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
@@ -2556,6 +2562,7 @@ export default function PosVentasPage() {
               }
             }
             setProductoKgPendiente(null);
+            volverAlBuscador();
           }}
           onCancelar={() => setProductoKgPendiente(null)}
         />
