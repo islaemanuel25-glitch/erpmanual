@@ -35,7 +35,12 @@ test("la hoja cuenta con la función compartida, no a mano, y sigue sin escribir
   // El factor del casillero es el de la ficha, o el bulto del papel cuando la
   // ficha no tiene (Cheddar, 2026-11-09). Sigue contando con la compartida.
   assert.match(fuente, /return enUnidadesDeLaFila\(b, factorDelCasillero\) \+ s;/);
-  assert.match(fuente, /const ofrecidas = enUnidadesDeLaFila\(Number\(cantidadDeLaFactura\) \|\| 0, factor\);/);
+  // Lo que ofrece la factura salió del memo a una constante (2026-11-15): lo
+  // usan el memo del aviso y la elección de la cantidad que cierra.
+  assert.match(
+    fuente,
+    /const ofrecidasDeLaFactura = enUnidadesDeLaFila\(\s*Number\(cantidadDeLaFactura\) \|\| 0,\s*vaPorPack \? Number\(fila\?\.factorPack\) \|\| 1 : 1\s*\);/
+  );
   assert.ok(!/b \* factor|\) \* factor/.test(fuente), "volvió a multiplicar a mano");
   assert.ok(!/factor_pack:\s/.test(fuente));
 });
@@ -85,5 +90,8 @@ test("TANDA 16: la hoja le pasa al control el bulto leído con la pieza", () => 
   const j = lib.indexOf("export function laCantidadCuadraDeLaFila");
   assert.ok(j > 0);
   assert.match(lib.slice(j, j + 900), /factorPack: bultoDeLaFila\(fila\),/);
-  assert.match(fuente, /\}, \[cantidadDeLaFactura, vaPorPack, fila\]\);/, "el memo se recalcula si cambia la fila");
+  // Desde el 2026-11-15 lo ofrecido es la cantidad que cierra o, si no hay,
+  // lo de la factura (`ofrecidasDeLaFactura`, que sale de la cantidad de la
+  // factura y del pack en cada dibujo).
+  assert.match(fuente, /\}, \[unidadesQueCierran, ofrecidasDeLaFactura, fila\]\);/, "el memo se recalcula si cambia la fila");
 });

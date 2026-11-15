@@ -96,7 +96,10 @@ test("DEFECTO 2 · «Cuánto entró» arranca con el papel (1 bulto), no con lo 
   assert.equal(cuantoEntroAlAbrir({ ...fuxi(), unidad: { ...fuxi().unidad, requiereDecision: true } }), null);
   // Y la hoja arranca con esto.
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
-  assert.match(hoja, /const alAbrir = fila\.cantidadEnKilos === true \? null : cuantoEntroAlAbrir\(fila\);/);
+  // Con la única cantidad que cierra con el importe, si la hay (2026-11-15).
+  // Esa cantidad no pisa lo que contó una persona:
+  assert.match(hoja, /const alAbrir = fila\.cantidadEnKilos === true \? null : cuantoEntroAlAbrir\(fila, \{ unidadesQueCierran \}\);/);
+  assert.deepEqual(cuantoEntroAlAbrir(fuxi({ revisado: true }), { unidadesQueCierran: 1 }), { completos: 6, sueltas: 0 });
 });
 
 test("DEFECTO 2 · al cerrar, lo pedido que la pantalla lleva como «contado» no pisa al papel", () => {

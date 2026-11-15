@@ -86,7 +86,9 @@ test("1 · 5 BULTOS DE 6 QUE PASAN A UNIDADES SON 30, NO 5", () => {
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   // Con el bulto que trae el papel y la ficha no tiene (Cheddar, 2026-11-09)
   // el casillero cuenta bultos: los completos se dividen por ese bulto.
-  assert.match(hoja, /cuantoEntroAlAbrir\(fila\);[\s\S]*?: alAbrir\s*\? String\(bultoDelPapel \? alAbrir\.completos \/ bultoDelPapel : alAbrir\.completos\)/);
+  // Con la única cantidad que cierra con el importe, si la hay (2026-11-15):
+  // reemplaza lo de la factura, no lo contado.
+  assert.match(hoja, /cuantoEntroAlAbrir\(fila, \{ unidadesQueCierran \}\);[\s\S]*?: alAbrir\s*\? String\(bultoDelPapel \? alAbrir\.completos \/ bultoDelPapel : alAbrir\.completos\)/);
 });
 
 // Del 2026-10-26 al 2026-11-07 esta fila decía que lo que no cuadraba era el

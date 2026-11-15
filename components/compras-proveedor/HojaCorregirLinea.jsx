@@ -132,6 +132,7 @@ import {
 } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
   laCantidadCuadraDeLaFila,
+  laCantidadQueCierraConElPapel,
   textoDeLaEscalaQueNoCuadra,
 } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { contenidoDelBulto, textoDelContenido } from "@/lib/compras-proveedor/contenidoDelBulto";
@@ -680,6 +681,26 @@ export default function HojaCorregirLinea({
   // que no existen.
   const soloLaFrase = explicacionDeLaUnidad?.noCompletanPacks === true;
 
+  // Lo que la factura ofrece, en unidades físicas: con lo que se mira si la
+  // cantidad cuadra con el precio del papel (ver `escalaOfrecida`).
+  const ofrecidasDeLaFactura = enUnidadesDeLaFila(
+    Number(cantidadDeLaFactura) || 0,
+    vaPorPack ? Number(fila?.factorPack) || 1 : 1
+  );
+  // ── SI OTRA LECTURA ES LA ÚNICA QUE CIERRA, ÉSA VIENE CARGADA ──────────
+  //
+  // Globo Rojo, BICARBONATO (2026-11-15): la factura decía 2, el papel 200 a
+  // $265,33 por $53.065,60, y el campo venía con 2 debajo del aviso que ya
+  // decía "Tendrían que ser 200". La regla está en
+  // `laCantidadQueCierraConElPapel`; si ninguna o varias cierran, es null y la
+  // hoja sigue como hasta hoy. Con el bulto del papel en el casillero, solo si
+  // completa bultos enteros: el casillero no escribe medio bulto.
+  const unidadesQueCierran = useMemo(() => {
+    const cierra = laCantidadQueCierraConElPapel({ fila, ofrecidas: ofrecidasDeLaFactura });
+    if (cierra === null || (bultoDelPapel && cierra % bultoDelPapel !== 0)) return null;
+    return cierra;
+  }, [fila, ofrecidasDeLaFactura, bultoDelPapel]);
+
   useEffect(() => {
     if (!abierta || !fila) return;
     // El fiambre de peso variable que viene en kilos: el papel no dice cuántas
@@ -697,7 +718,7 @@ export default function HojaCorregirLinea({
     // Lo pedido nunca: arrancaba con "Bultos de 10: 6" sobre un renglón que
     // decía 10 unidades (Mauro, 2026-11-06). La regla vive en
     // `cuantoEntroAlAbrir`; sin certeza, arranca vacío.
-    const alAbrir = fila.cantidadEnKilos === true ? null : cuantoEntroAlAbrir(fila);
+    const alAbrir = fila.cantidadEnKilos === true ? null : cuantoEntroAlAbrir(fila, { unidadesQueCierran });
     setBultos(
       fila.cantidadEnKilos === true
         ? contadasDelFiambre != null
@@ -741,7 +762,7 @@ export default function HojaCorregirLinea({
     setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
-  }, [abierta, fila, sugerida.marcado, saltoAceptable, deUnaUnidad?.papel, deUnaUnidad?.erp, bultoDelPapel]);
+  }, [abierta, fila, sugerida.marcado, saltoAceptable, deUnaUnidad?.papel, deUnaUnidad?.erp, bultoDelPapel, unidadesQueCierran]);
 
   // ── ¿ESTE PRODUCTO ENTRA AL STOCK EN KILOS? ───────────────────────────
   //
@@ -777,8 +798,10 @@ export default function HojaCorregirLinea({
   // Si lo ofrecido no cuadra, la escala está mal y la hoja lo dice en vez de
   // ofrecer el número como bueno.
   const escalaOfrecida = useMemo(() => {
-    const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
-    const ofrecidas = enUnidadesDeLaFila(Number(cantidadDeLaFactura) || 0, factor);
+    // Lo ofrecido es la lectura que viene cargada: la única que cierra con el
+    // importe si la hay, y si no lo de la factura. Con la que cierra, cuadra y
+    // el aviso no sale (2026-11-15).
+    const ofrecidas = unidadesQueCierran ?? ofrecidasDeLaFactura;
     // ── LA MISMA FUNCIÓN Y LA MISMA LECTURA QUE EL CIERRE ────────────────
     //
     // Sin el factor, la hoja valuaba lo que entra al stock al precio del BULTO
@@ -787,7 +810,7 @@ export default function HojaCorregirLinea({
     // distinto (Marlboro Fuxi, 2026-11-07). Las dos llaman a
     // `laCantidadCuadraDeLaFila` con la lectura de la fila.
     return laCantidadCuadraDeLaFila({ fila, fisicas: ofrecidas });
-  }, [cantidadDeLaFactura, vaPorPack, fila]);
+  }, [unidadesQueCierran, ofrecidasDeLaFactura, fila]);
 
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
 
