@@ -91,6 +91,8 @@ import {
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
+  AVISO_SIN_LINEA_DEL_PEDIDO,
+  faltaLaLineaDelPedido,
   ESTADO_LINEA,
   bultoDelPapelSinBultoEnLaFicha,
   cantidadEnEscalaDelPedido,
@@ -275,7 +277,7 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
  * el buscador del catálogo, que es la misma pieza que usa la conciliación de
  * escritorio: no se escribe un segundo buscador.
  */
-function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre, puedeCrearProducto }) {
+function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre, puedeCrearProducto, aviso = "" }) {
   // ── Y SI NO EXISTE, SE CREA SIN IRSE DE LA RECEPCIÓN ───────────────────
   //
   // Myf #383: "HELLMANNS MAY LIVIANA DP 24X237G" no estaba en el catálogo y
@@ -299,7 +301,8 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   const sinCandidatos =
     fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length && !hayPropuestaIa;
   const [buscando, setBuscando] = useState(sinCandidatos);
-  const [error, setError] = useState("");
+  // Arranca con el aviso de la hoja, si la abrió "Revisado y seguir".
+  const [error, setError] = useState(aviso);
   // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
   //
   // La cascada busca en tres lugares y devuelve el primero que encuentra: el
@@ -916,6 +919,16 @@ export default function HojaCorregirLinea({
 
   const guardar = async () => {
     setError("");
+    // ── SIN LÍNEA DEL PEDIDO NO HAY DÓNDE ANOTAR LO CONTADO ────────────
+    //
+    // La página no guardaba y no avisaba: el botón parecía roto (Globo Rojo,
+    // BICARBONATO, 2026-11-15). Se dice qué falta y se abre "Cambiar", que es
+    // donde se resuelve —el mismo selector, con buscar y crear—.
+    if (faltaLaLineaDelPedido(fila)) {
+      setError(AVISO_SIN_LINEA_DEL_PEDIDO);
+      setCambiandoProducto(true);
+      return;
+    }
     if (cantidadDifiere && !motivo) {
       setError("Elegí por qué la cantidad no coincide.");
       return;
@@ -1145,6 +1158,8 @@ export default function HojaCorregirLinea({
           fila={fila}
           onVincular={onVincular}
           onCerrar={cambiandoProducto ? () => setCambiandoProducto(false) : onCerrar}
+          // Si llegó acá desde "Revisado y seguir", con el porqué a la vista.
+          aviso={error === AVISO_SIN_LINEA_DEL_PEDIDO ? error : ""}
           guardando={guardando}
           puedeCrearProducto={puedeCrearProducto}
         />
