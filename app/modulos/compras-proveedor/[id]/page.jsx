@@ -327,8 +327,17 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [ubicacionDuena, setUbicacionDuena] = useState(null);
   const [fechaFactura, setFechaFactura] = useState("");
 
-  const cargar = async () => {
-    setLoading(true);
+  // ── `porDetras`: RELEER EL PEDIDO SIN TIRAR LA PANTALLA (2026-11-15) ────
+  //
+  // Con `loading` la página entera devuelve "Cargando...": la lista se
+  // desmonta y el operario pierde el lugar. Y lo de abajo vuelve a arrancar las
+  // cantidades de la pantalla desde el servidor, encima de lo que se está
+  // contando y todavía no se guardó. Después de agregar al pedido lo que vino
+  // en el papel (Globo Rojo, BICARBONATO) solo hace falta el pedido nuevo —la
+  // cantidad de ítems y el total del encabezado—, así que se relee por detrás
+  // y no se toca nada más: lo del renglón ya lo dejó la hoja en la pantalla.
+  const cargar = async ({ porDetras = false } = {}) => {
+    if (!porDetras) setLoading(true);
     try {
       const res = await fetch(`/api/compras-proveedor/obtener?id=${id}`, {
         credentials: "include",
@@ -339,6 +348,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         setCuentaPorPagar(data.cuentaPorPagar || null);
         setPagoParcial(Boolean(data.pagoParcial));
         setUbicacionDuena(data.ubicacionDuena || null);
+        if (porDetras) return;
         // Inicializar recibidos con la cantidad pedida
         const rec = {};
         const kgRec = {};
@@ -424,7 +434,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         setFechaFactura(data.item.fechaFactura ? data.item.fechaFactura.slice(0, 10) : "");
       }
     } finally {
-      setLoading(false);
+      if (!porDetras) setLoading(false);
     }
   };
 
@@ -844,9 +854,10 @@ export default function DetallePedidoProveedorPage({ params }) {
     // pedido, 2026-11-15), después de guardar se vuelven a pedir el pedido y la
     // conciliación: así el renglón queda atado a su línea nueva y el cierre la
     // ve. Después y no antes, para que lo que se relea ya traiga lo contado.
+    // Las dos por detrás: la lista se queda donde está (ver `cargar`).
     guardarEnLaBase(datos).then(() => {
       if (!datos.lineaAgregada) return;
-      cargar();
+      cargar({ porDetras: true });
       setRecargarConciliacion((n) => n + 1);
     });
     if (datos.cantidadRecibida != null) {
