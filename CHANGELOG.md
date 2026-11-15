@@ -3,6 +3,7 @@
 ## [2026-11-15] - Actualización: compras-proveedor
 
 ### Modificado
+- **compras-proveedor**: fix: «Revisado y seguir» en un renglón fuera del pedido dice qué falta en vez de no hacer nada
 - **compras-proveedor**: fix: Corregir abre con la única cantidad que cierra con el importe del papel
 
 ## [2026-11-14] - Actualización: pos-ventas, transferencias, stock
