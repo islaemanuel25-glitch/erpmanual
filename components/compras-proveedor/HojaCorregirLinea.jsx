@@ -91,7 +91,6 @@ import {
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
-  AVISO_SIN_LINEA_DEL_PEDIDO,
   faltaLaLineaDelPedido,
   ESTADO_LINEA,
   bultoDelPapelSinBultoEnLaFicha,
@@ -277,7 +276,7 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
  * el buscador del catálogo, que es la misma pieza que usa la conciliación de
  * escritorio: no se escribe un segundo buscador.
  */
-function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre, puedeCrearProducto, aviso = "" }) {
+function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre, puedeCrearProducto }) {
   // ── Y SI NO EXISTE, SE CREA SIN IRSE DE LA RECEPCIÓN ───────────────────
   //
   // Myf #383: "HELLMANNS MAY LIVIANA DP 24X237G" no estaba en el catálogo y
@@ -301,8 +300,7 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   const sinCandidatos =
     fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length && !hayPropuestaIa;
   const [buscando, setBuscando] = useState(sinCandidatos);
-  // Arranca con el aviso de la hoja, si la abrió "Revisado y seguir".
-  const [error, setError] = useState(aviso);
+  const [error, setError] = useState("");
   // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
   //
   // La cascada busca en tres lugares y devuelve el primero que encuentra: el
@@ -450,6 +448,11 @@ export default function HojaCorregirLinea({
   onDejarMiPrecio,
   /** Vincula la línea a un producto. Devuelve `{ ok, error? }`. */
   onVincular,
+  /**
+   * Agrega al pedido el producto vinculado que vino en el papel sin estar
+   * pedido: `(fila, { unidades, precioPorUnidad })` → `{ ok, pedidoDetalleId, error? }`.
+   */
+  onAgregarAlPedido,
   /** Devuelve la línea a pendiente. Solo se ofrece si ya está revisada. */
   onDesmarcar,
   revisada = false,
@@ -703,6 +706,13 @@ export default function HojaCorregirLinea({
     if (cierra === null || (bultoDelPapel && cierra % bultoDelPapel !== 0)) return null;
     return cierra;
   }, [fila, ofrecidasDeLaFactura, bultoDelPapel]);
+  // Lo que el papel cobra por UNA unidad: su importe por las unidades que la
+  // hoja le lee —las mismas que viene cargando "Cuánto entró"—. Es el precio de
+  // la línea que se agrega al pedido cuando el producto no estaba (2026-11-15).
+  const unidadesDelPapel = unidadesQueCierran ?? ofrecidasDeLaFactura;
+  const importeDelRenglon = Number(fila?.importeDelPapel ?? fila?.subtotal);
+  const precioPorUnidadDelPapel =
+    unidadesDelPapel > 0 && Number.isFinite(importeDelRenglon) ? importeDelRenglon / unidadesDelPapel : null;
 
   useEffect(() => {
     if (!abierta || !fila) return;
@@ -919,16 +929,6 @@ export default function HojaCorregirLinea({
 
   const guardar = async () => {
     setError("");
-    // ── SIN LÍNEA DEL PEDIDO NO HAY DÓNDE ANOTAR LO CONTADO ────────────
-    //
-    // La página no guardaba y no avisaba: el botón parecía roto (Globo Rojo,
-    // BICARBONATO, 2026-11-15). Se dice qué falta y se abre "Cambiar", que es
-    // donde se resuelve —el mismo selector, con buscar y crear—.
-    if (faltaLaLineaDelPedido(fila)) {
-      setError(AVISO_SIN_LINEA_DEL_PEDIDO);
-      setCambiandoProducto(true);
-      return;
-    }
     if (cantidadDifiere && !motivo) {
       setError("Elegí por qué la cantidad no coincide.");
       return;
@@ -990,6 +990,28 @@ export default function HojaCorregirLinea({
         return;
       }
     }
+    // ── VINO EN EL PAPEL Y NO ESTABA EN EL PEDIDO: SE LE AGREGA LA LÍNEA ──
+    //
+    // Globo Rojo, BICARBONATO (2026-11-15): vinculado, fuera del pedido, y sin
+    // línea donde anotar lo contado no entraba al stock. Decisión de Emanuel:
+    // entra. La línea se agrega con la ruta de "Agregar producto extra", en
+    // unidades —lo que dice "Entra al stock"— y al precio del papel por
+    // unidad, y después se guarda como cualquier otro renglón. El costo del
+    // producto no se toca: el cierre lo escribe solo si alguien acepta el
+    // precio del papel.
+    let pedidoDetalleId = fila.pedidoDetalleId;
+    if (faltaLaLineaDelPedido(fila)) {
+      if (!Number.isInteger(unidadesContadas) || unidadesContadas < 1) {
+        setError("Poné cuántas unidades entraron antes de seguir.");
+        return;
+      }
+      const r = await onAgregarAlPedido?.(fila, { unidades: unidadesContadas, precioPorUnidad: precioPorUnidadDelPapel });
+      if (!r?.ok) {
+        setError(r?.error || "No se pudo agregar este producto al pedido.");
+        return;
+      }
+      pedidoDetalleId = r.pedidoDetalleId;
+    }
     onGuardar?.({
       // El renglón del papel, para marcarlo controlado, y la línea del pedido,
       // que es donde van la cantidad y el motivo. Son dos cosas distintas: dos
@@ -998,7 +1020,10 @@ export default function HojaCorregirLinea({
       // El texto impreso viaja con el id: el id de un renglón muere cuando el
       // papel se vuelve a leer, y el texto no.
       textoCrudo: fila.textoCrudo ?? null,
-      pedidoDetalleId: fila.pedidoDetalleId,
+      pedidoDetalleId,
+      // La línea recién agregada: la página vuelve a pedir el pedido y la
+      // conciliación para que el renglón quede atado a ella.
+      lineaAgregada: pedidoDetalleId !== fila.pedidoDetalleId,
       // Sin papel no hay renglón que marcar: la página marca la línea del
       // pedido en su eco en vez de pedírselo al servidor.
       sinPapel,
@@ -1158,8 +1183,6 @@ export default function HojaCorregirLinea({
           fila={fila}
           onVincular={onVincular}
           onCerrar={cambiandoProducto ? () => setCambiandoProducto(false) : onCerrar}
-          // Si llegó acá desde "Revisado y seguir", con el porqué a la vista.
-          aviso={error === AVISO_SIN_LINEA_DEL_PEDIDO ? error : ""}
           guardando={guardando}
           puedeCrearProducto={puedeCrearProducto}
         />

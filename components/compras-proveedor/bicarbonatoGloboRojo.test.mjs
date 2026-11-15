@@ -37,15 +37,31 @@ const { default: HojaCorregirLinea } = await import("@/components/compras-provee
 const { analizarPrecioDeLinea } = await import("@/lib/compras-proveedor/comprobante/precioDeLinea");
 const { filasDeConciliacion } = await import("@/lib/compras-proveedor/comprobante/filasDeConciliacion");
 const { laCantidadQueCierraConElPapel } = await import("@/lib/compras-proveedor/laCantidadCuadraConElPrecio");
-const { cuantoEntroAlAbrir, unidadesFisicasDeLaFactura, AVISO_SIN_LINEA_DEL_PEDIDO } = await import("@/lib/compras-proveedor/estadoDeLineaFacturada");
+const { cuantoEntroAlAbrir, unidadesFisicasDeLaFactura, faltaLaLineaDelPedido } = await import("@/lib/compras-proveedor/estadoDeLineaFacturada");
+const { aplanarDetalles } = await import("@/lib/compras-proveedor/comprobante/analisisDeComprobante");
+const { resolverLineaDelPedido } = await import("@/lib/compras-proveedor/comprobante/vinculo");
+const { recibidosDelCierre, costosQueNoSeTocan, resumenDelCierre, loQueNoDejaCerrar } = await import("@/lib/compras-proveedor/cierreDeRecepcion");
+const { filasDelPapelPorDetalle, costoMaestroDeLaLectura } = await import("@/lib/compras-proveedor/lecturaDelCierre");
 
 const BICARBONATO = { precio_costo: 26000, factor_pack: 100, unidad_medida: "pack", modoCompraProveedor: "BULTO" };
 
 /**
- * El renglón del papel, vinculado. Sin `det`, sin línea del pedido —el caso del
- * local—; con `det`, atado a una línea del pedido como cualquier otro.
+ * El renglón del papel. Sin `det`, sin línea del pedido —el caso del local—;
+ * con `det`, atado a una línea del pedido. `columna` es `pedidoDetalleId` como
+ * está guardado en el renglón: null cuando la línea la deduce la conciliación
+ * por producto. `vinculado: false` es un renglón sin producto.
+ * `nombreDelProducto` es lo que pone `analizarLineas` desde el catálogo.
  */
-function fila({ cantidad = 200, netoUnitario = 265.33, subtotalImpreso = 53065.6, det = null } = {}) {
+function fila({
+  cantidad = 200,
+  netoUnitario = 265.33,
+  subtotalImpreso = 53065.6,
+  det = null,
+  columna = det?.id ?? null,
+  vinculado = true,
+  nombreDelProducto = null,
+  candidatos = [],
+} = {}) {
   const linea = {
     orden: 1,
     textoCrudo: "BICARBONATO",
@@ -60,7 +76,20 @@ function fila({ cantidad = 200, netoUnitario = 265.33, subtotalImpreso = 53065.6
     comprobantes: [{
       id: 80,
       estado: "CARGADO",
-      lineas: [{ ...linea, id: 800, pedidoDetalleId: det?.id ?? null, pedidoDetalle: det, productoLocalId: 1, productoBaseId: 900, precio, unidad: precio.unidad, decisionPrecio: null, costoMaestroCatalogo: BICARBONATO.precio_costo }],
+      lineas: [{
+        ...linea,
+        id: 800,
+        pedidoDetalleId: columna,
+        pedidoDetalle: det,
+        productoLocalId: vinculado ? 1 : null,
+        productoBaseId: vinculado ? 900 : null,
+        nombreDelProducto: vinculado ? nombreDelProducto : null,
+        candidatos,
+        precio: vinculado ? precio : null,
+        unidad: vinculado ? precio.unidad : null,
+        decisionPrecio: null,
+        costoMaestroCatalogo: vinculado ? BICARBONATO.precio_costo : null,
+      }],
     }],
     detalles: det ? [det] : [],
   }).grupos[0].filas;
@@ -146,11 +175,13 @@ test("RG5. sin unitario impreso, o con el papel corregido a mano, no se elige na
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// «REVISADO Y SEGUIR» NUNCA SE QUEDA CALLADO (2026-11-15)
+// LO QUE VINO EN EL PAPEL SIN ESTAR PEDIDO ENTRA (2026-11-15)
 //
 // Con d70383a la hoja abría bien y el botón no hacía nada: la página
-// (`guardarCorreccion`) sale sin guardar ni avisar cuando el renglón no tiene
-// línea del pedido, y éste no tiene. Pasaba igual con el 2 de antes.
+// (`guardarCorreccion`) sale sin guardar cuando el renglón no tiene línea del
+// pedido. 0010adc lo hizo avisar; la decisión de Emanuel es que entre:
+// "Revisado y seguir" le agrega la línea al pedido —la ruta de "Agregar
+// producto extra"— con lo que dice "Entra al stock" y el precio del papel.
 // ══════════════════════════════════════════════════════════════════════════
 
 const botonGuardar = () => [...document.querySelectorAll("button")].find((b) => b.textContent === "✓ Revisado y seguir");
@@ -161,23 +192,93 @@ const tocar = async (boton) => {
   });
 };
 
-test("RG6. fuera del pedido: «Revisado y seguir» no guarda en silencio, dice qué falta y abre «Cambiar»", async () => {
+const NOMBRE = "BICARBONATO DE SODIO x 100";
+
+test("RG6. vinculado y fuera del pedido: «Revisado y seguir» agrega la línea con 200 unidades a $265,33 y guarda", async () => {
+  const agregados = [];
   const guardados = [];
-  await abrir(fila(), { onGuardar: (d) => guardados.push(d), onVincular: async () => ({ ok: true }), puedeCrearProducto: true });
+  await abrir(fila({ nombreDelProducto: NOMBRE }), {
+    onAgregarAlPedido: async (f, datos) => (agregados.push({ f, datos }), { ok: true, pedidoDetalleId: 9001 }),
+    onGuardar: (d) => guardados.push(d),
+  });
   await tocar(botonGuardar());
-  assert.equal(guardados.length, 0, "mandó a guardar algo que la página tira sin avisar");
+  assert.equal(agregados.length, 1, "no agregó la línea al pedido");
+  assert.equal(agregados[0].f.productoLocalId, 1);
+  assert.equal(agregados[0].datos.unidades, 200);
+  assert.equal(Math.round(agregados[0].datos.precioPorUnidad * 100) / 100, 265.33, "53.065,60 ÷ 200");
+  assert.equal(guardados.length, 1, "agregó y no guardó");
+  assert.equal(guardados[0].pedidoDetalleId, 9001, "guardó sin la línea nueva");
+  assert.equal(guardados[0].lineaAgregada, true);
+  assert.equal(guardados[0].cantidadRecibida, 200);
+  assert.equal(guardados[0].unidadesFisicas, 200);
+});
+
+test("RG6b. arriba dice el nombre del producto vinculado; «Sin producto» solo sin producto", async () => {
+  const { texto } = await abrir(fila({ nombreDelProducto: NOMBRE }));
+  assert.match(texto, new RegExp(`Va a este producto\\s*${NOMBRE}`));
+  assert.doesNotMatch(texto, /Sin producto/);
+  // El nombre de la línea del pedido o de la sugerencia sigue mandando.
+  assert.equal(fila({ nombreDelProducto: NOMBRE, det: { id: 7001, cantidad: 2, unidad: "BULTO", nombre: "Del pedido" } }).producto, "Del pedido");
+});
+
+test("RG6c. si no se pudo agregar al pedido, la hoja lo dice y no guarda", async () => {
+  const guardados = [];
+  await abrir(fila(), {
+    onAgregarAlPedido: async () => ({ ok: false, error: "Pedido fuera de tu alcance" }),
+    onGuardar: (d) => guardados.push(d),
+  });
+  await tocar(botonGuardar());
+  assert.equal(guardados.length, 0);
+  assert.match(document.body.textContent, /Pedido fuera de tu alcance/);
+  // Y sin quien agregue, tampoco se queda callado.
+  await abrir(fila(), { onGuardar: (d) => guardados.push(d) });
+  await tocar(botonGuardar());
+  assert.equal(guardados.length, 0);
+  assert.match(document.body.textContent, /No se pudo agregar este producto al pedido\./);
+});
+
+test("RG6d. sin producto: la hoja abre en el selector, y al elegir se vincula; vinculado, guarda como RG6", async () => {
+  const vinculados = [];
+  const sinProducto = fila({ vinculado: false, candidatos: [{ productoBaseId: 900, nombre: NOMBRE }] });
+  await abrir(sinProducto, { onVincular: async (f, id) => (vinculados.push(id), { ok: true }), puedeCrearProducto: true });
   const texto = document.body.textContent.replace(/\s+/g, " ");
-  assert.ok(texto.includes(AVISO_SIN_LINEA_DEL_PEDIDO), "no dijo qué falta");
-  // El selector de producto de siempre, con su búsqueda y el alta.
   assert.match(texto, /Qué producto es/);
-  assert.ok(!botonGuardar(), "sigue en la hoja de cantidad en vez de llevar al producto");
-  assert.ok([...document.querySelectorAll("button")].some((b) => /^Buscar|Crear producto/.test(b.textContent)), "no ofrece buscar ni crear");
+  assert.ok(!botonGuardar(), "sin producto no hay cantidad que guardar");
+  assert.equal(faltaLaLineaDelPedido(sinProducto), false, "sin producto no se agrega nada al pedido");
+  assert.ok([...document.querySelectorAll("button")].some((b) => /^Buscar/.test(b.textContent)), "no ofrece buscar");
+  // Elegir el producto lo vincula; la página cierra la hoja y la lista vuelve
+  // con el renglón vinculado, que guarda agregando la línea (RG6).
+  await tocar([...document.querySelectorAll("button")].find((b) => b.textContent === NOMBRE));
+  assert.deepEqual(vinculados, [900]);
+});
+
+test("RG8. con la línea agregada, el renglón queda atado a ella, entran 200 al cierre y el costo no se toca", () => {
+  // La línea como la escribe `agregar-item` y la lee la conciliación.
+  const [detalle] = aplanarDetalles([{
+    id: 9001, cantidad: 200, precioCosto: 265.328, unidad: "UNIDAD", cantidadRecibida: 200, unidadesFisicas: 200,
+    producto: { baseId: 900, base: { ...BICARBONATO, id: 900, nombre: NOMBRE } },
+  }]);
+  // El renglón no tiene la columna: la conciliación la deduce por producto.
+  const { detalle: deducida } = resolverLineaDelPedido({ linea: { pedidoDetalleId: null }, productoBaseId: 900, detalles: [detalle] });
+  assert.equal(deducida?.id, 9001, "la conciliación no ata el renglón a la línea nueva");
+  const f = { ...fila({ det: deducida, columna: null }), revisada: true };
+  assert.equal(f.pedidoDetalleId, 9001);
+  assert.equal(faltaLaLineaDelPedido(f), false, "volvería a agregarla");
+  // El cierre: no lo frena y entran las 200 contadas.
+  assert.equal(loQueNoDejaCerrar(resumenDelCierre({ filas: [f] })), null, "la línea agregada frena el cierre");
+  assert.equal(recibidosDelCierre({ filas: [f], contados: { 9001: 200 } })[9001], 200);
+  // Y el cierre la ve CON papel: su costo sale solo de un precio aceptado.
+  const conPapel = filasDelPapelPorDetalle({ grupos: [{ filas: [f] }] });
+  assert.equal(conPapel.get(9001)?.length, 1);
+  assert.equal(costoMaestroDeLaLectura({ filas: conPapel.get(9001), base: { ...BICARBONATO, id: 900 } }), null, "escribiría un costo que nadie aceptó");
+  assert.deepEqual(costosQueNoSeTocan([f]), []);
 });
 
 test("RG7. un renglón vinculado con su línea del pedido guarda como siempre", async () => {
   const det = { id: 7001, cantidad: 2, unidad: "BULTO", precioCosto: 26000, costoMaestroHoy: 26000, productoBaseId: 900, factorPack: 100, cantidadRecibida: null };
   const guardados = [];
   await abrir(fila({ det }), {
+    onAgregarAlPedido: async () => assert.fail("un renglón con su línea no agrega nada"),
     onGuardar: (d) => guardados.push(d),
     onAceptarPrecio: async () => ({ ok: true }),
     onDejarMiPrecio: async () => ({ ok: true }),
@@ -186,5 +287,5 @@ test("RG7. un renglón vinculado con su línea del pedido guarda como siempre", 
   assert.equal(guardados.length, 1, `no guardó: ${document.body.textContent.replace(/\s+/g, " ").slice(-200)}`);
   assert.equal(guardados[0].pedidoDetalleId, 7001);
   assert.equal(guardados[0].unidadesFisicas, 200);
-  assert.ok(!document.body.textContent.includes(AVISO_SIN_LINEA_DEL_PEDIDO));
+  assert.equal(guardados[0].lineaAgregada, false, "agregó una línea que ya estaba");
 });

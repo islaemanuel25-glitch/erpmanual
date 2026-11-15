@@ -152,7 +152,9 @@ test("LA PANTALLA ESCRIBE AL GUARDAR LA HOJA Y LEE AL ABRIR", () => {
   const pagina = codigoDe(PAGINA);
   // Escribe.
   assert.match(pagina, /fetch\("\/api\/compras-proveedor\/recepcion\/correccion"/);
-  assert.match(pagina, /guardarEnLaBase\(datos\);/);
+  // Desde el 2026-11-15, después de escribir relee el pedido si la hoja le
+  // agregó una línea (lo que vino en el papel sin estar pedido).
+  assert.match(pagina, /guardarEnLaBase\(datos\)\.then\(\(\) => \{\s*if \(!datos\.lineaAgregada\) return;/);
   // Y lee: sin esto la pantalla vuelve vacía aunque la base tenga todo.
   assert.match(pagina, /d\.unidadesSueltas != null/);
   assert.match(pagina, /d\.unidadesFisicas != null/);

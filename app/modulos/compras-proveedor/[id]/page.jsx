@@ -839,7 +839,16 @@ export default function DetallePedidoProveedorPage({ params }) {
     // Se escribe sin esperar: el eco de abajo ya dejó la pantalla como quedó, y
     // frenar la hoja por un viaje de red en un depósito con mala señal es peor
     // que guardar un instante después.
-    guardarEnLaBase(datos);
+    //
+    // Con la línea recién agregada al pedido (lo que vino en el papel sin estar
+    // pedido, 2026-11-15), después de guardar se vuelven a pedir el pedido y la
+    // conciliación: así el renglón queda atado a su línea nueva y el cierre la
+    // ve. Después y no antes, para que lo que se relea ya traiga lo contado.
+    guardarEnLaBase(datos).then(() => {
+      if (!datos.lineaAgregada) return;
+      cargar();
+      setRecargarConciliacion((n) => n + 1);
+    });
     if (datos.cantidadRecibida != null) {
       setRecibidos((prev) => ({ ...prev, [id]: datos.cantidadRecibida }));
     }
@@ -864,6 +873,8 @@ export default function DetallePedidoProveedorPage({ params }) {
     // guarda por el mismo lugar, no por uno parecido.
     marcarRevisada(datos, true);
     setLineaACorregir(null);
+    // `cargar` se rearma en cada dibujo y lee solo el id del pedido, que no cambia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marcarRevisada, guardarEnLaBase]);
 
   // Volver una línea a pendiente. El mismo gesto que "Desmarcar" en la ficha
@@ -1127,22 +1138,51 @@ export default function DetallePedidoProveedorPage({ params }) {
     [pedido]
   );
 
+  // ── AGREGAR UNA LÍNEA AL PEDIDO: UNA SOLA LLAMADA ─────────────────────
+  //
+  // La usan "Agregar producto extra" y, desde el 2026-11-15, la hoja de
+  // Corregir con lo que vino en el papel sin estar pedido (Globo Rojo,
+  // BICARBONATO). La misma ruta para los dos.
+  const agregarLineaAlPedido = useCallback(async (linea) => {
+    const res = await fetch(`/api/compras-proveedor/agregar-item/${id}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(linea),
+    });
+    return res.json();
+  }, [id]);
+
+  // Desde la hoja: en unidades, con lo que dice "Entra al stock" y el precio
+  // del papel por unidad. Lo que no se pudo agregar se dice en la hoja.
+  const agregarAlPedidoDesdeElPapel = useCallback(async (fila, { unidades, precioPorUnidad }) => {
+    try {
+      const d = await agregarLineaAlPedido({
+        productoLocalId: fila?.productoLocalId,
+        cantidad: unidades,
+        cantidadRecibida: unidades,
+        precioCosto: precioPorUnidad,
+        unidad: "UNIDAD",
+      });
+      if (!d?.ok || d?.detalle?.id == null) {
+        return { ok: false, error: d?.error || "No se pudo agregar este producto al pedido." };
+      }
+      return { ok: true, pedidoDetalleId: d.detalle.id };
+    } catch {
+      return { ok: false, error: "No se pudo agregar este producto al pedido. Revisá la conexión y volvé a tocarlo." };
+    }
+  }, [agregarLineaAlPedido]);
+
   const agregarExtra = async (producto) => {
     setExtraAdding(producto.productoLocalId);
     try {
-      const res = await fetch(`/api/compras-proveedor/agregar-item/${id}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productoLocalId: producto.productoLocalId,
-          cantidad: 1,
-          cantidadRecibida: 1,
-          precioCosto: producto.precio_costo || null,
-          unidad: producto.modoCompra || "BULTO",
-        }),
+      const data = await agregarLineaAlPedido({
+        productoLocalId: producto.productoLocalId,
+        cantidad: 1,
+        cantidadRecibida: 1,
+        precioCosto: producto.precio_costo || null,
+        unidad: producto.modoCompra || "BULTO",
       });
-      const data = await res.json();
       if (data.ok) {
         setExtraSearch("");
         setExtraResults([]);
@@ -1816,6 +1856,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 }
               }}
               onVincular={vincularLinea}
+              onAgregarAlPedido={agregarAlPedidoDesdeElPapel}
               onQuitarProducto={quitarProductoDeLinea}
               onDesmarcar={desmarcarLinea}
               onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}
