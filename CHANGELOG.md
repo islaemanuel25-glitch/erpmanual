@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-16] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: fix: el lector escribiendo en la cantidad del carrito no cambia la línea
+
+
 ## [2026-11-15] - Actualización: compras-proveedor
 
 ### Modificado
