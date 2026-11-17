@@ -35,6 +35,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
+import { lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
   parDelTextoRechazado,
@@ -232,8 +233,23 @@ export async function POST(req) {
     // función, la misma tabla, en la misma transacción que el vínculo. La
     // cantidad por caja la vuelve a leer el servidor del renglón, no la manda
     // el cliente.
-    const lecturaDelAlta = lecturaRecordadaDelAltaDesdeElPapel({ fila: linea, precioEs: body?.precioEs ?? null });
+    //
+    // Si se creó desde el renglón de la lista guardada (`listaGuardada.js`), la
+    // pregunta fue sobre el precio y el bulto de LA LISTA: se recuerda con la
+    // función del alta de Listas sobre ese renglón, que el servidor vuelve a
+    // leer —y solo si es de una lista de este mismo proveedor—.
     const proveedorDelPapel = linea.comprobante.proveedorId;
+    const filaListaId = Number(body?.filaListaId) > 0 ? Number(body.filaListaId) : null;
+    const filaDeLaLista =
+      filaListaId && proveedorDelPapel
+        ? await prisma.importacionListaFila.findFirst({
+            where: { id: filaListaId, importacion: { grupoId, proveedorId: proveedorDelPapel } },
+            select: { id: true, unidadesPorBulto: true },
+          })
+        : null;
+    const lecturaDelAlta = filaDeLaLista
+      ? lecturaRecordadaDelAlta({ fila: filaDeLaLista, precioEs: body?.precioEs ?? null })
+      : lecturaRecordadaDelAltaDesdeElPapel({ fila: linea, precioEs: body?.precioEs ?? null });
     const usuarioId = Number(session?.id ?? session?.userId) || null;
 
     const resultado = await prisma.$transaction(async (tx) => {

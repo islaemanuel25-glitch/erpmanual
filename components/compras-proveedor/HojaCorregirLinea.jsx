@@ -78,6 +78,11 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import AltaDesdeElPapel from "@/components/compras-proveedor/AltaDesdeElPapel";
+import AltaDesdeLaLista from "@/components/proveedores/listas/AltaDesdeLaLista";
+import {
+  TEXTO_CREAR_DESDE_LA_LISTA,
+  detalleDelRenglonDeLaLista,
+} from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 // El porcentaje del renglón ERP es la pieza de la tarjeta, no una parecida.
 import { PorcentajeDelErp } from "@/components/compras-proveedor/TarjetaLineaFactura";
 import { formatearMoneda, formatearKgExacto } from "@/lib/moneda";
@@ -284,6 +289,15 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
   // precargada con el papel (`AltaDesdeElPapel`); el producto nuevo se vincula
   // por `elegir`, el mismo camino que escribe el alias del proveedor.
   const [creando, setCreando] = useState(false);
+  // ── Y SI LA LISTA DEL PROVEEDOR LO CONOCE, SE CREA CON SUS DATOS ───────
+  //
+  // Arcor, 2026-11-17: el renglón de la lista guardada que tiene el código del
+  // papel y no tiene producto (`listaGuardada.js`). El alta es la de Listas,
+  // `AltaDesdeLaLista`, tal cual: nombre, código, bulto y costo de la lista.
+  // El producto nuevo se vincula por `elegir`, que guarda el código del
+  // proveedor para la próxima boleta y la próxima lista.
+  const delaLista = puedeCrearProducto ? fila?.filaDeLaLista ?? null : null;
+  const [creandoDesdeLaLista, setCreandoDesdeLaLista] = useState(false);
   // ── SIN NINGÚN CANDIDATO, SE ABRE DIRECTO EL BUSCADOR ──────────────────
   //
   // Si la cascada no encontró nada en ningún escalón, una hoja con un solo
@@ -297,8 +311,12 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
       ficha: fila?.propuestaIa?.ficha,
       variacionNormalPct: fila?.variacionNormalPct,
     }) !== null;
+  // Con el renglón de la lista también hay algo que ofrecer.
   const sinCandidatos =
-    fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS && !(fila?.candidatos ?? []).length && !hayPropuestaIa;
+    fila?.origen === ORIGEN_VINCULO.SIN_CANDIDATOS &&
+    !(fila?.candidatos ?? []).length &&
+    !hayPropuestaIa &&
+    !delaLista;
   const [buscando, setBuscando] = useState(sinCandidatos);
   const [error, setError] = useState("");
   // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
@@ -368,6 +386,22 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
             </SunmiButton>
           )}
 
+          {delaLista && (
+            <SunmiButton
+              color="slate"
+              type="button"
+              disabled={guardando}
+              onClick={() => setCreandoDesdeLaLista(true)}
+              aria-label={`${TEXTO_CREAR_DESDE_LA_LISTA}: ${delaLista.fila?.descripcionProveedor ?? ""}`}
+              className="w-full min-h-toque justify-start text-left text-sm3"
+            >
+              <SunmiPar
+                arriba={`${TEXTO_CREAR_DESDE_LA_LISTA} · ${delaLista.fila?.descripcionProveedor ?? ""}`}
+                abajo={detalleDelRenglonDeLaLista(delaLista.fila)}
+              />
+            </SunmiButton>
+          )}
+
           {candidatos.length === 0 && !propuesta && (
             <span className="text-sm3 sunmi-text-muted">
               {deTodoElErp
@@ -414,6 +448,21 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
             // vínculo, y si el vínculo falla lo dice esta hoja.
             setCreando(false);
             await elegir(producto.id, extra);
+          }}
+        />
+      )}
+
+      {creandoDesdeLaLista && delaLista && (
+        <AltaDesdeLaLista
+          fila={delaLista.fila}
+          proveedorId={proveedorId}
+          cuentaDeLaLista={delaLista.cuentaDeLaLista}
+          onCancelar={() => setCreandoDesdeLaLista(false)}
+          onCreado={async (producto, extra) => {
+            // Igual que el alta desde el papel: el producto ya existe, el alta
+            // se cierra y si el vínculo falla lo dice esta hoja.
+            setCreandoDesdeLaLista(false);
+            await elegir(producto.id, { ...extra, filaListaId: delaLista.fila?.id ?? null });
           }}
         />
       )}

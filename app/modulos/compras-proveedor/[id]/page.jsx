@@ -951,6 +951,7 @@ export default function DetallePedidoProveedorPage({ params }) {
   // vínculo, la comparación y el análisis de precio de esa fila.
   // `extra.precioEs`: lo que preguntó el alta desde la recepción —por la caja o
   // por unidad—, que el vínculo recuerda para el producto con el proveedor.
+  // `extra.filaListaId`: si el alta salió del renglón de la lista guardada.
   const vincularLinea = useCallback(async (fila, productoBaseId, extra) => {
     try {
       const r = await fetch("/api/compras-proveedor/comprobantes/vincular", {
@@ -964,6 +965,8 @@ export default function DetallePedidoProveedorPage({ params }) {
           productoBaseId,
           codigoProveedor: fila?.codigoProveedor ?? null,
           ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}),
+          // Creado desde el renglón de la lista guardada: la pregunta fue sobre ese renglón.
+          ...(extra?.filaListaId ? { filaListaId: extra.filaListaId } : {}),
         }),
       });
       const d = await r.json().catch(() => null);
