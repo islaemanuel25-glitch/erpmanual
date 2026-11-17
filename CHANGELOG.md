@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-17] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: fix: el Enter del lector ya no abre el cobro en el POS — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-16] - Actualización: pos-ventas
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-11-14 11:31
+**Última actualización:** 2026-11-17 12:22
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-11-17: fix: el Enter del lector ya no abre el cobro en el POS — SIN VERIFICAR en pantalla
 - 2026-11-14: fix: el lector escribiendo en la cantidad del carrito no cambia la línea
 - 2026-11-10: refactor: tanda 17 de la regla de unidades — bultos y sueltas, la pieza de fiambre y el menor % salen de la pieza única — SIN VERIFICAR en pantalla
 - 2026-11-05: refactor: el buscador y la corrección del POS cuentan con la pieza única (regla de unidades, tanda 14)

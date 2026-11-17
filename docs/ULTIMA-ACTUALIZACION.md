@@ -1,16 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-16 15:31
+**Fecha:** 2026-11-17 12:22
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: el lector escribiendo en la cantidad del carrito no cambia la línea
-- Archivos: 1 nuevos, 4 modificados (5 total)
+- fix: el Enter del lector ya no abre el cobro en el POS — SIN VERIFICAR en pantalla
+- Archivos: 5 modificados (5 total)
 
 
-## Archivos nuevos desde última sincronización
-- components/pos-ventas/rafagaEnLaCantidad.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
