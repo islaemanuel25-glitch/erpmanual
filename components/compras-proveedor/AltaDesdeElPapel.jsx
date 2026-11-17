@@ -19,6 +19,7 @@ import ModalProducto from "@/components/productos/ModalProductoFinal";
 import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import {
+  bolsaDePesoDelAlta,
   codigoDelProveedorParaElAlta,
   costoDelAltaDesdeElPapel,
   precargaDelAlta,
@@ -45,6 +46,10 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
   const precarga = useMemo(() => precargaDelAlta({ fila, proveedorId }), [fila, proveedorId]);
   // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
   const pregunta = useMemo(() => preguntaDelAltaDesdeElPapel(fila), [fila]);
+  // La bolsa de peso fijo que se vende por kilo (BIOM ANANA TROZ X500GR): el
+  // peso que sugiere el papel y el costo de una bolsa. El campo aparece solo si
+  // eligen "Kg"; si el papel trae peso, el alta ya viene así (`precargaDelAlta`).
+  const bolsaDePeso = useMemo(() => bolsaDePesoDelAlta(fila), [fila]);
   const costoSugerido = pregunta ? costoDelAltaDesdeElPapel({ fila, precioEs }) : null;
 
   useEffect(() => {
@@ -134,6 +139,7 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
             : null
         }
         costoSugerido={costoSugerido}
+        bolsaDePeso={bolsaDePeso}
       />
     </>
   );

@@ -14,6 +14,7 @@ import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { TEXTO_CAMBIO_DE_ESCALA, interpretarSueltosPorUnidad } from "@/lib/productos/cambioDeEscala";
 import { splitUiToDb } from "@/lib/mappers/producto";
+import { piezaFijaFueraDeKilo, TEXTO_PIEZA_FIJA_FUERA_DE_KILO } from "@/lib/conversiones/stock";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -187,6 +188,12 @@ export async function POST(req) {
       pesoPromedioKg: num(body.pesoPromedioKg),
       actualizaPromedioPorRecepcion: body.actualizaPromedioPorRecepcion !== false,
     };
+    // La venta por pieza del depósito solo vale en un producto por kilo: puesta
+    // en uno por unidad, el depósito lo vende de a pedacito (Mogul Gusanitos
+    // Extreme, 2026-11-16). Ver `piezaFijaFueraDeKilo`.
+    if (piezaFijaFueraDeKilo(baseData)) {
+      return NextResponse.json({ ok: false, error: TEXTO_PIEZA_FIJA_FUERA_DE_KILO, campo: "modoVentaDeposito" }, { status: 400 });
+    }
     // Solo si hay algo que guardar: un alta sin el dato escribe exactamente lo
     // de siempre.
     if (sueltosPorUnidad !== null) baseData.sueltos_por_unidad = sueltosPorUnidad;

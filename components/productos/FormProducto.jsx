@@ -11,7 +11,7 @@ import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
 import CargarFotoProducto from "@/components/productos/CargarFotoProducto";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { costoPorKiloDeLaBolsa, defaultModoEnvio, fichaDeBolsaDePesoFijo } from "@/lib/conversiones/stock";
 import {
   precioDesdeMargen,
   margenEfectivoDe,
@@ -133,6 +133,12 @@ export default function FormProducto({
   // `{ costo, ayudaCosto, unitario, ayudaUnitario }` ("Costo * (por caja)",
   // "Costo por unidad"). Null: los de siempre.
   textosDelCosto = null,
+  // Solo en el alta desde el comprobante (`AltaDesdeElPapel`): la bolsa de peso
+  // fijo que se vende por kilo, como el MANI CON CASCARA X2KG. `{ pesoSugeridoKg,
+  // costoBolsa }`. Con "Kg" elegido aparece UN campo, el peso de la bolsa, que
+  // arma la ficha (`fichaDeBolsaDePesoFijo`) y saca el costo del kilo del de la
+  // bolsa. Null en el alta de Productos, que no cambia.
+  bolsaDePeso = null,
 }) {
   // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
   const soloLocal = !puedeEditarBase;
@@ -323,6 +329,31 @@ export default function FormProducto({
       if (!r.aplica) return { ...p, precio_costo: pc };
       return { ...p, precio_costo: pc, precio_venta: round2(r.precioFinal) };
     });
+  };
+
+  // ── LA BOLSA DE PESO FIJO (alta desde el comprobante, 2026-11-17) ────────
+  //
+  // Con un peso válido, la ficha queda como la del maní y el costo es el del
+  // kilo: costo de la bolsa ÷ lo que pesa. Sin peso válido solo se guarda lo
+  // tipeado: la validación pide el peso al guardar.
+  const aplicarBolsaDePeso = (pesoKg) => {
+    const ficha = fichaDeBolsaDePesoFijo(pesoKg);
+    if (!ficha) {
+      setField("pesoReferenciaKg", pesoKg === "" ? "" : Number(pesoKg));
+      return;
+    }
+    setForm((p) => ({ ...p, ...ficha }));
+    const porKilo = costoPorKiloDeLaBolsa({ costoBolsa: bolsaDePeso?.costoBolsa, pesoKg: ficha.pesoReferenciaKg });
+    if (porKilo !== null) onChangeCosto(porKilo);
+  };
+
+  // Dejar "Kg" deshace la ficha de la bolsa: la venta por pieza del depósito no
+  // puede quedar puesta en un producto por unidad (Mogul Gusanitos, 2026-11-16),
+  // y el costo vuelve a ser el de la bolsa, como lo dice el papel.
+  const deshacerBolsaDePeso = () => {
+    setForm((p) => ({ ...p, pesoEsFijo: false, modoVentaDeposito: "PESO", pesoReferenciaKg: "" }));
+    const costoBolsa = bolsaDePeso?.costoBolsa;
+    if (costoBolsa !== null && costoBolsa !== undefined) onChangeCosto(costoBolsa);
   };
 
   // El costo que trae la respuesta de la pregunta, cada vez que cambia. Queda
@@ -525,6 +556,9 @@ export default function FormProducto({
 
     if (form.modoCompraProveedor === "UNIDAD" && form.unidad_medida !== "kg")
       return "Modo compra 'Por pieza / barra' solo aplica a productos con tipo de venta Kg.";
+
+    if (bolsaDePeso && form.unidad_medida === "kg" && !(Number(form.pesoReferenciaKg) > 0))
+      return "Poné cuánto pesa la bolsa, en kilos.";
 
     // Validar proveedores no repetidos
     const provs = [form.proveedor_id, form.proveedor2_id, form.proveedor3_id]
@@ -739,8 +773,11 @@ export default function FormProducto({
       modo_stock: p.modo_stock || "BULTO",
       modoCompraProveedor: p.modoCompraProveedor || "BULTO",
       pesoReferenciaKg: p.pesoReferenciaKg === "" ? null : Number(p.pesoReferenciaKg),
-      pesoEsFijo: Boolean(p.pesoEsFijo),
-      modoVentaDeposito: p.modoVentaDeposito || "PESO",
+      // La venta por pieza del depósito solo vale por kilo (Mogul Gusanitos,
+      // 2026-11-16): en cualquier otro tipo de venta se manda apagada, y el
+      // servidor rechaza lo que llegue prendido (`piezaFijaFueraDeKilo`).
+      pesoEsFijo: p.unidad_medida === "kg" ? Boolean(p.pesoEsFijo) : false,
+      modoVentaDeposito: p.unidad_medida === "kg" ? p.modoVentaDeposito || "PESO" : "PESO",
       actualizaPromedioPorRecepcion: p.actualizaPromedioPorRecepcion !== false,
       // Tercer nivel de empaque. Vacío = sin sueltos: el backend lo lleva a null,
       // y si el producto tenía el dato, lo vacía con su reinterpretación.
@@ -1210,6 +1247,10 @@ export default function FormProducto({
                     }
                     return { ...p, unidad_medida: v, modo_pedido: modoPedido, modo_envio: modoEnvio, modoCompraProveedor: modoCompra };
                   });
+                  if (bolsaDePeso) {
+                    if (v === "kg") aplicarBolsaDePeso(form.pesoReferenciaKg || bolsaDePeso.pesoSugeridoKg || "");
+                    else if (form.unidad_medida === "kg") deshacerBolsaDePeso();
+                  }
                 }}
               >
                 <SunmiSelectOption value="unidad">Unidad</SunmiSelectOption>
@@ -1225,6 +1266,22 @@ export default function FormProducto({
                   : "Se vende por bulto (pack/cajón) en el POS."}
               </p>
             </Field>
+
+            {bolsaDePeso && form.unidad_medida === "kg" && (
+              <Field label="Peso de la bolsa (kg) *" fieldKey="pesoDeLaBolsa">
+                <SunmiInput
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  inputMode="decimal"
+                  value={form.pesoReferenciaKg}
+                  onChange={(e) => aplicarBolsaDePeso(e.target.value)}
+                />
+                <p className="text-xs sunmi-text-muted mt-1">
+                  El depósito la maneja por bolsa y los locales la venden por kilo. El costo del kilo sale del de la bolsa ÷ este peso.
+                </p>
+              </Field>
+            )}
 
             <Field label="Factor pack" fieldKey="factor_pack">
               <div className="flex items-center gap-2">

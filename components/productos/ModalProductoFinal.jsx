@@ -22,6 +22,9 @@ export default function ModalProducto({
   antesDelCosto = null,
   costoSugerido = null,
   textosDelCosto = null,
+  // El peso de la bolsa de peso fijo, solo en el alta desde el comprobante.
+  // Ver `FormProducto`.
+  bolsaDePeso = null,
 }) {
   return (
     <SunmiModalLayout
@@ -76,6 +79,7 @@ export default function ModalProducto({
           antesDelCosto={antesDelCosto}
           costoSugerido={costoSugerido}
           textosDelCosto={textosDelCosto}
+          bolsaDePeso={bolsaDePeso}
         />
       )}
     </SunmiModalLayout>

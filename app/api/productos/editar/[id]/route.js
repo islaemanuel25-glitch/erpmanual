@@ -11,6 +11,7 @@ import {
   localesQueQuedanRevisados,
 } from "@/lib/productos/revisionDePrecio";
 import { esComboBase } from "@/lib/combos/guards";
+import { piezaFijaFueraDeKilo, TEXTO_PIEZA_FIJA_FUERA_DE_KILO } from "@/lib/conversiones/stock";
 import {
   puedeEditarCosto,
   mensajeCostoNoEditable,
@@ -368,6 +369,11 @@ export async function PUT(req, context) {
     const sueltosFinales = sueltos.ok ? sueltos.valor : baseScope.sueltos_por_unidad ?? null;
     if (sueltosFinales !== null && baseData.unidad_medida === "kg") {
       return NextResponse.json({ ok: false, error: TEXTO_CAMBIO_DE_ESCALA.KG, campo: "sueltos_por_unidad" }, { status: 400 });
+    }
+    // La venta por pieza del depósito solo vale en un producto por kilo (Mogul
+    // Gusanitos Extreme, 2026-11-16). Ver `piezaFijaFueraDeKilo`.
+    if (piezaFijaFueraDeKilo(baseData)) {
+      return NextResponse.json({ ok: false, error: TEXTO_PIEZA_FIJA_FUERA_DE_KILO, campo: "modoVentaDeposito" }, { status: 400 });
     }
     const precioSuelto = localData.precio_venta_suelto;
     if (precioSuelto !== undefined && precioSuelto !== null && !(Number.isFinite(precioSuelto) && precioSuelto > 0)) {
