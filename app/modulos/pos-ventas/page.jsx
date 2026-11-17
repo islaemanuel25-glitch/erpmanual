@@ -1441,18 +1441,16 @@ export default function PosVentasPage() {
 
   useEffect(() => {
     const handleShortcut = (e) => {
-      // ENTER: cobrar (funciona incluso desde inputs)
-      if (e.key === "Enter") {
-        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-        if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
-        if (state.carrito.length > 0 && !state.cobrando) {
-          e.preventDefault();
-          iniciarCobro();
-        }
-        return;
-      }
+      // ── ENTER YA NO COBRA (Emanuel, 2026-11-17) ──────────────────────────
+      //
+      // Acá había un "Enter: cobrar" para cuando el foco no estaba en un campo.
+      // El lector de códigos teclea los dígitos y después Enter, así que un
+      // escaneo con el foco en cualquier otro lugar de la pantalla abría "Pago
+      // en Efectivo" con el total del carrito. Para cobrar quedan F10 y los
+      // botones; la ráfaga del lector la toma el buscador como un escaneo
+      // (`crearManejadorDeRafaga`), esté donde esté el foco.
 
-      // No interceptar si esta escribiendo en un input (excepto ENTER arriba)
+      // No interceptar si esta escribiendo en un input
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       // No interceptar si hay modal abierto
       if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
@@ -2349,6 +2347,7 @@ export default function PosVentasPage() {
               mostrarStock={mostrarStockPos}
               avisarNoEncontrado
               conSueltos
+              escaneoBloqueado={Boolean(state.modalEfectivo)}
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta

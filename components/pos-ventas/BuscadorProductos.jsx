@@ -15,7 +15,6 @@ import {
   sumarCodigoNoEncontrado,
   avisarErrorDeLectura,
   crearManejadorDeRafaga,
-  MENSAJE_CURSOR_EN_CANTIDAD,
 } from "@/lib/pos-ventas/lecturaEscaner";
 import AvisoProductoNoEncontrado from "@/components/pos-ventas/AvisoProductoNoEncontrado";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
@@ -45,6 +44,9 @@ function BuscadorProductos({
   // de empaque). Lo pide solo el POS de venta: en ofertas, combos y el consumo
   // del personal un suelto no se puede elegir.
   conSueltos = false,
+  // Con el modal de pago abierto, una ráfaga del lector no agrega nada: se come
+  // y se ignora. Lo pasa el POS de venta (ver `crearManejadorDeRafaga`).
+  escaneoBloqueado = false,
 }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
@@ -60,13 +62,10 @@ function BuscadorProductos({
   // ref espeja el estado para `handleKeyDown`, que decide al leer.
   const [codigosNoEncontrados, setCodigosNoEncontrados] = useState([]);
   const avisoAbiertoRef = useRef(false);
-  // El renglón del aviso cuando no es "no encontrado": null es el de siempre.
-  const [mensajeAviso, setMensajeAviso] = useState(null);
+  const escaneoBloqueadoRef = useRef(escaneoBloqueado);
+  escaneoBloqueadoRef.current = escaneoBloqueado;
 
-  const abrirAvisoNoEncontrado = (codigo, mensaje = null) => {
-    // El texto es el de quien ABRE el aviso: un "no encontrado" que llega en
-    // vuelo con el aviso abierto se suma a los códigos y no le cambia el texto.
-    if (!avisoAbiertoRef.current) setMensajeAviso(mensaje);
+  const abrirAvisoNoEncontrado = (codigo) => {
     avisoAbiertoRef.current = true;
     scanBuffer.current = "";
     setQuery("");
@@ -80,7 +79,6 @@ function BuscadorProductos({
     avisoAbiertoRef.current = false;
     scanBuffer.current = "";
     setCodigosNoEncontrados([]);
-    setMensajeAviso(null);
     inputRef.current?.focus();
   };
 
@@ -89,14 +87,17 @@ function BuscadorProductos({
     inputRef.current?.focus();
   }, []);
 
-  // ── EL LECTOR EN CUALQUIER CAMPO DE LA PANTALLA QUE NO SEA ESTE ──────────
+  // ── EL LECTOR EN CUALQUIER LUGAR DE LA PANTALLA (Emanuel, 2026-11-17) ────
   //
-  // Con el cursor en la cantidad de un renglón, el lector escribía el código
-  // ahí adentro. Se escucha la pantalla entera —`window`, en captura— y el
-  // Enter que cierra una ráfaga del lector en otro campo no agrega nada: el
-  // campo vuelve a lo que tenía, sale el mismo aviso de "no encontrado" con el
-  // texto de la cantidad, y el foco vuelve acá para el próximo escaneo. El
-  // criterio y el porqué están en `lib/pos-ventas/lecturaEscaner.js`.
+  // Se escucha la pantalla entera —`window`, en captura—. Una ráfaga del lector
+  // que termina fuera de este campo —en la cantidad de un renglón, en otro
+  // campo, o sin ningún campo con el foco— es un escaneo: si estaba en un campo,
+  // el campo vuelve a lo que tenía; el código se busca y se agrega igual que si
+  // se hubiera escaneado acá; y el foco vuelve acá para el próximo. Su Enter no
+  // llega a nada más: antes, con el foco afuera, abría el cobro.
+  //
+  // Con el modal de pago abierto (`escaneoBloqueado`) la ráfaga se come y no se
+  // agrega nada. El criterio y el porqué están en `lib/pos-ventas/lecturaEscaner.js`.
   //
   // Solo con `avisarNoEncontrado`, que es el POS de venta: ofertas y combos
   // usan este buscador y siguen como estaban. El foco va en la tarea siguiente
@@ -107,14 +108,21 @@ function BuscadorProductos({
     const alTeclear = crearManejadorDeRafaga({
       buscador: () => inputRef.current,
       avisoAbierto: () => avisoAbiertoRef.current,
+      escaneoBloqueado: () => escaneoBloqueadoRef.current,
+      // Primero el foco y después la búsqueda: si la ráfaga cayó en la cantidad
+      // de un renglón, ese campo guarda su valor al perder el foco, y tiene que
+      // guardarlo ANTES de que el producto escaneado le sume a su línea.
       alEscanearFueraDelBuscador: ({ codigo }) => {
-        abrirAvisoNoEncontrado(codigo, MENSAJE_CURSOR_EN_CANTIDAD);
-        setTimeout(() => inputRef.current?.focus(), 0);
+        setTimeout(() => {
+          inputRef.current?.focus();
+          setQuery(codigo);
+          buscarRef.current(codigo, true);
+        }, 0);
       },
     });
     window.addEventListener("keydown", alTeclear, true);
     return () => window.removeEventListener("keydown", alTeclear, true);
-    // `abrirAvisoNoEncontrado` solo usa setters y refs: la del primer dibujo sirve.
+    // `buscarRef` siempre tiene la búsqueda del último dibujo; el resto son setters y refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [avisarNoEncontrado]);
 
@@ -179,6 +187,11 @@ function BuscadorProductos({
     },
     [localId, clienteId, onAgregar, searchApi, avisarNoEncontrado, conSueltos]
   );
+  // La búsqueda del último dibujo, para el escaneo que llega por `window`: el
+  // manejador se cuelga una sola vez y no puede quedarse con el cliente o la
+  // ubicación del primer dibujo.
+  const buscarRef = useRef(buscar);
+  buscarRef.current = buscar;
 
   // ── LA VOZ Y EL CAMPO SE FUERON AL KIT ────────────────────────────────────
   //
@@ -389,7 +402,7 @@ function BuscadorProductos({
         </div>
       )}
 
-      <AvisoProductoNoEncontrado codigos={codigosNoEncontrados} onEntendido={alEntenderAviso} mensaje={mensajeAviso} />
+      <AvisoProductoNoEncontrado codigos={codigosNoEncontrados} onEntendido={alEntenderAviso} />
     </>
   );
 

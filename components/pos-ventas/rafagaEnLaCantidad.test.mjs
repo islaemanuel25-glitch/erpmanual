@@ -32,9 +32,9 @@ const { createRoot } = await import("react-dom/client");
 const { default: BuscadorProductos } = await import("@/components/pos-ventas/BuscadorProductos.jsx");
 const { default: CarritoVenta } = await import("@/components/pos-ventas/CarritoVenta.jsx");
 const { default: AvisoProductoNoEncontrado } = await import("@/components/pos-ventas/AvisoProductoNoEncontrado.jsx");
+const { default: ModalPagoEfectivo } = await import("@/components/pos-ventas/ModalPagoEfectivo.jsx");
 const { posVentaReducer, initialState, ActionTypes } = await import("@/app/modulos/pos-ventas/reducer/posVentaReducer.js");
 const {
-  MENSAJE_CURSOR_EN_CANTIDAD,
   MS_MAX_ENTRE_TECLAS_RAFAGA,
   LARGO_MIN_RAFAGA,
   seguirRafaga,
@@ -105,12 +105,16 @@ function escribir(campo, valor) {
   campo.dispatchEvent(new window.Event("input", { bubbles: true }));
 }
 
-/** Una tecla, `ms` después de la anterior. Si nadie frenó el keydown, la letra entra. */
+/**
+ * Una tecla, `ms` después de la anterior. Si nadie frenó el keydown, la letra
+ * entra —si el foco está en un campo: en el cuerpo de la página no se escribe
+ * nada, como en el navegador—.
+ */
 async function teclear(campo, tecla, ms) {
   reloj += ms;
   await act(async () => {
     const pasa = campo.dispatchEvent(new window.KeyboardEvent("keydown", { key: tecla, bubbles: true, cancelable: true }));
-    if (!pasa) return;
+    if (!pasa || campo.tagName !== "INPUT") return;
     if (tecla === "Backspace") escribir(campo, campo.value.slice(0, -1));
     else if (tecla.length === 1) escribir(campo, campo.value + tecla);
   });
@@ -139,9 +143,20 @@ let raiz;
 let contenedor;
 let estado;
 let agregados;
+// El modal de pago, como lo abre el POS: `state.modalEfectivo` y el buscador
+// con `escaneoBloqueado` mientras está abierto.
+let abrirPago;
+let confirmaciones;
+// Lo que llega a `window` en burbuja: ahí escuchan los atajos de la pantalla
+// (`handleShortcut`, F9, Ctrl+Z). Un Enter del lector que llegue acá es uno que
+// un atajo podría tomar.
+let enterQueLlegaALosAtajos;
+const alAtajo = (e) => { if (e.key === "Enter") enterQueLlegaALosAtajos++; };
 
 function Pos() {
   const [state, dispatch] = React.useReducer(posVentaReducer, initialState);
+  const [pago, setPago] = React.useState(false);
+  abrirPago = setPago;
   estado = state;
   const onAgregar = React.useCallback((p) => {
     agregados.push(p);
@@ -150,14 +165,15 @@ function Pos() {
   return h(
     React.Fragment,
     null,
-    h(BuscadorProductos, { localId: 1, onAgregar, avisarNoEncontrado: true, conSueltos: true }),
+    h(BuscadorProductos, { localId: 1, onAgregar, avisarNoEncontrado: true, conSueltos: true, escaneoBloqueado: pago }),
     h(CarritoVenta, {
       items: state.carrito,
       onCantidadChange: (idx, nuevaCantidad) => dispatch({ type: ActionTypes.UPDATE_CANTIDAD, payload: { idx, nuevaCantidad } }),
       onEliminar: () => {},
       onLimpiar: () => {},
       subtotal: 0,
-    })
+    }),
+    pago && h(ModalPagoEfectivo, { total: 1500, onConfirmar: (d) => confirmaciones.push(d), onCancelar: () => setPago(false) })
   );
 }
 
@@ -178,6 +194,7 @@ async function montarConUnaLinea(cant) {
   assert.equal(estado.carrito[0].cantidad, cant);
   agregados = [];
   pedidos = [];
+  enterQueLlegaALosAtajos = 0;
 }
 
 beforeEach(async () => {
@@ -188,6 +205,10 @@ beforeEach(async () => {
   document.body.appendChild(contenedor);
   agregados = [];
   pedidos = [];
+  confirmaciones = [];
+  enterQueLlegaALosAtajos = 0;
+  window.removeEventListener("keydown", alAtajo);
+  window.addEventListener("keydown", alAtajo);
   raiz = createRoot(contenedor);
   await act(async () => raiz.render(h(Pos)));
 });
@@ -195,52 +216,123 @@ beforeEach(async () => {
 // ══════════════════════════════════════════════════════════════════════════
 // LA RÁFAGA EN LA CANTIDAD
 // ══════════════════════════════════════════════════════════════════════════
+//
+// Hasta el 2026-11-17 estos candados afirmaban otra cosa: la ráfaga en la
+// cantidad no agregaba nada y abría el aviso "El cursor estaba en la cantidad".
+// Se reescribieron a sabiendas: Emanuel decidió que en toda la pantalla una
+// ráfaga del lector es un escaneo, esté donde esté el foco. La cantidad igual
+// vuelve a lo que tenía: el código nunca queda como cantidad.
 
-test("RC1. una ráfaga del lector en la cantidad: la cantidad vuelve, no se agrega nada, sale el aviso y el foco va al buscador", async () => {
+test("RC1. una ráfaga del lector en la cantidad: la cantidad vuelve, el producto se agrega como un escaneo y el foco va al buscador", async () => {
   await montarConUnaLinea(6);
 
   await enfocar(cantidad());
   await escanear(cantidad(), CODIGO);
 
-  assert.equal(estado.carrito.length, 1, "apareció otra línea");
-  assert.equal(estado.carrito[0].cantidad, 6, "la cantidad quedó con el código");
-  assert.equal(cantidad().value, "6");
-  assert.equal(agregados.length, 0, "se agregó un producto");
-  assert.deepEqual(pedidos, [], "se buscó el código");
-  assert.ok(avisoAbierto(), "no salió el aviso");
-  assert.match(textoDelAviso(), new RegExp(MENSAJE_CURSOR_EN_CANTIDAD.replace(/\./g, "\\.")));
-  assert.doesNotMatch(textoDelAviso(), new RegExp(TEXTO_NO_ENCONTRADO));
-  assert.equal(document.querySelector("[data-codigo-leido]").textContent, CODIGO);
+  assert.equal(estado.carrito.length, 1, "es el mismo producto: suma a su línea");
+  assert.equal(estado.carrito[0].cantidad, 7, "la cantidad quedó con el código, o no se agregó");
+  assert.equal(agregados.length, 1, "no se agregó el producto escaneado");
+  assert.deepEqual(pedidos, [CODIGO], "no se buscó el código");
+  assert.equal(avisoAbierto(), false, "salió un aviso");
+  assert.equal(enterQueLlegaALosAtajos, 0, "el Enter del lector llegó a los atajos");
+  await act(async () => { await esperar(5); });
   assert.ok(enfocado(buscador()), "el foco no volvió al buscador");
 });
 
-test("RC2. después de «Entendido», el próximo escaneo entra al buscador y agrega", async () => {
+test("RC2. un código inexistente escaneado en la cantidad abre el aviso de siempre, con la cantidad intacta", async () => {
   await montarConUnaLinea(6);
   await enfocar(cantidad());
-  await escanear(cantidad(), CODIGO);
+  await escanear(cantidad(), "1234567890");
 
-  const entendido = [...document.querySelectorAll("button")].find((b) => b.textContent === "Entendido");
-  await act(async () => entendido.click());
-  assert.equal(avisoAbierto(), false);
-  assert.ok(enfocado(buscador()), "«Entendido» no devolvió el foco al buscador");
-
-  await escanear(buscador(), CODIGO);
-  assert.equal(agregados.length, 1, "el escaneo siguiente no agregó");
-  assert.equal(estado.carrito[0].cantidad, 7);
-  assert.ok(enfocado(buscador()), "después de agregar el foco no quedó en el buscador");
+  assert.equal(estado.carrito[0].cantidad, 6, "la cantidad quedó con el código");
+  assert.equal(agregados.length, 0);
+  assert.ok(avisoAbierto(), "no salió el aviso de no encontrado");
+  assert.match(textoDelAviso(), new RegExp(TEXTO_NO_ENCONTRADO));
+  assert.equal(document.querySelector("[data-codigo-leido]").textContent, "1234567890");
 });
 
-test("RC3. el texto es del aviso de la cantidad: cerrado, un código inexistente vuelve a decir lo de siempre", async () => {
-  await montarConUnaLinea(6);
-  await enfocar(cantidad());
-  await escanear(cantidad(), CODIGO);
-  const entendido = [...document.querySelectorAll("button")].find((b) => b.textContent === "Entendido");
-  await act(async () => entendido.click());
+// ══════════════════════════════════════════════════════════════════════════
+// LOS TRES CASOS DEL COBRO (Emanuel, 2026-11-17)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// El defecto, en producción: con el foco en cualquier lugar que no fuera un
+// campo, el Enter del lector llegaba al atajo "Enter cobra" y se abría "Pago en
+// Efectivo" con el total del carrito.
 
-  await escanear(buscador(), "1234567890");
-  assert.ok(avisoAbierto());
-  assert.match(textoDelAviso(), new RegExp(TEXTO_NO_ENCONTRADO));
-  assert.doesNotMatch(textoDelAviso(), /El cursor estaba/);
+test("COBRO 1. escaneo con el foco afuera de todo campo: se agrega como en el buscador y el Enter no llega a ningún atajo", async () => {
+  await escanear(buscador(), CODIGO);
+  assert.equal(estado.carrito[0].cantidad, 1);
+  agregados = [];
+  pedidos = [];
+  enterQueLlegaALosAtajos = 0;
+
+  // Un clic en cualquier otro lugar: el foco queda en el cuerpo de la página.
+  await act(async () => { document.activeElement?.blur(); });
+  assert.ok(enfocado(document.body), "el foco no quedó afuera");
+  await escanear(document.body, CODIGO);
+
+  assert.equal(agregados.length, 1, "el escaneo con el foco afuera no agregó");
+  assert.deepEqual(pedidos, [CODIGO]);
+  assert.equal(estado.carrito[0].cantidad, 2);
+  assert.equal(enterQueLlegaALosAtajos, 0, "el Enter del lector llegó a los atajos: podía abrir el cobro");
+  await act(async () => { await esperar(5); });
+  assert.ok(enfocado(buscador()), "el foco no volvió al buscador");
+});
+
+test("COBRO 2. un Enter suelto con el foco afuera no agrega nada; la pantalla ya no lo usa para cobrar", async () => {
+  await escanear(buscador(), CODIGO);
+  agregados = [];
+  pedidos = [];
+  await act(async () => { document.activeElement?.blur(); });
+  await tipearAMano(document.body, ["Enter"]);
+  assert.equal(agregados.length, 0);
+  assert.deepEqual(pedidos, []);
+
+  // Y el atajo "Enter cobra" ya no está en la pantalla: para cobrar quedan F10
+  // y los botones. Se lee sin comentarios —el comentario que explica por qué se
+  // fue nombra al Enter—.
+  const PANTALLA = fs
+    .readFileSync(path.resolve(import.meta.dirname, "../../app/modulos/pos-ventas/page.jsx"), "utf8")
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+  const atajos = PANTALLA.slice(PANTALLA.indexOf("const handleShortcut"), PANTALLA.indexOf('window.addEventListener("keydown", handleShortcut)'));
+  assert.ok(atajos.length > 0, "no se encontró el manejador de atajos");
+  assert.doesNotMatch(atajos, /"Enter"/, "el manejador de atajos volvió a mirar el Enter");
+  assert.match(atajos, /case "F10":[\s\S]*?iniciarCobro\(\)/, "F10 dejó de cobrar");
+});
+
+test("COBRO 3. con el modal de pago abierto, un escaneo no escribe en «Cliente paga con», no confirma y no agrega", async () => {
+  await escanear(buscador(), CODIGO);
+  agregados = [];
+  pedidos = [];
+  enterQueLlegaALosAtajos = 0;
+  await act(async () => abrirPago(true));
+  const pagaCon = document.querySelector('input[placeholder="0.00"]');
+  assert.ok(pagaCon, "no se abrió el modal de pago");
+  await enfocar(pagaCon);
+
+  await escanear(pagaCon, CODIGO);
+  assert.equal(pagaCon.value, "", "el código quedó escrito en «Cliente paga con»");
+  assert.equal(confirmaciones.length, 0, "se confirmó una venta");
+  assert.equal(agregados.length, 0, "se agregó un producto con el modal abierto");
+  assert.deepEqual(pedidos, [], "se buscó el código con el modal abierto");
+  assert.equal(enterQueLlegaALosAtajos, 0);
+
+  // Un segundo escaneo, el del riesgo: tampoco.
+  await escanear(pagaCon, CODIGO);
+  assert.equal(pagaCon.value, "");
+  assert.equal(confirmaciones.length, 0);
+
+  // Y tipear a mano sigue escribiendo: lo que se come es la ráfaga, no el campo.
+  await tipearAMano(pagaCon, [..."2000"]);
+  assert.equal(pagaCon.value, "2000");
+  assert.equal(confirmaciones.length, 0, "tipear el monto confirmó solo");
+
+  // Cerrado el modal, el escaneo vuelve a agregar.
+  await act(async () => abrirPago(false));
+  await escanear(buscador(), CODIGO);
+  assert.equal(agregados.length, 1, "cerrado el modal, el escaneo no agregó");
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -319,23 +411,19 @@ test("RC7. solo un campo que no es el buscador cuenta como «fuera del buscador�
 // EL AVISO ES EL MISMO, Y EL DE SIEMPRE NO CAMBIÓ
 // ══════════════════════════════════════════════════════════════════════════
 
-test("RC8. el aviso de la cantidad es el de «no encontrado» con un solo texto cambiado", async () => {
-  // Con `document` presente el aviso va por portal, así que se monta en el DOM
-  // y se lee lo que dibujó.
-  const montar = async (props) => {
-    const lugar = document.createElement("div");
-    document.body.appendChild(lugar);
-    const r = createRoot(lugar);
-    await act(async () => r.render(h(AvisoProductoNoEncontrado, { codigos: [CODIGO], onEntendido: () => {}, ...props })));
-    const html = document.querySelector("[data-sunmi-modal]").closest("body > *").outerHTML;
-    await act(async () => r.unmount());
-    lugar.remove();
-    return html;
-  };
-  const deSiempre = await montar({});
-  assert.match(deSiempre, new RegExp(`>${TEXTO_NO_ENCONTRADO}<`), "el aviso de código inexistente cambió");
-  assert.equal(await montar({ mensaje: MENSAJE_CURSOR_EN_CANTIDAD }), deSiempre.replace(TEXTO_NO_ENCONTRADO, MENSAJE_CURSOR_EN_CANTIDAD));
-  assert.equal(MENSAJE_CURSOR_EN_CANTIDAD, "El cursor estaba en la cantidad. Volvé a escanear el producto.");
+test("RC8. el aviso de «no encontrado» dice lo de siempre, y el de la cantidad ya no existe", async () => {
+  // Hasta el 2026-11-17 el aviso aceptaba un texto alternativo para la
+  // cantidad. Ese aviso dejó de existir: una ráfaga en la cantidad es un escaneo.
+  const lugar = document.createElement("div");
+  document.body.appendChild(lugar);
+  const r = createRoot(lugar);
+  await act(async () => r.render(h(AvisoProductoNoEncontrado, { codigos: [CODIGO], onEntendido: () => {} })));
+  const html = document.querySelector("[data-sunmi-modal]").closest("body > *").outerHTML;
+  await act(async () => r.unmount());
+  lugar.remove();
+  assert.match(html, new RegExp(`>${TEXTO_NO_ENCONTRADO}<`), "el aviso de código inexistente cambió");
+  const LECTURA = fs.readFileSync(path.resolve(import.meta.dirname, "../../lib/pos-ventas/lecturaEscaner.js"), "utf8");
+  assert.doesNotMatch(LECTURA, /export const MENSAJE_CURSOR_EN_CANTIDAD/);
 });
 
 test("RC9. el POS devuelve el foco al buscador al agregar desde el modal de peso y desde el de servicio", () => {
