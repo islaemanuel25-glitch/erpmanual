@@ -162,6 +162,8 @@ export default function DetallePedidoProveedorPage({ params }) {
   // estado a un papel ("no cierra" → "cierra") sin pasar por el panel.
   const [recargarPapeles, setRecargarPapeles] = useState(0);
   const [lineaACorregir, setLineaACorregir] = useState(null);
+  // La línea en la que la hoja sigue abierta después de crear desde la lista.
+  const [seguirEnLaLinea, setSeguirEnLaLinea] = useState(null);
   // La hoja que se abre antes de cerrar: pregunta por las líneas que ningún
   // comprobante trajo y dice qué queda a medias.
   const [cerrandoRecepcion, setCerrandoRecepcion] = useState(false);
@@ -972,12 +974,31 @@ export default function DetallePedidoProveedorPage({ params }) {
       const d = await r.json().catch(() => null);
       if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo vincular." };
       setRecargarConciliacion((n) => n + 1);
-      setLineaACorregir(null);
+      // Creado desde la lista: la hoja sigue en esta línea (ver `seguirEnLaLinea`).
+      if (extra?.filaListaId) setSeguirEnLaLinea(claveDeFila(fila));
+      else setLineaACorregir(null);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo vincular." };
     }
   }, [id]);
+
+  // ── CREADO DESDE LA LISTA, LA HOJA NO SE CIERRA (Emanuel, 2026-11-18) ──
+  //
+  // Una sola pasada por línea: después de crear el producto con los datos de
+  // la lista, la hoja queda en ESA línea, ya vinculada, lista para "Revisado y
+  // seguir" con lo que entró y el precio del papel. Se espera a la conciliación
+  // nueva y se abre con su fila —la vieja todavía dice "sin vincular"—; la
+  // hoja se rearma sola al cambiar la fila. Solo cuando la fila ya tiene
+  // producto: antes de eso la que hay es la de antes de vincular.
+  useEffect(() => {
+    if (seguirEnLaLinea == null) return;
+    const nueva = filasDeFactura.find((f) => claveDeFila(f) === seguirEnLaLinea);
+    if (nueva?.productoBaseId != null) {
+      setLineaACorregir(nueva);
+      setSeguirEnLaLinea(null);
+    }
+  }, [filasDeFactura, seguirEnLaLinea]);
 
   // Quitar el producto: la misma ruta que vincular, con DELETE. Al volver, la
   // línea queda sin producto y la hoja se cierra, igual que al vincular.
@@ -1852,7 +1873,14 @@ export default function DetallePedidoProveedorPage({ params }) {
               proveedorNombre={pedido.proveedor?.nombre ?? null}
               fila={lineaACorregir}
               abierta={!!lineaACorregir}
-              onCerrar={() => setLineaACorregir(null)}
+              onCerrar={() => {
+                // Cerrarla a propósito mientras se espera no la vuelve a abrir.
+                setSeguirEnLaLinea(null);
+                setLineaACorregir(null);
+              }}
+              // Mientras llega la conciliación con la línea vinculada, los
+              // botones quedan quietos: un segundo toque crearía otro producto.
+              guardando={seguirEnLaLinea != null}
               onAceptarPrecio={aceptarPrecioDeLinea}
               onDejarMiPrecio={dejarMiPrecioDeLinea}
               onGuardar={guardarCorreccion}
