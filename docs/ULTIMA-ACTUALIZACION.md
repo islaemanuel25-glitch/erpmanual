@@ -1,8 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-18 13:36
+**Fecha:** 2026-11-18 15:07
 
 ## Módulos modificados recientemente
+
+### proveedores
+- feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
+- Archivos: 2 modificados (2 total)
+
+### productos
+- feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
+- Archivos: 2 modificados (2 total)
 
 
 
