@@ -967,6 +967,8 @@ export default function DetallePedidoProveedorPage({ params }) {
           productoBaseId,
           codigoProveedor: fila?.codigoProveedor ?? null,
           ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}),
+          // El pack que quedó en el formulario del alta: con él se recuerda la lectura.
+          ...(extra?.bulto ? { bulto: extra.bulto } : {}),
           // Creado desde el renglón de la lista guardada: la pregunta fue sobre ese renglón.
           ...(extra?.filaListaId ? { filaListaId: extra.filaListaId } : {}),
         }),

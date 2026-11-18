@@ -43,7 +43,7 @@ import {
   reconciliarLaFila,
 } from "@/lib/proveedores/listas/vincularFilaSinProducto";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
-import { lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
+import { bultoQueMandoElAlta, lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 
 export async function POST(req, context) {
   try {
@@ -138,7 +138,8 @@ export async function POST(req, context) {
     // confirmada, y el motor la usa ya para este renglón: así la cuenta contra
     // la lista sale con la misma lectura con la que se cargó el costo, y la
     // próxima lista no lo vuelve a preguntar.
-    const lectura = lecturaRecordadaDelAlta({ fila, precioEs: body?.precioEs ?? null });
+    // Con el pack que quedó en el formulario del alta, si lo mandó (2026-11-18).
+    const lectura = lecturaRecordadaDelAlta({ fila, precioEs: body?.precioEs ?? null, bulto: bultoQueMandoElAlta(body?.bulto) });
     const recalculada = reconciliarLaFila({
       fila,
       producto,

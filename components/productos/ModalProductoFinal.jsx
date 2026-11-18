@@ -25,6 +25,10 @@ export default function ModalProducto({
   // El peso de la bolsa de peso fijo, solo en el alta desde el comprobante.
   // Ver `FormProducto`.
   bolsaDePeso = null,
+  // El Factor pack en vivo y los packs para tocar, solo en las altas desde el
+  // papel y desde la lista. Ver `FormProducto`.
+  onFactorPack = null,
+  opcionesDeFactor = null,
 }) {
   return (
     <SunmiModalLayout
@@ -80,6 +84,8 @@ export default function ModalProducto({
           costoSugerido={costoSugerido}
           textosDelCosto={textosDelCosto}
           bolsaDePeso={bolsaDePeso}
+          onFactorPack={onFactorPack}
+          opcionesDeFactor={opcionesDeFactor}
         />
       )}
     </SunmiModalLayout>

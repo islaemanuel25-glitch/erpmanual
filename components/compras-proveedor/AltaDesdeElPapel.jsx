@@ -18,8 +18,10 @@ import { useEffect, useMemo, useState } from "react";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { OPCIONES_PACK_LATA, esLata, precioPorLataDeReferencia } from "@/lib/productos/packDeLata";
 import {
   bolsaDePesoDelAlta,
+  bultoPropuestoDelAltaDesdeElPapel,
   codigoDelProveedorParaElAlta,
   costoDelAltaDesdeElPapel,
   precargaDelAlta,
@@ -40,27 +42,50 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
   // Lo mismo que `AltaDesdeLaLista`, copiado tal cual: arranca SIN elegir y,
   // hasta que la persona conteste, el costo queda vacío.
   const [precioEs, setPrecioEs] = useState(null);
+  // ── UNA LATA: EL PRECIO POR LATA DE LAS OTRAS DEL PROVEEDOR (2026-11-18) ─
+  // Con él se ve si el pack propuesto da un precio por lata coherente
+  // (`packDeLata.js`). Solo se pide si el renglón es una lata.
+  const lata = esLata(fila?.textoCrudo);
+  const [referenciaPorLata, setReferenciaPorLata] = useState(null);
+  const bultoPropuesto = useMemo(
+    () => bultoPropuestoDelAltaDesdeElPapel({ fila, referenciaPorLata }),
+    [fila, referenciaPorLata]
+  );
+  // ── EL FACTOR PACK EN VIVO (2026-11-18) ──────────────────────────────
+  // El que tiene el formulario: la pregunta "Por la caja de N", el costo de la
+  // respuesta y lo que se recuerda lo siguen si alguien lo cambia. `undefined`
+  // hasta que el formulario avisa el primero; vacío o 1 no es un pack.
+  const [factorEnVivo, setFactorEnVivo] = useState(undefined);
+  const bultoParaLaCuenta = factorEnVivo === undefined ? bultoPropuesto : factorEnVivo ?? 1;
   // Memorizada y SIN la respuesta: el formulario se reinicia cada vez que
   // cambia su `initialData`, y contestar no puede borrar lo que ya se cargó. El
   // costo de la respuesta entra aparte, por `costoSugerido`.
-  const precarga = useMemo(() => precargaDelAlta({ fila, proveedorId }), [fila, proveedorId]);
+  const precarga = useMemo(() => precargaDelAlta({ fila, proveedorId, bulto: bultoPropuesto }), [fila, proveedorId, bultoPropuesto]);
   // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
-  const pregunta = useMemo(() => preguntaDelAltaDesdeElPapel(fila), [fila]);
+  const pregunta = useMemo(() => preguntaDelAltaDesdeElPapel(fila, { bulto: bultoParaLaCuenta }), [fila, bultoParaLaCuenta]);
   // La bolsa de peso fijo que se vende por kilo (BIOM ANANA TROZ X500GR): el
   // peso que sugiere el papel y el costo de una bolsa. El campo aparece solo si
   // eligen "Kg"; si el papel trae peso, el alta ya viene así (`precargaDelAlta`).
   const bolsaDePeso = useMemo(() => bolsaDePesoDelAlta(fila), [fila]);
-  const costoSugerido = pregunta ? costoDelAltaDesdeElPapel({ fila, precioEs }) : null;
+  const costoSugerido = pregunta ? costoDelAltaDesdeElPapel({ fila, precioEs, bulto: bultoParaLaCuenta }) : null;
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       try {
-        const [cat, prov, area] = await Promise.all(
-          ["/api/catalogos/categorias", "/api/catalogos/proveedores", "/api/catalogos/areas-fisicas"].map((u) =>
+        const [cat, prov, area, delProveedor] = await Promise.all([
+          ...["/api/catalogos/categorias", "/api/catalogos/proveedores", "/api/catalogos/areas-fisicas"].map((u) =>
             fetch(u, { credentials: "include" }).then((r) => r.json())
-          )
-        );
+          ),
+          // Las latas del proveedor, para el precio por lata de referencia. Si
+          // no llega, el pack propuesto queda el del nombre.
+          lata && Number(proveedorId) > 0
+            ? fetch(`/api/compras-proveedor/productos?proveedorId=${Number(proveedorId)}`, { credentials: "include" })
+                .then((r) => r.json())
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        if (vivo) setReferenciaPorLata(precioPorLataDeReferencia(delProveedor?.items ?? []));
         if (vivo) setCatalogos({ CATEGORIAS: cat?.items ?? [], PROVEEDORES: prov?.items ?? [], AREAS: area?.items ?? [] });
       } catch (e) {
         if (vivo) setError("No se pudieron cargar las categorías y los proveedores. Probá de nuevo.");
@@ -88,7 +113,7 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
         alert(data?.error || "No se pudo crear el producto.");
         return;
       }
-      await onCreado?.(data.item, { precioEs });
+      await onCreado?.(data.item, { precioEs, bulto: bultoParaLaCuenta });
     } catch (e) {
       alert("No se pudo crear el producto: se cortó la conexión.");
     }
@@ -140,6 +165,8 @@ export default function AltaDesdeElPapel({ fila, proveedorId, onCreado, onCancel
         }
         costoSugerido={costoSugerido}
         bolsaDePeso={bolsaDePeso}
+        onFactorPack={setFactorEnVivo}
+        opcionesDeFactor={lata ? OPCIONES_PACK_LATA : null}
       />
     </>
   );

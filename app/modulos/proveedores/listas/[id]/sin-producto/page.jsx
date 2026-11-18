@@ -131,7 +131,12 @@ export default function SinProductoDeLaListaPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productoBaseId, ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}) }),
+        body: JSON.stringify({
+          productoBaseId,
+          ...(extra?.precioEs ? { precioEs: extra.precioEs } : {}),
+          // El pack que quedó en el formulario del alta: con él se recuerda la lectura.
+          ...(extra?.bulto ? { bulto: extra.bulto } : {}),
+        }),
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) return { ok: false, error: j?.error || "El servidor no pudo vincularlo y no dijo por qué." };

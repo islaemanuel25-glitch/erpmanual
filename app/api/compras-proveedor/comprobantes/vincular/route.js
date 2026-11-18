@@ -35,7 +35,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
-import { lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
+import { bultoQueMandoElAlta, lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
   parDelTextoRechazado,
@@ -248,8 +248,8 @@ export async function POST(req) {
           })
         : null;
     const lecturaDelAlta = filaDeLaLista
-      ? lecturaRecordadaDelAlta({ fila: filaDeLaLista, precioEs: body?.precioEs ?? null })
-      : lecturaRecordadaDelAltaDesdeElPapel({ fila: linea, precioEs: body?.precioEs ?? null });
+      ? lecturaRecordadaDelAlta({ fila: filaDeLaLista, precioEs: body?.precioEs ?? null, bulto: bultoQueMandoElAlta(body?.bulto) })
+      : lecturaRecordadaDelAltaDesdeElPapel({ fila: linea, precioEs: body?.precioEs ?? null, bulto: bultoQueMandoElAlta(body?.bulto) });
     const usuarioId = Number(session?.id ?? session?.userId) || null;
 
     const resultado = await prisma.$transaction(async (tx) => {

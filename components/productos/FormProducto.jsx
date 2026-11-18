@@ -8,6 +8,7 @@ import SunmiSelectConCrearRapido from "@/components/sunmi/SunmiSelectConCrearRap
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
 import CargarFotoProducto from "@/components/productos/CargarFotoProducto";
@@ -139,6 +140,14 @@ export default function FormProducto({
   // arma la ficha (`fichaDeBolsaDePesoFijo`) y saca el costo del kilo del de la
   // bolsa. Null en el alta de Productos, que no cambia.
   bolsaDePeso = null,
+  // ── EL FACTOR PACK EN VIVO (2026-11-18) ───────────────────────────────
+  // Solo en las altas desde el papel y desde la lista. `onFactorPack(n)` avisa
+  // cada cambio del Factor pack, para que la pregunta "Por la caja de N" y su
+  // costo lo sigan. `opcionesDeFactor` son los packs para tocar debajo del
+  // campo —los de una lata: 24 / 16 / 6 / 4—. Null en el alta de Productos,
+  // que no cambia.
+  onFactorPack = null,
+  opcionesDeFactor = null,
 }) {
   // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
   const soloLocal = !puedeEditarBase;
@@ -355,6 +364,13 @@ export default function FormProducto({
     const costoBolsa = bolsaDePeso?.costoBolsa;
     if (costoBolsa !== null && costoBolsa !== undefined) onChangeCosto(costoBolsa);
   };
+
+  // Cada cambio del Factor pack, a quien abrió el alta: la pregunta y su costo
+  // se rearman con el pack nuevo.
+  useEffect(() => {
+    onFactorPack?.(form.factor_pack === "" ? null : Number(form.factor_pack));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.factor_pack]);
 
   // El costo que trae la respuesta de la pregunta, cada vez que cambia. Queda
   // editable: es lo mismo que tipearlo.
@@ -1304,6 +1320,19 @@ export default function FormProducto({
                   />
                 )}
               </div>
+              {/* Los packs posibles para tocar —los de una lata: 24 / 16 / 6 / 4—,
+                  con el que tiene el campo marcado. Solo si quien abre el alta
+                  los pasa (2026-11-18). */}
+              {Array.isArray(opcionesDeFactor) && opcionesDeFactor.length > 0 && (
+                <div className="mt-2">
+                  <SunmiSolapas
+                    etiqueta="Unidades por pack"
+                    opciones={opcionesDeFactor.map((n) => ({ valor: String(n), texto: String(n) }))}
+                    valor={String(form.factor_pack)}
+                    onCambiar={(v) => applyFactorPackValue(v)}
+                  />
+                </div>
+              )}
               {/* Tercer nivel de empaque: cartón → atado → suelto. Va adentro del
                   campo del factor para no mover la grilla de la ficha: cerrado,
                   lo único nuevo es el enlace. Un producto por kilo no se vende

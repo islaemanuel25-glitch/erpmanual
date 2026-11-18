@@ -21,13 +21,16 @@ import ModalProducto from "@/components/productos/ModalProductoFinal";
 import SunmiOpcionElegible from "@/components/sunmi/SunmiOpcionElegible";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import {
+  bultoDeLaFila,
   codigoDelProveedorParaElAltaDesdeLaLista,
   precargaDelAltaDesdeLaLista,
 } from "@/lib/proveedores/listas/altaDesdeLaLista";
 import {
+  PRECIO_ES,
   costoDelAltaDesdeLaLista,
   preguntaDelPrecioDeLaLista,
 } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
+import { OPCIONES_PACK_LATA, esLata, packDeLataCoherente, precioPorLataDeReferencia } from "@/lib/productos/packDeLata";
 
 /**
  * @param cuentaDeLaLista  `{ recargoPct, impuestoAdicionalPct }` de la
@@ -52,33 +55,59 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
   // costo de la respuesta entra aparte, por `costoSugerido`.
   // Sin pregunta (sin cantidad, o 1), el costo ya se sabe y va en la precarga;
   // con pregunta, `costoDelAltaDesdeLaLista` sin respuesta da null y queda vacío.
+  // ── UNA LATA: EL PRECIO POR LATA DE LAS OTRAS DEL PROVEEDOR (2026-11-18) ─
+  // Con él se ve si el pack propuesto da un precio por lata coherente
+  // (`packDeLata.js`). Solo se pide si el renglón es una lata.
+  const lata = esLata(fila?.descripcionProveedor);
+  const [referenciaPorLata, setReferenciaPorLata] = useState(null);
+  const bultoPropuesto = useMemo(() => {
+    const propuesto = bultoDeLaFila(fila);
+    if (!lata) return propuesto;
+    const precioCaja = costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, precioEs: PRECIO_ES.CAJA, bulto: propuesto });
+    return packDeLataCoherente({ propuesto, precioCaja, referenciaPorLata });
+  }, [fila, lata, recargoPct, impuestoAdicionalPct, referenciaPorLata]);
+  // ── EL FACTOR PACK EN VIVO (2026-11-18) ──────────────────────────────
+  // El que tiene el formulario: la pregunta "Por la caja de N", el costo de la
+  // respuesta y lo que se recuerda lo siguen si alguien lo cambia. `undefined`
+  // hasta que el formulario avisa el primero; vacío o 1 no es un pack.
+  const [factorEnVivo, setFactorEnVivo] = useState(undefined);
+  const bultoParaLaCuenta = factorEnVivo === undefined ? bultoPropuesto : factorEnVivo ?? 1;
   const precarga = useMemo(
     () =>
       precargaDelAltaDesdeLaLista({
         fila,
         proveedorId,
-        costo: costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct }),
+        costo: costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, bulto: bultoPropuesto }),
+        bulto: bultoPropuesto,
       }),
-    [fila, proveedorId, recargoPct, impuestoAdicionalPct]
+    [fila, proveedorId, recargoPct, impuestoAdicionalPct, bultoPropuesto]
   );
   // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
   const pregunta = useMemo(
-    () => preguntaDelPrecioDeLaLista(fila, { recargoPct, impuestoAdicionalPct }),
-    [fila, recargoPct, impuestoAdicionalPct]
+    () => preguntaDelPrecioDeLaLista(fila, { recargoPct, impuestoAdicionalPct, bulto: bultoParaLaCuenta }),
+    [fila, recargoPct, impuestoAdicionalPct, bultoParaLaCuenta]
   );
   const costoSugerido = pregunta
-    ? costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, precioEs })
+    ? costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, precioEs, bulto: bultoParaLaCuenta })
     : null;
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       try {
-        const [cat, prov, area] = await Promise.all(
-          ["/api/catalogos/categorias", "/api/catalogos/proveedores", "/api/catalogos/areas-fisicas"].map((u) =>
+        const [cat, prov, area, delProveedor] = await Promise.all([
+          ...["/api/catalogos/categorias", "/api/catalogos/proveedores", "/api/catalogos/areas-fisicas"].map((u) =>
             fetch(u, { credentials: "include" }).then((r) => r.json())
-          )
-        );
+          ),
+          // Las latas del proveedor, para el precio por lata de referencia. Si
+          // no llega, el pack propuesto queda el del nombre.
+          lata && Number(proveedorId) > 0
+            ? fetch(`/api/compras-proveedor/productos?proveedorId=${Number(proveedorId)}`, { credentials: "include" })
+                .then((r) => r.json())
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        if (vivo) setReferenciaPorLata(precioPorLataDeReferencia(delProveedor?.items ?? []));
         if (vivo) setCatalogos({ CATEGORIAS: cat?.items ?? [], PROVEEDORES: prov?.items ?? [], AREAS: area?.items ?? [] });
       } catch (e) {
         if (vivo) setError("No se pudieron cargar las categorías y los proveedores. Probá de nuevo.");
@@ -106,7 +135,7 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
         alert(data?.error || "No se pudo crear el producto.");
         return;
       }
-      await onCreado?.(data.item, { precioEs });
+      await onCreado?.(data.item, { precioEs, bulto: bultoParaLaCuenta });
     } catch (e) {
       alert("No se pudo crear el producto: se cortó la conexión.");
     }
@@ -157,6 +186,8 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
             : null
         }
         costoSugerido={costoSugerido}
+        onFactorPack={setFactorEnVivo}
+        opcionesDeFactor={lata ? OPCIONES_PACK_LATA : null}
       />
     </>
   );

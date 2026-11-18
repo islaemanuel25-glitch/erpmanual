@@ -162,14 +162,17 @@ test("LO ELEGIDO SE RECUERDA PARA EL PRODUCTO CON EL PROVEEDOR, COMO EN LISTAS",
   assert.equal(lecturaRecordadaDelAltaDesdeElPapel({ fila: CREMA(), precioEs: null }), null);
   // El camino: el alta lo devuelve, la hoja y la pantalla lo pasan, y la ruta
   // lo guarda en la misma tabla y la misma transacción que el vínculo.
+  // Desde 2026-11-18 viaja también el pack que quedó en el formulario
+  // (`bulto`): la lectura se recuerda con el pack con que se cargó el costo.
   const alta = codigoDe("components/compras-proveedor/AltaDesdeElPapel.jsx");
-  assert.match(alta, /await onCreado\?\.\(data\.item, \{ precioEs \}\);/);
+  assert.match(alta, /await onCreado\?\.\(data\.item, \{ precioEs, bulto: bultoParaLaCuenta \}\);/);
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   assert.match(hoja, /const r = await onVincular\?\.\(fila, productoBaseId, extra\);/);
   const pantalla = codigoDe("app/modulos/compras-proveedor/[id]/page.jsx");
   assert.match(pantalla, /\.\.\.\(extra\?\.precioEs \? \{ precioEs: extra\.precioEs \} : \{\}\)/);
+  assert.match(pantalla, /\.\.\.\(extra\?\.bulto \? \{ bulto: extra\.bulto \} : \{\}\)/);
   const ruta = codigoDe("app/api/compras-proveedor/comprobantes/vincular/route.js");
-  assert.match(ruta, /lecturaRecordadaDelAltaDesdeElPapel\(\{ fila: linea, precioEs: body\?\.precioEs \?\? null \}\)/);
+  assert.match(ruta, /lecturaRecordadaDelAltaDesdeElPapel\(\{ fila: linea, precioEs: body\?\.precioEs \?\? null, bulto: bultoQueMandoElAlta\(body\?\.bulto\) \}\)/);
   assert.match(ruta, /enQueViene: true,/);
   const transaccion = ruta.slice(ruta.indexOf("await prisma.$transaction(async (tx) => {"));
   assert.match(transaccion, /^await prisma\.\$transaction\(async \(tx\) => \{\s*if \(lecturaDelAlta && proveedorDelPapel\) \{\s*await tx\.lecturaProductoProveedor\.upsert\(/);
@@ -186,5 +189,6 @@ test("LA PREGUNTA ES LA DE LISTAS COPIADA TAL CUAL: misma pieza, mismos rótulos
   assert.match(recepcion, /import SunmiOpcionElegible from "@\/components\/sunmi\/SunmiOpcionElegible";/);
   assert.match(recepcion, /const \[precioEs, setPrecioEs\] = useState\(null\);/);
   assert.match(recepcion, /costoSugerido=\{costoSugerido\}/);
-  assert.match(recepcion, /const costoSugerido = pregunta \? costoDelAltaDesdeElPapel\(\{ fila, precioEs \}\) : null;/);
+  // Con el pack en vivo (2026-11-18): el costo de la respuesta sigue al Factor pack.
+  assert.match(recepcion, /const costoSugerido = pregunta \? costoDelAltaDesdeElPapel\(\{ fila, precioEs, bulto: bultoParaLaCuenta \}\) : null;/);
 });
