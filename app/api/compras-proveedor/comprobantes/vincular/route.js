@@ -36,6 +36,7 @@ import {
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
 import { bultoQueMandoElAlta, lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
+import { codigoCompartidoEntreVariantes, otrosNombresDelCodigo } from "@/lib/proveedores/identidad/codigoCompartido";
 import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
   parDelTextoRechazado,
@@ -157,8 +158,27 @@ export async function POST(req) {
       );
     }
 
+    // ── UN CÓDIGO COMPARTIDO ENTRE VARIANTES SE GUARDA POR TEXTO ─────────
+    //
+    // Dab, 2026-11-18: el 2530 es "LIMPIADOR LIMON" en la lista y "LIMPIADOR
+    // CITRONELA" en la factura. Si otro nombre conocido para este código —en sus
+    // listas, sus vínculos o sus papeles— es otra variante, el vínculo es el par
+    // de texto de ESTE nombre y no el código solo: así cada aroma queda con su
+    // producto (`codigoCompartido.js`), y el código no se le quita al otro.
+    const codigoDelPapel = body?.codigoProveedor ?? linea.codigoProveedor ?? null;
+    const compartido = codigoDelPapel
+      ? codigoCompartidoEntreVariantes({
+          texto: linea.textoCrudo,
+          otrosTextos: await otrosNombresDelCodigo(prisma, {
+            grupoId,
+            proveedorId: linea.comprobante.proveedorId,
+            codigo: codigoDelPapel,
+            excluirLineaId: linea.id,
+          }),
+        })
+      : false;
     const alias = aliasAEscribir({
-      linea: { codigoProveedor: body?.codigoProveedor ?? null, descripcion: linea.textoCrudo },
+      linea: { codigoProveedor: compartido ? null : body?.codigoProveedor ?? null, descripcion: linea.textoCrudo },
       productoBaseId,
       grupoId,
       proveedorId: linea.comprobante.proveedorId,
@@ -356,7 +376,11 @@ export async function POST(req) {
           where: { grupoId, proveedorId: linea.comprobante.proveedorId, activo: true },
           select: { id: true, productoBaseId: true, codigoInterno: true, descripcionProveedor: true, activo: true },
         }),
-      }).filter((v) => Number(v.productoBaseId) !== Number(productoBaseId));
+      })
+        .filter((v) => Number(v.productoBaseId) !== Number(productoBaseId))
+        // Con el código compartido entre variantes, el código es también de la
+        // otra: solo se da de baja un par de TEXTO que reconocía este nombre.
+        .filter((v) => !compartido || String(v.codigoInterno ?? "").startsWith("TXT:"));
       if (viejos.length) {
         await tx.productoCodigoProveedor.updateMany({
           where: { id: { in: viejos.map((v) => v.id) } },

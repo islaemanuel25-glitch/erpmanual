@@ -81,7 +81,7 @@ import AltaDesdeElPapel from "@/components/compras-proveedor/AltaDesdeElPapel";
 import AltaDesdeLaLista from "@/components/proveedores/listas/AltaDesdeLaLista";
 import {
   TEXTO_CREAR_DESDE_LA_LISTA,
-  detalleDelRenglonDeLaLista,
+  referenciaDelRenglonDeLaLista,
 } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 // El porcentaje del renglón ERP es la pieza de la tarjeta, no una parecida.
 import { PorcentajeDelErp } from "@/components/compras-proveedor/TarjetaLineaFactura";
@@ -392,12 +392,15 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
               type="button"
               disabled={guardando}
               onClick={() => setCreandoDesdeLaLista(true)}
-              aria-label={`${TEXTO_CREAR_DESDE_LA_LISTA}: ${delaLista.fila?.descripcionProveedor ?? ""}`}
+              aria-label={`${TEXTO_CREAR_DESDE_LA_LISTA}: ${fila?.textoCrudo ?? ""}`}
               className="w-full min-h-toque justify-start text-left text-sm3"
             >
               <SunmiPar
-                arriba={`${TEXTO_CREAR_DESDE_LA_LISTA} · ${delaLista.fila?.descripcionProveedor ?? ""}`}
-                abajo={detalleDelRenglonDeLaLista(delaLista.fila)}
+                // El nombre es SIEMPRE el del papel (Dab 2530, 2026-11-18): de la
+                // lista salen el pack, el precio y el código. Si la lista dice
+                // otra variante, abajo queda como referencia.
+                arriba={`${TEXTO_CREAR_DESDE_LA_LISTA} · ${fila?.textoCrudo ?? ""}`}
+                abajo={referenciaDelRenglonDeLaLista(delaLista.fila, delaLista.varianteDeLaLista)}
               />
             </SunmiButton>
           )}
@@ -455,6 +458,7 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, pr
       {creandoDesdeLaLista && delaLista && (
         <AltaDesdeLaLista
           fila={delaLista.fila}
+          nombre={fila?.textoCrudo ?? null}
           proveedorId={proveedorId}
           cuentaDeLaLista={delaLista.cuentaDeLaLista}
           onCancelar={() => setCreandoDesdeLaLista(false)}

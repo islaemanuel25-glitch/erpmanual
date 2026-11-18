@@ -39,7 +39,10 @@ import { OPCIONES_PACK_LATA, esLata, packDeLataCoherente, precioPorLataDeReferen
  * @param onCreado         `(producto, { precioEs })`: lo que eligió la persona
  *                         viaja al vínculo, que lo recuerda para el proveedor.
  */
-export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = null, onCreado, onCancelar }) {
+// `nombre`: el del papel, cuando el alta se abre desde la recepción (Dab 2530,
+// 2026-11-18). De la lista salen el pack, el precio y el código; el nombre del
+// producto es el que dice el papel. En Listas no se pasa: queda el del renglón.
+export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = null, nombre = null, onCreado, onCancelar }) {
   const { contexto } = useContextoActivo();
   const localId = contexto?.localId || 0;
   const [catalogos, setCatalogos] = useState({ CATEGORIAS: [], PROVEEDORES: [], AREAS: [] });
@@ -79,8 +82,9 @@ export default function AltaDesdeLaLista({ fila, proveedorId, cuentaDeLaLista = 
         proveedorId,
         costo: costoDelAltaDesdeLaLista({ fila, recargoPct, impuestoAdicionalPct, bulto: bultoPropuesto }),
         bulto: bultoPropuesto,
+        nombre,
       }),
-    [fila, proveedorId, recargoPct, impuestoAdicionalPct, bultoPropuesto]
+    [fila, proveedorId, recargoPct, impuestoAdicionalPct, bultoPropuesto, nombre]
   );
   // Cada opción trae su cuenta, con la misma cuenta que el costo que carga.
   const pregunta = useMemo(
