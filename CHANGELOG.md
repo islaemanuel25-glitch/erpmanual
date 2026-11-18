@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-18] - Actualización: productos, pos-ventas
+
+### Modificado
+- **productos**: feat: «Nuevo producto» desde el comprobante crea por kilo la bolsa de peso fijo — SIN VERIFICAR en pantalla
+- **pos-ventas**: fix: el Enter del lector ya no abre el cobro en el POS — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-17] - Actualización: pos-ventas
 
 ### Modificado
