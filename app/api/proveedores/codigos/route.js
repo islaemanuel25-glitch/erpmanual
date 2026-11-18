@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { PREFIJO_ALIAS } from "@/lib/proveedores/identidad/servicioIdentidad";
 
 export async function GET(req) {
   try {
@@ -33,8 +34,9 @@ export async function GET(req) {
     }
 
     // El proveedor es global, pero los vínculos son por grupoId.
+    // Solo códigos: los vínculos por texto (`TXT:…`) no se listan como código.
     const vinculos = await prisma.productoCodigoProveedor.findMany({
-      where: { grupoId, proveedorId, activo: true },
+      where: { grupoId, proveedorId, activo: true, NOT: { codigoInterno: { startsWith: PREFIJO_ALIAS } } },
       include: {
         productoBase: {
           select: {

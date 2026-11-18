@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { PREFIJO_ALIAS } from "@/lib/proveedores/identidad/servicioIdentidad";
 
 export async function GET(req) {
   try {
@@ -44,8 +45,11 @@ export async function GET(req) {
       );
     }
 
+    // Los vínculos por texto (`TXT:…`) no son códigos: quedan para el macheo y
+    // no se listan acá. Borrar uno desde la ficha, creyendo que era un código
+    // raro, dejaba al macheo sin él (Citronela de Dab, 2026-11-18).
     const items = await prisma.productoCodigoProveedor.findMany({
-      where: { grupoId, productoBaseId, activo: true },
+      where: { grupoId, productoBaseId, activo: true, NOT: { codigoInterno: { startsWith: PREFIJO_ALIAS } } },
       include: {
         proveedor: { select: { id: true, nombre: true, cuit: true } },
       },

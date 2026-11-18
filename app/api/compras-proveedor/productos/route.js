@@ -12,6 +12,7 @@ import {
   ordenarPorCodigo,
   ordenarPorPalabras,
 } from "@/lib/compras-proveedor/busquedaPorPalabras";
+import { esClaveDeAlias } from "@/lib/proveedores/identidad/servicioIdentidad";
 
 export async function GET(req) {
   try {
@@ -96,9 +97,14 @@ export async function GET(req) {
 
     // Código interno del proveedor por base (el primero si hubiera más de uno).
     // Solo para mostrar como columna; no afecta la búsqueda ni la resolución.
+    //
+    // Los vínculos por texto (`TXT:…`) amplían el universo de arriba igual que
+    // un código, pero NO son códigos: no van a la columna ni a la búsqueda por
+    // código (de "TXT:coca 2250" quedaría el número 2250).
     const codigoInternoPorBase = new Map();
     const vinculosPorBase = new Map();
-    for (const v of vinculos) {
+    const vinculosDeCodigo = vinculos.filter((v) => !esClaveDeAlias(v.codigoInterno));
+    for (const v of vinculosDeCodigo) {
       if (!codigoInternoPorBase.has(v.productoBaseId)) {
         codigoInternoPorBase.set(v.productoBaseId, v.codigoInterno);
       }
@@ -120,7 +126,7 @@ export async function GET(req) {
       String(value || "").trim().toLowerCase().replace(/\D/g, "");
     const query = normalizeCodigoInterno(search);
     const matchCodigo = query
-      ? vinculos.filter((v) => {
+      ? vinculosDeCodigo.filter((v) => {
           const code = normalizeCodigoInterno(v.codigoInterno);
           return (
             !!code &&

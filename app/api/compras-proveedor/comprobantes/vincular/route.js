@@ -38,6 +38,7 @@ import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resol
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
 import { bultoQueMandoElAlta, lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
 import { codigoCompartidoEntreVariantes, otrosNombresDelCodigo } from "@/lib/proveedores/identidad/codigoCompartido";
+import { esClaveDeAlias } from "@/lib/proveedores/identidad/servicioIdentidad";
 import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
   parDelTextoRechazado,
@@ -384,7 +385,7 @@ export async function POST(req) {
         .filter((v) => Number(v.productoBaseId) !== Number(productoBaseId))
         // Con el código compartido entre variantes, el código es también de la
         // otra: solo se da de baja un par de TEXTO que reconocía este nombre.
-        .filter((v) => !compartido || String(v.codigoInterno ?? "").startsWith("TXT:"));
+        .filter((v) => !compartido || esClaveDeAlias(v.codigoInterno));
       if (viejos.length) {
         await tx.productoCodigoProveedor.updateMany({
           where: { id: { in: viejos.map((v) => v.id) } },

@@ -20,6 +20,7 @@ import {
 import { traerFilasParaControles } from "@/lib/productos/sqlControles";
 import { sellosDeOfertaVigente } from "@/lib/ofertas/servidor";
 import { buscarComoLaCaja } from "@/lib/productos/busquedaComoLaCaja";
+import { codigoInternoParaMostrar } from "@/lib/productos/codigoInternoParaMostrar";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 
@@ -398,12 +399,8 @@ export async function GET(req) {
 
         // Código interno por proveedor (preferir el del proveedor principal;
         // si no, el primero activo disponible). NO es el código de barras.
-        codigoInterno: (() => {
-          const cods = p.codigosProveedor ?? [];
-          if (cods.length === 0) return null;
-          const principal = cods.find((c) => c.proveedorId === p.proveedor_id);
-          return (principal ?? cods[0]).codigoInterno ?? null;
-        })(),
+        // Los vínculos por texto (`TXT:…`) no son códigos: no se muestran.
+        codigoInterno: codigoInternoParaMostrar({ codigosProveedor: p.codigosProveedor, proveedorId: p.proveedor_id }),
       };
     });
 
