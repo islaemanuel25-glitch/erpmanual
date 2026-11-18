@@ -170,9 +170,10 @@ export function useGuardarLaExplicacion({ setMensaje }) {
           fetchImpl: fetch,
         });
         if (json?.ok) bien++;
-        // Si se acabó la cuota en el medio se frena: seguir gasta llamadas que
-        // van a fallar todas y demora el aviso.
-        else if (json?.motivo === "CUOTA_AGOTADA") {
+        // Si se acabó la cuota —o el saldo— en el medio se frena: seguir gasta
+        // llamadas que van a fallar todas y demora el aviso. Sin saldo seguía de
+        // largo y terminaba en "Guardada. Se volvieron a leer 0" en verde.
+        else if (json?.motivo === "CUOTA_AGOTADA" || json?.motivo === "SIN_SALDO") {
           cortado = json?.error;
           break;
         }
