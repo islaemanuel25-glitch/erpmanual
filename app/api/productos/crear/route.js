@@ -15,6 +15,7 @@ import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStoc
 import { TEXTO_CAMBIO_DE_ESCALA, interpretarSueltosPorUnidad } from "@/lib/productos/cambioDeEscala";
 import { splitUiToDb } from "@/lib/mappers/producto";
 import { piezaFijaFueraDeKilo, TEXTO_PIEZA_FIJA_FUERA_DE_KILO } from "@/lib/conversiones/stock";
+import { motivoDeAltaSinGanancia } from "@/lib/precios/reglaPropuesta";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -193,6 +194,20 @@ export async function POST(req) {
     // Extreme, 2026-11-16). Ver `piezaFijaFueraDeKilo`.
     if (piezaFijaFueraDeKilo(baseData)) {
       return NextResponse.json({ ok: false, error: TEXTO_PIEZA_FIJA_FUERA_DE_KILO, campo: "modoVentaDeposito" }, { status: 400 });
+    }
+    // ── NINGÚN ALTA SE GUARDA SIN GANANCIA (Emanuel, 2026-11-18) ──────────
+    //
+    // Ni sin regla ni con la venta en o debajo del costo. Es la ruta de las
+    // tres altas —la común, desde la lista y desde el papel—, así que ninguna
+    // la saltea. El formulario hace la misma pregunta antes de mandar.
+    const sinGanancia = motivoDeAltaSinGanancia({
+      precioCosto: baseData.precio_costo,
+      precioVenta: baseData.precio_venta,
+      margen: baseData.margen,
+      modalidad: baseData.modalidad,
+    });
+    if (sinGanancia) {
+      return NextResponse.json({ ok: false, error: sinGanancia.error, campo: sinGanancia.campo }, { status: 400 });
     }
     // Solo si hay algo que guardar: un alta sin el dato escribe exactamente lo
     // de siempre.

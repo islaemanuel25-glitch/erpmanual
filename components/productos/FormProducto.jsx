@@ -18,6 +18,7 @@ import {
   margenEfectivoDe,
 } from "@/lib/precios/precioDesdeMargen";
 import { redondear100 } from "@/lib/precios/redondeo";
+import { motivoDeAltaSinGanancia, textoDeLaPropuesta } from "@/lib/precios/reglaPropuesta";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import {
   MAX_CODIGO_BARRA,
@@ -261,6 +262,10 @@ export default function FormProducto({
     const modoPedido = calcularModoPedidoDefault(initial);
     const inicial = camelToForm({ ...initial, modo_pedido: modoPedido });
     setForm(inicial);
+    // Un margen que ya trae la precarga cuenta como elegido; si no trae, la
+    // ganancia propuesta vuelve a ponerse sobre el formulario nuevo.
+    margenElegido.current = inicial.margen !== "";
+    if (!initialData?.id && !margenElegido.current && propuestaRef.current) aplicarMargen(propuestaRef.current.margen);
     setMasChicoAbierto(Number(inicial.sueltos_por_unidad) > 1);
     setTimeout(() => scrollRef.current?.scrollTo(0, 0), 30);
   }, [initialData]);
@@ -380,7 +385,57 @@ export default function FormProducto({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costoSugerido]);
 
+  // ── LA GANANCIA PROPUESTA DEL ALTA (Emanuel, 2026-11-18) ─────────────────
+  //
+  // Un alta no se guarda sin ganancia (`motivoDeAltaSinGanancia`). Si nadie
+  // eligió margen, se precarga el más usado de la categoría y el proveedor
+  // (`reglaPropuestaParaElAlta`); si no hay de dónde, el formulario lo dice y
+  // pide elegirlo. Lo que la persona escribe —margen o venta— no se pisa.
+  const esAlta = !initialData?.id;
+  const margenElegido = useRef(false);
+  const [propuesta, setPropuesta] = useState(null);
+  const [propuestaCargada, setPropuestaCargada] = useState(false);
+  // La misma propuesta, para el reinicio del formulario cuando cambia la precarga.
+  const propuestaRef = useRef(null);
+  propuestaRef.current = propuesta;
+  useEffect(() => {
+    if (!esAlta) return undefined;
+    let vivo = true;
+    const qs = new URLSearchParams();
+    if (form.categoria_id) qs.set("categoriaId", String(form.categoria_id));
+    if (form.proveedor_id) qs.set("proveedorId", String(form.proveedor_id));
+    fetch(`/api/productos/regla-propuesta?${qs.toString()}`, { credentials: "include", cache: "no-store" })
+      .then((r) => r.json().then((d) => ({ r, d })))
+      .then(({ r, d }) => {
+        if (!vivo) return;
+        if (!r.ok || !d?.ok) console.error(`productos/regla-propuesta: ${d?.error ?? r.status}`);
+        setPropuesta(d?.ok ? d.propuesta ?? null : null);
+        setPropuestaCargada(true);
+      })
+      .catch((e) => {
+        if (!vivo) return;
+        console.error(`productos/regla-propuesta: ${e?.message}`);
+        setPropuesta(null);
+        setPropuestaCargada(true);
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAlta, form.categoria_id, form.proveedor_id]);
+
+  useEffect(() => {
+    if (!esAlta || margenElegido.current || !propuesta) return;
+    aplicarMargen(propuesta.margen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propuesta]);
+
   const onChangeMargen = (val) => {
+    margenElegido.current = true;
+    aplicarMargen(val);
+  };
+
+  const aplicarMargen = (val) => {
     if (val === "") return setForm((p) => ({ ...p, margen: "" }));
     const m = Number(val);
     if (!Number.isFinite(m)) return; // margen negativo es válido (no se persiste "-" suelto)
@@ -396,6 +451,7 @@ export default function FormProducto({
   };
 
   const onChangeVenta = (val) => {
+    margenElegido.current = true;
     if (val === "") return setForm((p) => ({ ...p, precio_venta: "" }));
     const pv = Number(val);
     if (!Number.isFinite(pv) || pv < 0) return; // no precio negativo; venta baja o 0 permitido
@@ -815,6 +871,18 @@ export default function FormProducto({
     // Costo administrado por el depósito (producto de depósito editado desde un
     // local): no enviar el costo. El backend igual lo bloquea (defensa en profundidad).
     if (!puedeEditarCosto) delete payload.precio_costo;
+
+    // Un alta sin ganancia no se manda: la misma pregunta que hace la ruta, con
+    // el precio ya redondeado como se va a guardar.
+    if (esAlta) {
+      const sinGanancia = motivoDeAltaSinGanancia({
+        precioCosto: payload.precio_costo,
+        precioVenta: payload.precio_venta,
+        margen: payload.margen,
+        modalidad: payload.modalidad,
+      });
+      if (sinGanancia) return alert(sinGanancia.error);
+    }
 
     onSubmit(payload);
   };
@@ -1556,6 +1624,12 @@ export default function FormProducto({
                       })}%`}
                 </span>
               </p>
+              {/* La ganancia propuesta del alta: de dónde sale, o que hay que elegirla. */}
+              {esAlta && !esServicio && propuestaCargada && (
+                <p className="text-xs sunmi-text-muted mt-1" data-regla-propuesta>
+                  {textoDeLaPropuesta(propuesta)}
+                </p>
+              )}
             </Field>
             )}
 
