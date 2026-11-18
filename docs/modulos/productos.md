@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-11-18 15:07
+**Última actualización:** 2026-11-18 23:16
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,8 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-11-18: feat: ningún alta se guarda sin ganancia, y si no se elige se propone la de la categoría — SIN VERIFICAR en pantalla
+- 2026-11-18: fix: el texto de un vínculo por texto ya no se muestra como código, y la corrección de la recepción respeta el código compartido — SIN VERIFICAR en pantalla
 - 2026-11-18: feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
 - 2026-11-17: feat: «Nuevo producto» desde el comprobante crea por kilo la bolsa de peso fijo — SIN VERIFICAR en pantalla
 - 2026-11-07: fix: la recepción lee el fiambre por pieza en piezas y escribe el kilo; se va el freno de los 64 productos — SIN VERIFICAR en pantalla
