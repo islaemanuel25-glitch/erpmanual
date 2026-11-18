@@ -24,6 +24,7 @@ import {
   aplanarDetalles,
   buscarProductoDeLaLinea,
   cargarContexto,
+  precioDelRenglon,
 } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { productoBaseDeLaLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
@@ -70,6 +71,9 @@ async function lineaQueSePuedeVincular({ grupoId, lineaId, body }) {
       // de pedido equivocada y nadie se entera.
       productoLocalId: true, pedidoDetalleId: true,
       precioPedidoPrevio: true, costoFinalUnitario: true,
+      // El precio del renglón: el desempate entre código y texto de la cascada
+      // lo necesita para dar el mismo producto que la pantalla (`precioDelRenglon`).
+      cantidad: true, costoFinalRenglon: true, subtotalImpreso: true,
       // `pedidoId` para poder resolver a qué línea del pedido corresponde.
       comprobante: {
         select: { id: true, pedidoId: true, proveedorId: true, estado: true, confirmadoEn: true },
@@ -516,6 +520,7 @@ export async function DELETE(req) {
           ? buscarProductoDeLaLinea({
               linea: { codigoProveedor: linea.codigoProveedor, descripcion: linea.textoCrudo },
               contexto,
+              precio: precioDelRenglon(linea),
             })?.vinculoAutomatico?.productoBaseId ?? null
           : null,
     });
