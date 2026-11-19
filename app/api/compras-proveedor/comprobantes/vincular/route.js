@@ -37,7 +37,8 @@ import {
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { lecturaRecordadaDelAltaDesdeElPapel } from "@/lib/compras-proveedor/altaDesdeElPapel";
 import { bultoQueMandoElAlta, lecturaRecordadaDelAlta } from "@/lib/proveedores/listas/costoDelAltaDesdeLaLista";
-import { codigoCompartidoEntreVariantes, otrosNombresDelCodigo } from "@/lib/proveedores/identidad/codigoCompartido";
+import { codigoCompartidoDeVerdad } from "@/lib/proveedores/identidad/codigoCompartido";
+import { papelCorrido } from "@/lib/compras-proveedor/comprobante/lecturaCorrida";
 import { esClaveDeAlias } from "@/lib/proveedores/identidad/servicioIdentidad";
 import { resultadoDeLaEleccion } from "@/lib/compras-proveedor/comprobante/propuestaIa";
 import {
@@ -163,23 +164,20 @@ export async function POST(req) {
       );
     }
 
-    // ── UN CÓDIGO COMPARTIDO ENTRE VARIANTES SE GUARDA POR TEXTO ─────────
+    // ── UN CÓDIGO COMPARTIDO DE VERDAD SE GUARDA POR TEXTO ───────────────
     //
-    // Dab, 2026-11-18: el 2530 es "LIMPIADOR LIMON" en la lista y "LIMPIADOR
-    // CITRONELA" en la factura. Si otro nombre conocido para este código —en sus
-    // listas, sus vínculos o sus papeles— es otra variante, el vínculo es el par
-    // de texto de ESTE nombre y no el código solo: así cada aroma queda con su
-    // producto (`codigoCompartido.js`), y el código no se le quita al otro.
+    // Solo si un mismo documento —una lista guardada o un papel— repite el
+    // código con variantes distintas: ahí el vínculo es el par de texto de ESTE
+    // nombre y no el código solo (`codigoCompartido.js`). Una diferencia entre la
+    // lista y la lectura de un papel no alcanza: es una posible lectura corrida
+    // (Dab 00614085, 2026-11-19), y se vincula por código.
     const codigoDelPapel = body?.codigoProveedor ?? linea.codigoProveedor ?? null;
     const compartido = codigoDelPapel
-      ? codigoCompartidoEntreVariantes({
-          texto: linea.textoCrudo,
-          otrosTextos: await otrosNombresDelCodigo(prisma, {
-            grupoId,
-            proveedorId: linea.comprobante.proveedorId,
-            codigo: codigoDelPapel,
-            excluirLineaId: linea.id,
-          }),
+      ? await codigoCompartidoDeVerdad(prisma, {
+          grupoId,
+          proveedorId: linea.comprobante.proveedorId,
+          codigo: codigoDelPapel,
+          esPapelCorrido: (comprobanteId) => papelCorrido(prisma, { grupoId, comprobanteId }),
         })
       : false;
     const alias = aliasAEscribir({

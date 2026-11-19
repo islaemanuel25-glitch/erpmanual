@@ -34,7 +34,8 @@ import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 import { filasDeIdentidad, METODO_DETECCION } from "@/lib/proveedores/identidad/servicioIdentidad";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
-import { codigoCompartidoEntreVariantes, otrosNombresDelCodigo } from "@/lib/proveedores/identidad/codigoCompartido";
+import { codigoCompartidoDeVerdad } from "@/lib/proveedores/identidad/codigoCompartido";
+import { papelCorrido } from "@/lib/compras-proveedor/comprobante/lecturaCorrida";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import { lecturaRecordadaDeLaEleccion } from "@/lib/compras-proveedor/comprobante/preguntaDeLectura";
 import { hermanosDelRenglon } from "@/lib/compras-proveedor/comprobante/hermanosDelRenglon";
@@ -211,20 +212,15 @@ export async function POST(req) {
         ? (await prisma.productoLocal.findUnique({ where: { id: linea.productoLocalId }, select: { baseId: true } }))?.baseId
         : null;
       if (linea && productoBaseId) {
-        // ── UN CÓDIGO COMPARTIDO ENTRE VARIANTES SE RECUERDA POR TEXTO ──────
+        // ── UN CÓDIGO COMPARTIDO DE VERDAD SE RECUERDA POR TEXTO ────────────
         //
-        // Igual que la ruta de vincular (`codigoCompartido.js`). Acá no se
-        // miraba: al confirmar "bulto de 15" del Citronela de Dab (2026-11-18)
-        // se escribió el código 002530 → Citronela, y el próximo papel del
-        // Limón con el mismo código se habría vinculado solo al Citronela.
-        const compartido = codigoCompartidoEntreVariantes({
-          texto: linea.textoCrudo,
-          otrosTextos: await otrosNombresDelCodigo(prisma, {
-            grupoId,
-            proveedorId: linea.comprobante.proveedorId,
-            codigo: linea.codigoProveedor,
-            excluirLineaId: linea.id,
-          }),
+        // Igual que la ruta de vincular (`codigoCompartido.js`): solo si un
+        // mismo documento repite el código con variantes distintas.
+        const compartido = await codigoCompartidoDeVerdad(prisma, {
+          grupoId,
+          proveedorId: linea.comprobante.proveedorId,
+          codigo: linea.codigoProveedor,
+          esPapelCorrido: (comprobanteId) => papelCorrido(prisma, { grupoId, comprobanteId }),
         });
         const filas = filasDeIdentidad({
           grupoId,

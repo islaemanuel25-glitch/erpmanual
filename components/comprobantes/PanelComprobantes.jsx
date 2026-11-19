@@ -551,9 +551,13 @@ export default function PanelComprobantes({
         // Sin total impreso no hay "verificado": la suma de lo leído se compara
         // contra sí misma (Mauro #590, 1 producto de 31 "leído y verificado").
         const sinTotal = d.estado === "SIN_TOTAL";
+        // Posible lectura corrida (2026-11-19): se releyó y sigue corrida, así
+        // que nada se vinculó solo. Va primero: es lo que hay que hacer ahora.
         setMensaje({
-          tipo: d.cierra && !sinTotal ? "ok" : "aviso",
-          texto: sinTotal
+          tipo: d.cierra && !sinTotal && !d.posibleLecturaCorrida ? "ok" : "aviso",
+          texto: d.posibleLecturaCorrida
+            ? d.avisoLecturaCorrida
+            : sinTotal
             ? textoDelPapelSinTotal({ leidos: d.lineas, vistos: d.lineasEnElPapel, hojaImpresa: d.hojaImpresa })
             : d.cierra
             ? `Leído y verificado: ${d.lineas} ${d.lineas === 1 ? "producto" : "productos"}.`

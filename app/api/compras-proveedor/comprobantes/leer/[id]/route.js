@@ -79,6 +79,8 @@ import {
   TEXTO_TURNO,
 } from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
 import { proponerRecetaConLoDelPie } from "@/lib/compras-proveedor/comprobante/percepcionEnLaReceta";
+import { armarListaGuardada, cargarListaGuardada } from "@/lib/compras-proveedor/comprobante/listaGuardada";
+import { lecturaCorrida, TEXTO_LECTURA_CORRIDA } from "@/lib/compras-proveedor/comprobante/lecturaCorrida";
 
 /** Lo que hace falta de un comprobante para leerlo: el del pedido y cada hoja de un PDF partido. */
 const SELECT_DEL_COMPROBANTE = {
@@ -527,6 +529,40 @@ export async function POST(req, { params }) {
         }
       }
 
+      // ── POSIBLE LECTURA CORRIDA: SE RELEE UNA VEZ, ANTES DE VINCULAR NADA ─
+      //
+      // Regla de Emanuel (2026-11-19). Si dos o más renglones dicen otro
+      // producto que el que la lista del proveedor da para su código, lo leído
+      // está corrido (`lecturaCorrida.js`: el pedido 473 de Arcor, la factura
+      // 00614085 de Dab). Se pide otra lectura, y se queda SOLO si ya no está
+      // corrida y la cuenta cierra. Si sigue corrida se guarda igual —es lo que
+      // alguien va a corregir mirando el papel— y la conciliación no vincula
+      // ningún renglón solo.
+      let lecturaCorridaDescartada = null;
+      let corridaDeLaLectura = { corrida: false, renglones: [] };
+      if (resultado.ok === true && cuantasTrajo(resultado)) {
+        const listaDelProveedor = armarListaGuardada(
+          (await cargarListaGuardada(prisma, { grupoId, proveedorId: comprobante.proveedorId })) ?? {}
+        );
+        corridaDeLaLectura = lecturaCorrida({ lineas: resultado.lectura.lineas, listaGuardada: listaDelProveedor });
+        if (corridaDeLaLectura.corrida) {
+          console.log(
+            `[comprobante ${comprobante.id}] posible lectura corrida (${corridaDeLaLectura.renglones.length} renglones contra la lista): se lee otra vez`
+          );
+          const otra = await pedirle();
+          lecturaCorridaDescartada = otra;
+          if (otra?.ok === true && cuantasTrajo(otra)) {
+            const corridaDeLaOtra = lecturaCorrida({ lineas: otra.lectura.lineas, listaGuardada: listaDelProveedor });
+            const v = verificarLecturaInterpretada(otra.lectura);
+            if (!corridaDeLaOtra.corrida && (v.cierra || !v.hayTotal)) {
+              lecturaCorridaDescartada = resultado;
+              resultado = otra;
+              corridaDeLaLectura = corridaDeLaOtra;
+            }
+          }
+        }
+      }
+
       // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
       //
       // La cadena informa cuántas hubo: pasar al respaldo son DOS, y la del
@@ -548,6 +584,10 @@ export async function POST(req, { params }) {
             ? reintento.intentos
             : []),
           // La de la imagen de respaldo, si hubo.
+          // La relectura por lectura corrida, o la corrida que se descartó.
+          ...(lecturaCorridaDescartada && lecturaCorridaDescartada !== resultado && Array.isArray(lecturaCorridaDescartada.intentos)
+            ? lecturaCorridaDescartada.intentos
+            : []),
           ...(respaldoConImagen && respaldoConImagen !== resultado && Array.isArray(respaldoConImagen.intentos)
             ? respaldoConImagen.intentos
             : []),
@@ -984,6 +1024,10 @@ export async function POST(req, { params }) {
         // Si quedó corta, con la MISMA pregunta que la puerta: la pantalla no
         // vuelve a comparar los dos números por su cuenta.
         faltanRenglones: puerta.faltanLineas != null,
+        // Si quedó como posible lectura corrida después de releer: la pantalla
+        // lo dice, y nada se vinculó solo.
+        posibleLecturaCorrida: corridaDeLaLectura.corrida,
+        avisoLecturaCorrida: corridaDeLaLectura.corrida ? TEXTO_LECTURA_CORRIDA : null,
         // La única puerta hacia una propuesta de costo.
         proponeCostos: puerta.proponeCostos,
         porque: puerta.porque,
