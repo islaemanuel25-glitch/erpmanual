@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-11-19] - Actualización: productos, proveedores
+
+### Modificado
+- **productos**: feat: ningún alta se guarda sin ganancia, y si no se elige se propone la de la categoría — SIN VERIFICAR en pantalla
+- **productos**: fix: el texto de un vínculo por texto ya no se muestra como código, y la corrección de la recepción respeta el código compartido — SIN VERIFICAR en pantalla
+- **productos**: feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
+- **proveedores**: fix: el texto de un vínculo por texto ya no se muestra como código, y la corrección de la recepción respeta el código compartido — SIN VERIFICAR en pantalla
+- **proveedores**: feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-18] - Actualización: productos, pos-ventas
 
 ### Modificado
