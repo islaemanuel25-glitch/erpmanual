@@ -55,7 +55,7 @@ import { claveDeFila } from "@/lib/compras-proveedor/comprobante/filasDeConcilia
  * línea que se factura por encima del precio interno. Un número negativo sin
  * señal se lee como uno positivo cuando se mira rápido.
  */
-function RenglonDeImporte({ rotulo, valor, porcentaje = null, fuerte = false }) {
+function RenglonDeImporte({ rotulo, valor, porcentaje = null, fuerte = false, texto = null }) {
   const negativo = Number(valor) < 0;
   return (
     <span className="flex items-baseline justify-between gap-renglon">
@@ -69,7 +69,9 @@ function RenglonDeImporte({ rotulo, valor, porcentaje = null, fuerte = false }) 
             : "text-sm2 sunmi-text-strong"
         }`}
       >
-        {formatearMoneda(valor)}
+        {/* Un renglón sin importe que decir —el cambio de mercadería— lleva
+            su leyenda en lugar de un $0,00 que se leería como "vale cero". */}
+        {texto ?? formatearMoneda(valor)}
         {porcentaje != null
           ? ` (${porcentaje < 0 ? "−" : ""}${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %)`
           : ""}
@@ -405,10 +407,25 @@ export default function ListaDeLaFactura({
               ))}
             </>
           )}
-          {envases.some((f) => !f.cargo && !f.descuento) && (
+          {envases.some((f) => f.cambio) && (
+            <>
+              {/* Un cambio de mercadería: neto cero, no suma a la cuenta ni
+                  entra al stock, y no se pide nada (`marcarRenglonesDeCambio`). */}
+              <SunmiSeparator label="Cambios de mercadería" />
+              {envases.filter((f) => f.cambio).map((f) => (
+                <RenglonDeImporte
+                  key={claveDeFila(f)}
+                  rotulo={f.textoCrudo ?? "Cambio"}
+                  valor={0}
+                  texto="Cambio · no suma"
+                />
+              ))}
+            </>
+          )}
+          {envases.some((f) => !f.cargo && !f.descuento && !f.cambio) && (
             <>
               <SunmiSeparator label="Envases" />
-              {envases.filter((f) => !f.cargo && !f.descuento).map((f) => (
+              {envases.filter((f) => !f.cargo && !f.descuento && !f.cambio).map((f) => (
                 <RenglonDeImporte
                   key={claveDeFila(f)}
                   rotulo={`${f.textoCrudo ?? "Envase"} · ${f.cantidad ?? "—"}`}

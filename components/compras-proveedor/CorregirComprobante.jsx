@@ -30,7 +30,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
 import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
-import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
+import { comoLoEntendio, muestraNoCierra } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 
 export const TITULO = "Este papel no cierra";
 /**
@@ -51,6 +51,12 @@ export const BAJADA =
  * siempre se puede recibir. Va debajo de la bajada, con su mismo estilo.
  */
 export const RECIBIR_IGUAL = "Podés recibir igual: entra el stock y los costos quedan como estaban.";
+/**
+ * La cuenta de lo guardado cierra pero el papel quedó "no cierra" al leerse:
+ * volver a leer lo pasa por la puerta de hoy y habilita los costos.
+ */
+export const VEREDICTO_VENCIDO =
+  "Este papel se leyó antes del último arreglo del lector. Volvé a leerlo para que proponga los costos.";
 
 export default function CorregirComprobante({ comprobanteId, onCorregido = null }) {
   const [cargando, setCargando] = useState(true);
@@ -158,7 +164,16 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
   // Cuando lo que falta no es un número sino la lectura: la lista vacía o
   // corta (#247), o un papel leído con el lector anterior.
   const lecturaVieja = lectura?.interpretada !== true;
-  const hayQueReleer = lecturaVieja || resultado.productos.length === 0 || resultado.faltanRenglones;
+  // ── UN SOLO VEREDICTO (2026-11-24) ──────────────────────────────────────
+  //
+  // Este bloque se monta porque el comprobante quedó "no cierra" al leerse.
+  // Si la cuenta de lo guardado hoy SÍ cierra —un papel leído antes de que el
+  // lector reconociera los cambios de mercadería—, el veredicto guardado está
+  // vencido: no se dice "no cierra" al lado del ✓, y se ofrece volver a leer,
+  // que pasa el papel por la puerta de hoy y deja su estado al día.
+  const noCierra = muestraNoCierra(resultado, { lecturaVieja });
+  const veredictoVencido = !lecturaVieja && resultado.cierra === true;
+  const hayQueReleer = lecturaVieja || resultado.productos.length === 0 || resultado.faltanRenglones || veredictoVencido;
 
   return (
     <section className="space-y-3 mb-4">
@@ -166,13 +181,15 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
           Sin total leído, el cartel de abajo dice otra cosa —que no trae total,
           o que no se leyeron los productos— y "no cierra" al lado afirmaría una
           cuenta que no se hizo. */}
-      {resultado.hayTotal && !lecturaVieja && (
+      {noCierra && (
         <SunmiCard className="p-3 space-y-1">
           <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
           <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
           <p className="text-sm2 sunmi-text-muted break-words">{RECIBIR_IGUAL}</p>
         </SunmiCard>
       )}
+
+      {veredictoVencido && <p className="text-sm2 sunmi-text-muted break-words">{VEREDICTO_VENCIDO}</p>}
 
       {lecturaVieja && (
         <SunmiCard className="p-3 sunmi-state-warning">
