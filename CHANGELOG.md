@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-24] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: fix: los cambios de mercadería no suman ni bloquean el cierre, y un solo veredicto en pantalla — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-19] - Actualización: productos, proveedores
 
 ### Modificado
