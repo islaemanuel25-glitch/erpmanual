@@ -3,6 +3,7 @@
 ## [2026-11-25] - Actualización: compras-proveedor, proveedores
 
 ### Modificado
+- **proveedores**: fix: «Dejar como está» elegido ya no se sale de la tarjeta
 - **proveedores**: perf: abrir una lista ya no pasa por el motor los renglones que no puede atar por nombre (2,3 s -> 0,4 s)
 - **proveedores**: perf: aplicar una lista escribe en lote, con la misma auditoría y el mismo Libro de Costos (5,8 s -> 0,6 s)
 - **proveedores**: perf: tocar una tarjeta trae esa tarjeta y no la lista entera (2,2 s -> 0,3 s) — SIN VERIFICAR en pantalla

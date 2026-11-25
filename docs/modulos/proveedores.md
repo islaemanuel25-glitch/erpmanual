@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-25: fix: «Dejar como está» elegido ya no se sale de la tarjeta
 - 2026-11-25: perf: tocar una tarjeta trae esa tarjeta y no la lista entera — SIN VERIFICAR en pantalla
 - 2026-11-25: perf: aplicar una lista escribe en lote, con la misma auditoría y el mismo Libro de Costos
 - 2026-11-25: perf: abrir una lista ya no pasa por el motor los renglones que no puede atar por nombre
