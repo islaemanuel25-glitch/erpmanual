@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-25] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: fix: una cantidad menor a 0,01 sin importe es un cambio, también en lo guardado y al recibir — SIN VERIFICAR en pantalla
+
+
 ## [2026-11-24] - Actualización: compras-proveedor
 
 ### Modificado

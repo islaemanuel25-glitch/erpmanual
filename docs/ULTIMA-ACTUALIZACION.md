@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-24 12:09
+**Fecha:** 2026-11-25 18:28
 
 ## Módulos modificados recientemente
 
 ### compras-proveedor
-- fix: los cambios de mercadería no suman ni bloquean el cierre, y un solo veredicto en pantalla — SIN VERIFICAR en pantalla
-- Archivos: 1 nuevo, 12 modificados (13 total)
+- fix: una cantidad menor a 0,01 sin importe es un cambio, también en lo guardado y al recibir — SIN VERIFICAR en pantalla
+- Archivos: 1 nuevo, 6 modificados (7 total)
 
 
 ## Acción recomendada
