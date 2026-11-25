@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-11-18 23:16
+**Última actualización:** 2026-11-25 19:42
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-25: fix: Listas nunca queda en pantalla negra: límite de error por tarjeta y del segmento, que ofrece recargar si el sistema se actualizó — SIN VERIFICAR la causa
 - 2026-11-18: fix: el texto de un vínculo por texto ya no se muestra como código, y la corrección de la recepción respeta el código compartido — SIN VERIFICAR en pantalla
 - 2026-11-18: feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
 - 2026-11-06: feat: el alta desde la lista trae el costo y pregunta si el precio es por la caja o por unidad — SIN VERIFICAR en pantalla

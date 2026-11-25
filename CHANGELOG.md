@@ -1,8 +1,9 @@
 # Changelog
 
-## [2026-11-25] - Actualización: compras-proveedor
+## [2026-11-25] - Actualización: compras-proveedor, proveedores
 
 ### Modificado
+- **proveedores**: fix: Listas nunca queda en pantalla negra: límite de error por tarjeta y del segmento, que ofrece recargar si el sistema se actualizó — SIN VERIFICAR la causa
 - **compras-proveedor**: fix: si el papel cierra lo decide hoy la puerta sobre lo guardado, no el estado que quedó de la lectura vieja — SIN VERIFICAR en pantalla
 - **compras-proveedor**: fix: una cantidad menor a 0,01 sin importe es un cambio, también en lo guardado y al recibir — SIN VERIFICAR en pantalla
 
