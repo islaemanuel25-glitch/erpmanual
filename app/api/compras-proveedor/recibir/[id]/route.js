@@ -8,7 +8,13 @@ import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-p
 import { bultosEnFraccion, comoViene, escalaDelCosto } from "@/lib/unidades/reglaDeUnidades";
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo, sueltosParaCongelar, toUnidades } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
-import { fiambreAlCerrar, papelQueNoCierra } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import { esRenglonDeCambio } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
+import {
+  detallesQueSoloTraenCambios,
+  fiambreAlCerrar,
+  papelQueNoCierra,
+  sinMovimientoDeLosCambios,
+} from "@/lib/compras-proveedor/cierreDeRecepcion";
 import {
   clasificarDiferenciaCosto,
   decidirEscrituraDeCosto,
@@ -298,6 +304,39 @@ export async function POST(req, { params }) {
       costosExcluidos.add(d.id);
       costosAceptados.delete(d.id);
     }
+
+    // ── UN CAMBIO DE MERCADERÍA NO MUEVE STOCK NI COSTO (2026-11-25) ──────
+    //
+    // Las líneas del pedido que solo traen renglones de cambio —CUNNINGTON
+    // 0,001 de la factura P 0100-00189744— quedan en cero y sin costo, digan
+    // lo que digan los mapas del cuerpo. Antes de cualquier control de
+    // cantidades: un −0,001 contado no puede frenar el cierre por negativo.
+    const renglonesVinculados = await prisma.comprobanteLinea.findMany({
+      where: {
+        comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
+        pedidoDetalleId: { not: null },
+        noVino: false,
+      },
+      select: {
+        pedidoDetalleId: true,
+        cantidad: true,
+        netoUnitario: true,
+        subtotalImpreso: true,
+        subtotalCorregido: true,
+        costoFinalRenglon: true,
+        tipoRenglon: true,
+      },
+    });
+    sinMovimientoDeLosCambios({
+      detalles: detallesQueSoloTraenCambios(renglonesVinculados),
+      recibidos,
+      kgRecibidos: kgRecibidosMap,
+      sueltas: sueltasMap,
+      fisicas: fisicasMap,
+      costosExcluidos,
+      costosAceptados,
+      llegaronSinPapel: new Set(llegaronSinPapel.map((d) => d.id)),
+    });
     const decisionesDeCosto = []; // para informar qué se escribió y qué no
 
     // ── LOS UMBRALES, Y QUIÉN GOBIERNA A QUIÉN ───────────────────────────
@@ -589,7 +628,8 @@ export async function POST(req, { params }) {
     //
     // Si una línea del pedido tiene DOS renglones del papel, no se mira: ahí lo
     // que entra es la suma de los dos y la igualdad no aplica renglón a renglón.
-    const lineasDelPapel = await prisma.comprobanteLinea.findMany({
+    // Sin los cambios de mercadería: no traen nada, ni piezas ni kilos.
+    const lineasDelPapel = (await prisma.comprobanteLinea.findMany({
       where: {
         comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
         pedidoDetalleId: { not: null },
@@ -615,8 +655,11 @@ export async function POST(req, { params }) {
         // nuevo" —"dejar el que tenía" no lo toca—, y `vincular` lo borra si el
         // renglón cambia de producto. Ver `aceptadoEnElPapel`, abajo.
         costoFinalUnitario: true,
+        // Con qué se reconoce un cambio de mercadería (`esRenglonDeCambio`).
+        costoFinalRenglon: true,
+        tipoRenglon: true,
       },
-    });
+    })).filter((l) => !esRenglonDeCambio(l));
     // ── LO QUE YA SE ACEPTÓ EN ESTA RECEPCIÓN, POR LÍNEA DEL PEDIDO ──────
     //
     // El freno de abajo deja pasar un costo fuera de la variación si "la
