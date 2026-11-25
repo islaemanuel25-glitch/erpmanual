@@ -46,6 +46,17 @@ import {
   filaCoincideConLaBusqueda,
   textoVinculado,
 } from "@/lib/proveedores/listas/sinProducto";
+import LimiteDelRenglon from "@/components/proveedores/listas/LimiteDelRenglon";
+
+/**
+ * Un renglón de la lista, con la tarjeta de la recepción. La conversión va
+ * ADENTRO del componente, y no en el `.map` de la página, para que si ella
+ * falla la ataje el límite del renglón (`LimiteDelRenglon`): un error del
+ * padre no lo ataja ningún límite de un hijo.
+ */
+function TarjetaDelRenglon({ f, guardando, onCorregir }) {
+  return <TarjetaLineaFactura fila={filaParaLaTarjetaDeRecepcion(f)} guardando={guardando} onCorregir={onCorregir} />;
+}
 
 export default function SinProductoDeLaListaPage() {
   const params = useParams();
@@ -222,12 +233,15 @@ export default function SinProductoDeLaListaPage() {
         lista={
           <>
             {visibles.slice(0, cuantas).map((f) => (
-              <TarjetaLineaFactura
-                key={f.id}
-                fila={filaParaLaTarjetaDeRecepcion(f)}
-                guardando={!abierta}
-                onCorregir={(t) => abierta && setEligiendo(porId.get(t.filaId) ?? null)}
-              />
+              // Con su límite de error (`LimiteDelRenglon`, 2026-11-25): un
+              // renglón que no se puede dibujar deja un aviso, no la pantalla negra.
+              <LimiteDelRenglon key={f.id} nombre={f.descripcionProveedor ?? f.codigoCrudo ?? null}>
+                <TarjetaDelRenglon
+                  f={f}
+                  guardando={!abierta}
+                  onCorregir={(t) => abierta && setEligiendo(porId.get(t.filaId) ?? null)}
+                />
+              </LimiteDelRenglon>
             ))}
             {visibles.length > cuantas && (
               <SunmiButton

@@ -64,6 +64,7 @@ import {
   money,
 } from "@/components/proveedores/listas/PiezasPantallas";
 import TarjetaProductoDeLaLista from "@/components/proveedores/listas/TarjetaProductoDeLaLista";
+import LimiteDelRenglon from "@/components/proveedores/listas/LimiteDelRenglon";
 import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincularConLaLista";
 import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
@@ -1131,34 +1132,38 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         ? // Los confirmados son tarjetas de la revisión: «✓ Usar», «Corregir»,
           // la cuenta y el costo nuevo, iguales que en el paquete 1, más
           // «No es de Dab».
+          // Cada tarjeta con su límite de error (`LimiteDelRenglon`): una que no
+          // se puede dibujar deja un aviso y no tira la pantalla (2026-11-25).
           puedenSer.confirmados.map((item) => (
-            <TarjetaProductoDeLaLista
-              key={item.productoBaseId}
-              item={item}
-              abierta={abierta}
-              puedeCambiarCostos={puedeCambiarCostos}
-              controlando={controlando}
-              trabajando={tocando === item.productoBaseId}
-              error={errores.get(item.productoBaseId) ?? ""}
-              onUsar={(it) => usar(it)}
-              onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
-              onCaja={caja}
-              onKilos={kilos}
-              onNoEsDe={noEsDe}
-              proveedor={nombreProveedor}
-            />
+            <LimiteDelRenglon key={item.productoBaseId} nombre={item.nombre}>
+              <TarjetaProductoDeLaLista
+                item={item}
+                abierta={abierta}
+                puedeCambiarCostos={puedeCambiarCostos}
+                controlando={controlando}
+                trabajando={tocando === item.productoBaseId}
+                error={errores.get(item.productoBaseId) ?? ""}
+                onUsar={(it) => usar(it)}
+                onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+                onCaja={caja}
+                onKilos={kilos}
+                onNoEsDe={noEsDe}
+                proveedor={nombreProveedor}
+              />
+            </LimiteDelRenglon>
           ))
         : puedenSer.porConfirmar.map((item) => (
-            <TarjetaPorConfirmar
-              key={item.productoBaseId}
-              item={item}
-              abierta={abierta}
-              trabajando={tocando === item.productoBaseId}
-              error={errores.get(item.productoBaseId) ?? ""}
-              onSi={siPuedeSer}
-              onNo={noPuedeSer}
-              onOtro={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre, sumarProveedor: true })}
-            />
+            <LimiteDelRenglon key={item.productoBaseId} nombre={item.nombre}>
+              <TarjetaPorConfirmar
+                item={item}
+                abierta={abierta}
+                trabajando={tocando === item.productoBaseId}
+                error={errores.get(item.productoBaseId) ?? ""}
+                onSi={siPuedeSer}
+                onNo={noPuedeSer}
+                onOtro={(it) => setVinculando({ productoBaseId: it.productoBaseId, nombre: it.nombre, sumarProveedor: true })}
+              />
+            </LimiteDelRenglon>
           ))}
       {(enConfirmados ? puedenSer.confirmados : puedenSer.porConfirmar).length === 0 && (
         <p className="text-center py-6 sunmi-text-muted text-sm2">
@@ -1539,19 +1544,20 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
               </p>
             )}
             {tarjetas.map((item) => (
-              <TarjetaProductoDeLaLista
-                key={item.productoBaseId}
-                item={item}
-                abierta={abierta}
-                puedeCambiarCostos={puedeCambiarCostos}
-                controlando={controlando}
-                trabajando={tocando === item.productoBaseId}
-                error={errores.get(item.productoBaseId) ?? ""}
-                onUsar={(it) => usar(it)}
-                onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
-                onCaja={caja}
-                onKilos={kilos}
-              />
+              <LimiteDelRenglon key={item.productoBaseId} nombre={item.nombre}>
+                <TarjetaProductoDeLaLista
+                  item={item}
+                  abierta={abierta}
+                  puedeCambiarCostos={puedeCambiarCostos}
+                  controlando={controlando}
+                  trabajando={tocando === item.productoBaseId}
+                  error={errores.get(item.productoBaseId) ?? ""}
+                  onUsar={(it) => usar(it)}
+                  onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
+                  onCaja={caja}
+                  onKilos={kilos}
+                />
+              </LimiteDelRenglon>
             ))}
             {visibles.length === 0 && (
               <p className="text-center py-6 sunmi-text-muted text-sm2">
