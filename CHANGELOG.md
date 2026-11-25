@@ -3,6 +3,7 @@
 ## [2026-11-25] - Actualización: compras-proveedor
 
 ### Modificado
+- **compras-proveedor**: fix: si el papel cierra lo decide hoy la puerta sobre lo guardado, no el estado que quedó de la lectura vieja — SIN VERIFICAR en pantalla
 - **compras-proveedor**: fix: una cantidad menor a 0,01 sin importe es un cambio, también en lo guardado y al recibir — SIN VERIFICAR en pantalla
 
 
