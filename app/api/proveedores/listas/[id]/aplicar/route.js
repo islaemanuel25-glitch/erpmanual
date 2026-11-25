@@ -70,6 +70,8 @@ import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedor
 import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
 import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { escribirEnLote } from "@/lib/proveedores/listas/escrituraEnLote";
+import { leerAntesParaAuditar, registrarEscriturasEnLote } from "@/lib/auditoria/interceptor";
 
 /** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
 function numeroONull(v) {
@@ -454,6 +456,21 @@ export async function POST(req, context) {
       // Ver la nota larga más abajo, en el insert.
       const vinculosNuevos = new Map();
 
+      // ── LAS ESCRITURAS SE JUNTAN Y VAN EN LOTE (2026-11-25) ─────────────
+      //
+      // El bucle decide igual que siempre y con los mismos datos —el producto
+      // y los precios por local leídos arriba, que ninguna escritura de este
+      // bucle cambiaba—; lo que cambió es que en vez de un `update` por
+      // escritura se anotan acá, en orden, y se escriben juntas después del
+      // bucle (`escrituraEnLote.js`). Eran 1.882 idas y vueltas para 180
+      // precios de Arcor.
+      const escrituras = { ProductoBase: [], ProductoLocal: [], ImportacionListaFila: [] };
+      const ordenDeEscritura = [];
+      const escribir = (modelo, id, data) => {
+        escrituras[modelo].push({ id, data });
+        ordenDeEscritura.push({ modelo, id });
+      };
+
       for (const fila of filas) {
         const base = fila.productoBaseId === null ? null : porId.get(fila.productoBaseId) ?? null;
         const v = revalidarFila({ fila, base, contexto, config, recargoPct });
@@ -489,7 +506,7 @@ export async function POST(req, context) {
         });
         const dataBase = { precio_costo: costoNuevo };
         if (ventaMaestra.aplica) dataBase.precio_venta = ventaMaestra.precioFinal;
-        await tx.productoBase.update({ where: { id: base.id }, data: dataBase });
+        escribir("ProductoBase", base.id, dataBase);
 
         // ── Overrides por ubicación ────────────────────────────────────
         //
@@ -516,27 +533,24 @@ export async function POST(req, context) {
               dataLocal.precio_venta = ventaLocal.precioFinal;
             }
           }
-          await tx.productoLocal.update({ where: { id: ov.id }, data: dataLocal });
+          escribir("ProductoLocal", ov.id, dataLocal);
         }
 
         // ── Historial de la fila ───────────────────────────────────────
-        await tx.importacionListaFila.update({
-          where: { id: fila.id },
-          data: {
-            aplicada: true,
-            // Deja de estar seleccionada: una fila cerrada marcada para aplicar
-            // es una contradicción, y ensucia los contadores de la tanda
-            // siguiente.
-            seleccionada: false,
-            costoAplicado: costoNuevo,
-            costoPrevioAplicacion: costoAnterior,
-            ventaAnterior: ventaAnteriorMaestra,
-            ventaNueva: ventaMaestra.aplica ? ventaMaestra.precioFinal : ventaAnteriorMaestra,
-            aplicadaEn: ahora,
-            aplicadaPorUsuarioId: usuarioId,
-            resultadoAplicacion: RESULTADO_FILA.APLICADA,
-            motivoAplicacion: null,
-          },
+        escribir("ImportacionListaFila", fila.id, {
+          aplicada: true,
+          // Deja de estar seleccionada: una fila cerrada marcada para aplicar
+          // es una contradicción, y ensucia los contadores de la tanda
+          // siguiente.
+          seleccionada: false,
+          costoAplicado: costoNuevo,
+          costoPrevioAplicacion: costoAnterior,
+          ventaAnterior: ventaAnteriorMaestra,
+          ventaNueva: ventaMaestra.aplica ? ventaMaestra.precioFinal : ventaAnteriorMaestra,
+          aplicadaEn: ahora,
+          aplicadaPorUsuarioId: usuarioId,
+          resultadoAplicacion: RESULTADO_FILA.APLICADA,
+          motivoAplicacion: null,
         });
 
         // ── El macheo aprendido ────────────────────────────────────────
@@ -573,6 +587,31 @@ export async function POST(req, context) {
           costoNuevo,
           ventaAnterior: ventaAnteriorMaestra,
           ventaNueva: ventaMaestra.aplica ? ventaMaestra.precioFinal : ventaAnteriorMaestra,
+        });
+      }
+
+      // ── Las escrituras del bucle, en lote, con su auditoría ──────────────
+      //
+      // Los "antes" se leen juntos y fuera de la transacción, como los leía la
+      // extensión de auditoría antes de cada `update`; los "después", juntos y
+      // adentro, que es lo que devolvía cada `update`. Y se registran en el
+      // orden del bucle: el buffer queda como quedaba escribiendo de a una.
+      const antes = {
+        ProductoBase: await leerAntesParaAuditar("ProductoBase", [...new Set(escrituras.ProductoBase.map((e) => e.id))]),
+        ProductoLocal: await leerAntesParaAuditar("ProductoLocal", [...new Set(escrituras.ProductoLocal.map((e) => e.id))]),
+      };
+      await escribirEnLote(tx, "ProductoBase", escrituras.ProductoBase, ahora);
+      await escribirEnLote(tx, "ProductoLocal", escrituras.ProductoLocal, ahora);
+      await escribirEnLote(tx, "ImportacionListaFila", escrituras.ImportacionListaFila, ahora);
+      if (antes.ProductoBase || antes.ProductoLocal) {
+        const despuesDe = async (delegado, lista) => {
+          const ids = [...new Set(lista.map((e) => e.id))];
+          if (ids.length === 0) return new Map();
+          return new Map((await delegado.findMany({ where: { id: { in: ids } } })).map((f) => [f.id, f]));
+        };
+        registrarEscriturasEnLote(ordenDeEscritura, antes, {
+          ProductoBase: await despuesDe(tx.productoBase, escrituras.ProductoBase),
+          ProductoLocal: await despuesDe(tx.productoLocal, escrituras.ProductoLocal),
         });
       }
 
