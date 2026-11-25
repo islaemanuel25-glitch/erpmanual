@@ -61,7 +61,13 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { alcanceDeLaListaWhere } from "@/lib/proveedores/listas/cargaErp";
-import { quienAdministraLosCostos, tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
+import {
+  ESTADO_TU_PRODUCTO,
+  estadoDeTuProducto,
+  quienAdministraLosCostos,
+  tusProductosDeLaLista,
+} from "@/lib/proveedores/listas/tusProductos";
+import { productosPedidos, soloLasPedidas } from "@/lib/proveedores/listas/tarjetasTocadas";
 import { cargarLecturasRecordadas, conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import {
   proveedoresDeAntes,
@@ -159,6 +165,14 @@ export async function GET(req, context) {
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json({ ok: false, error: "Importación inválida." }, { status: 400 });
     }
+    const url = new URL(req.url);
+    // ── DESPUÉS DE UN TOQUE, SOLO LAS TARJETAS TOCADAS (2026-11-25) ──────
+    //
+    // Con `?productos=` las cuentas son las mismas, sobre la lista entera; de
+    // las tarjetas viajan las pedidas y el orden de todas, y la pantalla las une
+    // con las que ya tiene (`tarjetasTocadas.js`). Sin el parámetro, la
+    // respuesta es la de siempre.
+    const pedidos = productosPedidos(url.searchParams.get("productos"));
 
     // El grupo va en el WHERE junto al id: una importación de otro grupo no
     // existe para esta consulta, así que da 404 y no revela que existe.
@@ -354,20 +368,45 @@ export async function GET(req, context) {
     // Las dos tarjetas —paquete 1 y confirmados del 2— salen de la MISMA
     // cuenta (`tusProductosDeLaLista`), con las mismas lecturas y omisiones:
     // «✓ Usar», la cuenta y el porcentaje no pueden decir distinto en una y otra.
+    const noVienenSet = new Set(noVienen.map((n) => n.productoBaseId));
+    const abierta = esImportacionAbierta(cab.estado);
+    // ── LAS LECTURAS QUE HACEN FALTA ─────────────────────────────────────
+    //
+    // Leer una fila es lo caro de esta ruta: la fila entera, su producto y la
+    // cuenta de cada lectura posible. Abriendo, se leen todas: todas se
+    // dibujan. Después de un toque se dibujan solo las pedidas, y de las demás
+    // importa nada más en qué estado caen —los chips y la barra—, y la lectura
+    // solo puede mover el estado de una que el motor deja PARA REVISAR
+    // (`tusProductosDeLaLista`: «mismo precio» y la del kilo nacen de ahí). Así
+    // que se leen las pedidas y las que están para revisar, con la MISMA
+    // función que decide el estado.
+    const productosALeer = pedidos
+      ? productosDelProveedor.filter(
+          (p) =>
+            pedidos.has(p.id) ||
+            estadoDeTuProducto({
+              filas: p.filasImportacionLista,
+              rango: rangoDelProveedor,
+              omitidas: revision.ids,
+              noViene: noVienenSet.has(p.id),
+              abierta,
+            }).estado === ESTADO_TU_PRODUCTO.REVISAR
+        )
+      : productosDelProveedor;
     const comunes = {
       rango: rangoDelProveedor,
       omitidas: revision.ids,
-      noVienen: new Set(noVienen.map((n) => n.productoBaseId)),
+      noVienen: noVienenSet,
       lecturaPorFila: await lecturasDeTusFilas({
         importacionId: id,
         grupoId,
-        productos: productosDelProveedor,
+        productos: productosALeer,
         cab,
         rango: rangoDelProveedor,
         operandoEnLocalId: Number(localId),
         depositoLocalId,
       }),
-      abierta: esImportacionAbierta(cab.estado),
+      abierta,
       puedeCambiarCostos,
       // Para el cartel: "Dab suele aumentar entre 0 % y 12 %".
       proveedor: cab.proveedor?.nombre ?? null,
@@ -452,7 +491,6 @@ export async function GET(req, context) {
     //
     // Ahora `contarResultado` devuelve el rango de las filas que contó como
     // listas, así que el texto no puede hablar de filas que el número no cuenta.
-    const url = new URL(req.url);
     const motivoPedido = url.searchParams.get("motivo");
     let cola = null;
     if (motivoPedido && Object.values(MOTIVO_REVISION).includes(motivoPedido)) {
@@ -549,7 +587,8 @@ export async function GET(req, context) {
       },
       variacion: conteo.rangoDeLosListos,
       // PAQUETE 1, "Tus productos de Dab": sin lo sumado a esta lista.
-      tusProductos,
+      // Después de un toque, solo las tarjetas pedidas y el orden de todas.
+      tusProductos: pedidos ? { ...soloLasPedidas(tusProductos.items, pedidos), conteo: tusProductos.conteo } : tusProductos,
       // PAQUETE 2, "Pueden ser de Dab". `conteo` de arriba —«Para aplicar», sin
       // tildar— cuenta las filas de la lista entera: es de los DOS paquetes.
       puedenSer: {
@@ -563,7 +602,9 @@ export async function GET(req, context) {
           ]),
           renglon: renglonDeLaHoja(p.fila),
         })),
-        confirmados: confirmados.items,
+        ...(pedidos
+          ? (({ items, orden }) => ({ confirmados: items, ordenConfirmados: orden }))(soloLasPedidas(confirmados.items, pedidos))
+          : { confirmados: confirmados.items }),
         conteo: { porConfirmar: porConfirmar.length, confirmados: confirmados.items.length },
       },
       muestra: muestra.map((f) => ({

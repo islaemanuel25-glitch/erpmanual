@@ -24,7 +24,7 @@
 // Cuando ya se aplicó y se terminó, esta pantalla muestra lo que pasó y ofrece
 // SOLO lo que se puede hacer: sin botones en las tarjetas y sin barra de aplicar.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
@@ -83,6 +83,7 @@ import {
   textoNoVienenEnLaLista,
   textoSinMarcarEnUnaCerrada,
 } from "@/lib/proveedores/listas/tusProductos";
+import { conLasTarjetasTocadas } from "@/lib/proveedores/listas/tarjetasTocadas";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
 import HojaBajasDePrecio from "@/components/proveedores/listas/HojaBajasDePrecio";
 import {
@@ -283,21 +284,30 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
   // perdía el lugar de la lista: la tarjeta que se acaba de tocar quedaba
   // pantallas más arriba. Si la recarga silenciosa falla, se dice en el aviso
   // y lo que había queda a la vista.
-  const cargar = useCallback(async ({ silencioso = false } = {}) => {
+  //
+  // `productos`: después de tocar una tarjeta se piden solo esas tarjetas —los
+  // contadores vienen enteros— y se unen con las que ya están
+  // (`conLasTarjetasTocadas`). Si no se pueden unir, se relee entera.
+  const datosActuales = useRef(null);
+  const cargar = useCallback(async ({ silencioso = false, productos = null } = {}) => {
     if (!silencioso) setCargando(true);
     if (!silencioso) setError("");
+    const parcial = Array.isArray(productos) && productos.length > 0 && datosActuales.current !== null;
     try {
-      const r = await fetch(`/api/proveedores/listas/${id}/resultado`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        const texto = json?.error || "No se pudo cargar el resultado de esta lista.";
+      const r = await fetch(
+        `/api/proveedores/listas/${id}/resultado${parcial ? `?productos=${productos.join(",")}` : ""}`,
+        { credentials: "include", cache: "no-store" }
+      );
+      const recibido = await r.json();
+      if (!r.ok || !recibido?.ok) {
+        const texto = recibido?.error || "No se pudo cargar el resultado de esta lista.";
         if (silencioso) setAviso({ tono: "danger", texto });
         else setError(texto);
         return;
       }
+      const json = parcial ? conLasTarjetasTocadas(datosActuales.current, recibido) : recibido;
+      if (!json) return cargar({ silencioso });
+      datosActuales.current = json;
       setDatos(json);
       // El chip con el que arranca: el primero que tenga algo. Solo la primera
       // vez —después manda el que eligió la persona—.
@@ -326,9 +336,9 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
    * barra salen de la relectura. `deshacer` es el pedido que vuelve atrás esa
    * acción, o null si no hay uno.
    */
-  const despuesDeResolver = async (nombre, deshacer) => {
-    await cargar({ silencioso: true });
-    setHecho({ nombre, deshacer, vez: Date.now() });
+  const despuesDeResolver = async (nombre, deshacer, productoBaseId = null) => {
+    await cargar({ silencioso: true, productos: productoBaseId ? [productoBaseId] : null });
+    setHecho({ nombre, deshacer, productoBaseId, vez: Date.now() });
   };
 
   // El aviso dura unos segundos; uno nuevo reinicia la cuenta.
@@ -355,7 +365,8 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         setAviso({ tono: "danger", texto: `${j?.error || "No se pudo deshacer."} Quedó como estaba.` });
       }
       setHecho(null);
-      await cargar({ silencioso: true });
+      // Deshacer toca la misma tarjeta que el pedido que deshace.
+      await cargar({ silencioso: true, productos: hecho?.productoBaseId ? [hecho.productoBaseId] : null });
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor para deshacer. Quedó como estaba." });
     } finally {
@@ -466,7 +477,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         setErrores((prev) => new Map(prev).set(pid, `${j?.error || textoSiFalla} No se guardó nada.`));
         return null;
       }
-      await despuesDeResolver(item.nombre, typeof deshacer === "function" ? deshacer(j) : deshacer);
+      await despuesDeResolver(item.nombre, typeof deshacer === "function" ? deshacer(j) : deshacer, pid);
       return j;
     } catch {
       setErrores((prev) =>

@@ -25,7 +25,6 @@ import {
   validarSeleccion,
   normalizarIds,
   idsSeleccionables,
-  resumirSeleccion,
   TEXTO_NO_SELECCIONABLE,
 } from "@/lib/proveedores/listas/seleccion";
 
@@ -178,24 +177,13 @@ export async function POST(req, context) {
         }
       }, OPCIONES_TX);
 
-      const frescasEx = await prisma.importacionListaFila.findMany({
-        where: { importacionId },
-        select: {
-          id: true, estado: true, aplicada: true, seleccionada: true,
-          productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
-        },
-      });
-      return NextResponse.json({
-        ok: true,
-        accion,
-        afectadas: objetivo.length,
-        resumen: resumirSeleccion(frescasEx, importacion),
-        // Las aplicadas conservan la marca de cuando se aplicaron. No se limpia
-        // —tocar una fila cerrada sería peor— pero no se informa como selección
-        // viva: la pantalla dibujaría un tilde en una fila que no se puede tocar.
-        seleccionadas: frescasEx.filter((f) => f.seleccionada && !f.aplicada).map((f) => f.id),
-        excluidas: frescasEx.filter((f) => f.excluidaManual).map((f) => f.id),
-      });
+      // ── SIN RELEER LA LISTA (2026-11-25) ─────────────────────────────────
+      //
+      // Acá se volvían a leer todas las filas para devolver un resumen y las
+      // listas de seleccionadas y excluidas, y ninguna pantalla las usaba: cada
+      // toque de una tarjeta leía la lista entera dos veces para nada. Lo que la
+      // tarjeta muestra después lo pide la pantalla (`resultado?productos=`).
+      return NextResponse.json({ ok: true, accion, afectadas: objetivo.length });
     } else {
       const ids = normalizarIds(body?.ids);
       if (ids.length === 0) {
@@ -243,23 +231,12 @@ export async function POST(req, context) {
       }, OPCIONES_TX);
     }
 
-    const frescas = await prisma.importacionListaFila.findMany({
-      where: { importacionId },
-      select: {
-        id: true, estado: true, aplicada: true, seleccionada: true,
-        productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
-      },
-    });
-
     return NextResponse.json({
       ok: true,
       accion,
       marcadas: aMarcar.length,
       desmarcadas: aDesmarcar.length,
       rechazadas,
-      resumen: resumirSeleccion(frescas, importacion),
-      seleccionadas: frescas.filter((f) => f.seleccionada && !f.aplicada).map((f) => f.id),
-      excluidas: frescas.filter((f) => f.excluidaManual).map((f) => f.id),
     });
   } catch (e) {
     console.error("[listas/seleccion] error:", e);

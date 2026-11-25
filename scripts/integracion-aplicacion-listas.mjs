@@ -79,6 +79,28 @@ function libroArcor(filas) {
 
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
+/**
+ * El resumen de la selección CONTADO EN LA BASE, con la misma función que la
+ * pantalla. Hasta el 2026-11-25 lo devolvía la ruta de selección releyendo la
+ * lista entera en cada toque —y ninguna pantalla lo usaba—; las afirmaciones
+ * de abajo son las mismas, medidas donde vive el dato.
+ */
+async function resumenEnLaBase(importacionId) {
+  const { resumirSeleccion } = await import("../lib/proveedores/listas/seleccion.js");
+  const importacion = await prisma.importacionListaProveedor.findUnique({
+    where: { id: importacionId },
+    select: { id: true, estado: true, proveedorId: true },
+  });
+  const filas = await prisma.importacionListaFila.findMany({
+    where: { importacionId },
+    select: {
+      id: true, estado: true, aplicada: true, seleccionada: true,
+      productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
+    },
+  });
+  return resumirSeleccion(filas, importacion);
+}
+
 async function main() {
   console.log(`\n=== INTEGRACIÓN: APLICACIÓN DE COSTOS (${SUFIJO}) ===\n`);
 
@@ -114,7 +136,15 @@ async function main() {
 
   const cat = await prisma.categoria.create({ data: { nombre: `Cat ${SUFIJO}` } });
   const arcor = await prisma.proveedor.create({
-    data: { nombre: `Arcor ${SUFIJO}`, creadoEnLocalId: dep.id, parserListaId: "ARCOR_XLSX" },
+    // El rango y los impuestos los exige la importación desde que se
+    // configuran por proveedor (`configuracionProveedor.js`): sin ellos este
+    // arnés no pasaba del primer chequeo. El rango es ancho a propósito —lo
+    // que se prueba acá es la escritura, no el rango— y sin impuesto aparte.
+    data: {
+      nombre: `Arcor ${SUFIJO}`, creadoEnLocalId: dep.id, parserListaId: "ARCOR_XLSX",
+      listaAumentoEsperadoMinPct: 0, listaAumentoEsperadoMaxPct: 999,
+      listaImpuestosDefinidos: true, listaImpuestoAdicionalPct: 0,
+    },
   });
 
   const crear = async (nombre, extra = {}, codigoProveedor = null) => {
@@ -227,21 +257,23 @@ async function main() {
   chequear("14. sin permiso no se puede seleccionar", selSinPermiso.status === 403, String(selSinPermiso.status));
 
   const selTodos = await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, { accion: "TODOS" }), ctxId(IMP)));
+  const trasTodos = await resumenEnLaBase(IMP);
   chequear("15. 'todos' marca solo los listos",
-    selTodos.ok === true && selTodos.resumen.seleccionadas === selTodos.resumen.seleccionables,
-    `${selTodos.resumen?.seleccionadas}/${selTodos.resumen?.seleccionables}`);
+    selTodos.ok === true && trasTodos.seleccionadas === trasTodos.seleccionables,
+    `${trasTodos.seleccionadas}/${trasTodos.seleccionables}`);
   chequear("16. los seleccionables son exactamente los 6 listos",
-    selTodos.resumen.seleccionables === 6, String(selTodos.resumen?.seleccionables));
+    trasTodos.seleccionables === 6, String(trasTodos.seleccionables));
 
   // Se desmarca el que tiene que quedar afuera.
-  const selQuitar = await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, {
+  await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, {
     accion: "DESMARCAR", ids: [fNoSelecc.id],
   }), ctxId(IMP)));
-  chequear("17. desmarcar deja 5 seleccionadas", selQuitar.resumen.seleccionadas === 5,
-    String(selQuitar.resumen?.seleccionadas));
+  const trasQuitar = await resumenEnLaBase(IMP);
+  chequear("17. desmarcar deja 5 seleccionadas", trasQuitar.seleccionadas === 5,
+    String(trasQuitar.seleccionadas));
 
-  const ninguno = await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, { accion: "NINGUNO" }), ctxId(IMP)));
-  chequear("18. 'ninguno' deja la selección en cero", ninguno.resumen.seleccionadas === 0);
+  await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, { accion: "NINGUNO" }), ctxId(IMP)));
+  chequear("18. 'ninguno' deja la selección en cero", (await resumenEnLaBase(IMP)).seleccionadas === 0);
 
   // Se rearma la selección real de la prueba.
   await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, {
@@ -364,9 +396,10 @@ async function main() {
   chequear("56. reintentar una tercera vez tampoco mueve nada",
     JSON.stringify(costosTrasPrimera) === JSON.stringify(costosTrasTercera));
 
-  const selTrasAplicar = await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, { accion: "TODOS" }), ctxId(IMP)));
+  await json(await seleccion(pedido(`${BASE}/${IMP}/seleccion`, A, { accion: "TODOS" }), ctxId(IMP)));
+  const trasAplicarSel = await resumenEnLaBase(IMP);
   chequear("57. sobre una importación aplicada no queda nada seleccionable",
-    selTrasAplicar.resumen.seleccionables === 0, String(selTrasAplicar.resumen?.seleccionables));
+    trasAplicarSel.seleccionables === 0, String(trasAplicarSel.seleccionables));
 
   // ── Segunda importación: filas que cambiaron desde la conciliación ───────
   console.log("\n  — filas que dejan de ser válidas —");
@@ -458,9 +491,10 @@ async function main() {
   const IMP4 = imp4.importacionId;
   chequear("73. la importación del rollback entra", imp4.ok === true, imp4.error || "");
 
-  const selRb = await json(await seleccion(pedido(`${BASE}/${IMP4}/seleccion`, A, { accion: "TODOS" }), ctxId(IMP4)));
+  await json(await seleccion(pedido(`${BASE}/${IMP4}/seleccion`, A, { accion: "TODOS" }), ctxId(IMP4)));
+  const trasRb = await resumenEnLaBase(IMP4);
   chequear("74. las dos filas del rollback quedan seleccionadas",
-    selRb.resumen?.seleccionadas === 2, String(selRb.resumen?.seleccionadas));
+    trasRb.seleccionadas === 2, String(trasRb.seleccionadas));
 
   const res4 = await aplicar(pedido(`${BASE}/${IMP4}/aplicar`, A, {
     modoPrecioVenta: "RECALCULAR_POR_MARGEN",
