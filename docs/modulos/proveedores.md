@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-25: fix: una lista leída con el lector propio del proveedor, sin decisión de columna, ya no tira la pantalla de la lista — SIN VERIFICAR en pantalla
 - 2026-11-25: fix: Listas nunca queda en pantalla negra: límite de error por tarjeta y del segmento, que ofrece recargar si el sistema se actualizó — SIN VERIFICAR la causa
 - 2026-11-18: fix: el texto de un vínculo por texto ya no se muestra como código, y la corrección de la recepción respeta el código compartido — SIN VERIFICAR en pantalla
 - 2026-11-18: feat: las latas van por plancha entera y la pregunta del precio sigue al Factor pack en vivo — SIN VERIFICAR en pantalla
