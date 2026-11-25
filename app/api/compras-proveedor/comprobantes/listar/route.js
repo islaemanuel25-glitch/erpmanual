@@ -21,6 +21,8 @@ import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comp
 import "@/lib/compras-proveedor/comprobante/lector/index.js";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { comoVaLaLectura } from "@/lib/compras-proveedor/comprobante/lecturaEnSegundoPlano";
+import { conElVeredictoDeHoy, ESTADOS_QUE_SE_RECALCULAN } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
+import { QUE_TRAER_DE_CADA_HOJA } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
 
 export async function GET(req) {
   try {
@@ -93,6 +95,32 @@ export async function GET(req) {
         },
       },
     });
+
+    // ── EL ESTADO QUE SE MUESTRA ES EL VEREDICTO DE HOY (2026-11-25) ───────
+    //
+    // Factura P 0100-00189744: guardada "no cierra" por la lectura vieja, con
+    // renglones que cierran con las reglas de hoy. La lista decide con este
+    // estado si monta "Este papel no cierra" (`onMalLeidos`), así que se
+    // juzga cada papel leído con la misma puerta que la lectura
+    // (`veredictoDeLoGuardado`). Al abrir el pedido, `recepcion/recalcular`
+    // además lo deja escrito.
+    const paraJuzgar = items.filter((c) => ESTADOS_QUE_SE_RECALCULAN.includes(c.estado)).map((c) => c.id);
+    const deHoy = new Map(
+      (paraJuzgar.length
+        ? await prisma.comprobanteProveedor.findMany({
+            where: { id: { in: paraJuzgar }, grupoId },
+            select: { ...QUE_TRAER_DE_CADA_HOJA, explicacionLeida: true, lineas: { orderBy: { orden: "asc" } } },
+          })
+        : []
+      ).map((p) => [p.id, conElVeredictoDeHoy(p)])
+    );
+    for (const c of items) {
+      const hoy = deHoy.get(c.id);
+      if (hoy && hoy.estado !== c.estado) {
+        c.estado = hoy.estado;
+        c.diferenciaCentavos = hoy.diferenciaCentavos;
+      }
+    }
 
     // `archivos` viene sin ubicación, así que para el resumen hay que decirle
     // cuáles siguen teniendo foto: eso lo dice `imagenBorradaEn`, que es del

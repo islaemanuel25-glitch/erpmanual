@@ -54,6 +54,8 @@ import {
   cargarContexto,
 } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { guardarDecisionDePrecio } from "@/lib/compras-proveedor/comprobante/guardarDecisionDePrecio";
+import { conElVeredictoDeHoy } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
+import { QUE_TRAER_DE_CADA_HOJA } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
 import {
   DECISION_DE_PRECIO,
   esDecisionConocida,
@@ -188,7 +190,19 @@ export async function POST(req) {
     // Se recibe igual —regla de Emanuel, Secco #256— pero sus precios salen de
     // una lectura que no se pudo verificar: ninguno se acepta. Corregido a mano
     // hasta que cierre, vuelve a proponer costos como siempre.
-    if (linea.comprobante.estado === "MAL_LEIDO") {
+    //
+    // ── "NO CIERRA" ES EL VEREDICTO DE HOY, NO EL GUARDADO (2026-11-25) ────
+    //
+    // Factura P 0100-00189744: guardada "no cierra" por la lectura vieja, con
+    // renglones que cierran con las reglas de hoy. Se juzga el papel guardado
+    // con la misma puerta que la lectura (`veredictoDeLoGuardado`).
+    const papelDeHoy = conElVeredictoDeHoy(
+      await prisma.comprobanteProveedor.findFirst({
+        where: { id: linea.comprobante.id, grupoId },
+        select: { ...QUE_TRAER_DE_CADA_HOJA, explicacionLeida: true, lineas: { orderBy: { orden: "asc" } } },
+      })
+    );
+    if ((papelDeHoy?.estado ?? linea.comprobante.estado) === "MAL_LEIDO") {
       const noCierra =
         "Este papel no cierra: no se acepta ningún precio de él. Podés recibir igual y los costos quedan como estaban.";
       return NextResponse.json({ ok: false, error: noCierra, queHacer: noCierra }, { status: 409 });
@@ -462,7 +476,8 @@ export async function POST(req) {
       // decidiendo.
       productoBaseId: analizada?.productoBaseId ?? null,
       lineaDePedidoId: delPedido.detalle?.id ?? null,
-      comprobante: linea.comprobante,
+      // Con el veredicto de hoy, no el guardado (`papelDeHoy`, arriba).
+      comprobante: { ...linea.comprobante, estado: papelDeHoy?.estado ?? linea.comprobante.estado },
       decision: analisis.decision,
       unidad: analisis.unidad,
       frenoLevantado,

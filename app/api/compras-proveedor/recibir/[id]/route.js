@@ -9,6 +9,8 @@ import { bultosEnFraccion, comoViene, escalaDelCosto } from "@/lib/unidades/regl
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo, sueltosParaCongelar, toUnidades } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { esRenglonDeCambio } from "@/lib/compras-proveedor/comprobante/lector/lecturaInterpretada";
+import { QUE_TRAER_DE_CADA_HOJA } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
+import { conElVeredictoDeHoy } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
 import {
   detallesQueSoloTraenCambios,
   fiambreAlCerrar,
@@ -504,15 +506,25 @@ export async function POST(req, { params }) {
     // LA DEUDA ES LO QUE FACTURA EL PROVEEDOR. Los comprobantes son los mismos
     // que muestra la conciliación: los de este pedido y este grupo, sin los
     // anulados.
-    const facturasDelPedido = await prisma.comprobanteProveedor.findMany({
+    const facturasGuardadas = await prisma.comprobanteProveedor.findMany({
       where: { grupoId, pedidoId, estado: { not: "ANULADO" } },
       select: {
-        totalLeido: true, estado: true, diferenciaCentavos: true, numero: true,
-        // Para el papel sin total: lo que se le paga es la suma de sus
+        // Lo que la puerta necesita para decidir HOY si el papel cierra
+        // (`veredictoDeLoGuardado`), con los renglones enteros. De ellos sale
+        // también lo que se le paga a un papel sin total: la suma de sus
         // productos (`totalAPagarDelComprobante`).
-        lineas: { select: { costoFinalRenglon: true } },
+        ...QUE_TRAER_DE_CADA_HOJA,
+        explicacionLeida: true,
+        diferenciaCentavos: true,
+        lineas: { orderBy: { orden: "asc" } },
       },
     });
+    // ── EL VEREDICTO ES EL DE HOY, NO EL GUARDADO (2026-11-25) ─────────────
+    //
+    // Factura P 0100-00189744: guardada "no cierra" con renglones que cierran
+    // con las reglas de hoy. El cierre leía el estado guardado y no escribía
+    // ningún costo. Se recalcula con la misma puerta que la lectura.
+    const facturasDelPedido = facturasGuardadas.map(conElVeredictoDeHoy);
 
     // ── CON UN PAPEL QUE NO CIERRA SE RECIBE IGUAL, SIN TOCAR COSTOS ──────
     //
