@@ -104,6 +104,14 @@ export async function POST(req, context) {
         return NextResponse.json({ ok: false, error: "Ninguna fila pertenece a esta importación." }, { status: 404 });
       }
       const excluir = accion === "EXCLUIR";
+      // ── «DEJAR COMO ESTÁ» VALE PARA ESTA LISTA (Emanuel, 2026-11-25) ──────
+      //
+      // El botón de la tarjeta fuera de rango deja el costo de hoy en ESTA
+      // lista: un precio que bajó un mes no dice nada del mes que viene. Manda
+      // `soloEstaLista` y no toca la memoria de "no lo cambio" de abajo —ni la
+      // crea al excluir ni la borra al volver a incluir—. «No lo cambio» de la
+      // hoja de revisar sigue recordándolo, como siempre.
+      const recordar = body?.soloEstaLista !== true;
       // Los productos de las filas que se están tocando. Se sacan ACÁ, de las
       // filas ya traídas, y no con otra consulta: el `select` de arriba ya pide
       // `productoBaseId`.
@@ -140,7 +148,7 @@ export async function POST(req, context) {
         //
         // Y desmarcar lo DESHACE, que es la otra mitad: una decisión que no se
         // puede revertir desde donde se ve no es una decisión, es una trampa.
-        if (productosTocados.length > 0) {
+        if (productosTocados.length > 0 && recordar) {
           if (excluir) {
             // `skipDuplicates` en vez de comprobar antes: el único de la tabla
             // ya garantiza uno por producto y proveedor, y preguntar primero

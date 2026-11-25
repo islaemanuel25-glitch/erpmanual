@@ -69,6 +69,7 @@ import HojaVincularConLaLista from "@/components/proveedores/listas/HojaVincular
 import HojaRevisarPrecio, { ConfirmarFueraDeRango } from "@/components/proveedores/listas/HojaRevisarPrecio";
 import {
   ACCION_USAR,
+  ACCION_DEJAR,
   ESTADO_TU_PRODUCTO,
   FILTRO,
   ORDEN_FILTROS,
@@ -485,7 +486,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
    * Una lectura fuera de rango NO se usa de un toque: se pregunta antes con la
    * misma pregunta de la hoja de revisar.
    */
-  const usar = (item, { aceptarFueraDeRango = false } = {}) => {
+  const usar = async (item, { aceptarFueraDeRango = false } = {}) => {
     const u = item.usar;
     if (!u) return;
     if (u.accion === ACCION_USAR.CONFIRMAR) {
@@ -493,6 +494,8 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         setPreguntaFuera(item);
         return;
       }
+      // Dejada como está: primero vuelve a entrar en la lista, después se usa.
+      if (u.desdeDejada && !(await incluirDeNuevo(item))) return;
       // Deshacer una confirmada es destildarla: vuelve a «Para revisar».
       return pedirDesdeLaTarjeta(
         item,
@@ -502,6 +505,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
         { url: `/api/proveedores/listas/${id}/seleccion`, cuerpo: { accion: ACCION_USAR.DESMARCAR, ids: [item.filaId] } }
       );
     }
+    if (u.desdeDejada && !(await incluirDeNuevo(item))) return;
     // Tildar y destildar se deshacen uno con el otro.
     const inversa = u.accion === ACCION_USAR.MARCAR ? ACCION_USAR.DESMARCAR : ACCION_USAR.MARCAR;
     return pedirDesdeLaTarjeta(
@@ -511,6 +515,49 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
       "El servidor no pudo cambiarlo y no dijo por qué.",
       { url: `/api/proveedores/listas/${id}/seleccion`, cuerpo: { accion: inversa, ids: [item.filaId] } }
     );
+  };
+
+  /**
+   * «DEJAR COMO ESTÁ», EL OTRO BOTÓN DE UNA TARJETA FUERA DE RANGO
+   * (2026-11-25, `ACCION_DEJAR`). Excluye la fila de ESTA lista —sin recordarlo
+   * para las próximas: `soloEstaLista`— y la tarjeta sale de «Para revisar».
+   * Marcado, tocarlo la vuelve a incluir. Se deshacen uno con el otro.
+   */
+  const dejar = (item) => {
+    const d = item.dejar;
+    if (!d) return;
+    const inversa = d.accion === ACCION_DEJAR.EXCLUIR ? ACCION_DEJAR.INCLUIR : ACCION_DEJAR.EXCLUIR;
+    return pedirDesdeLaTarjeta(
+      item,
+      `/api/proveedores/listas/${id}/seleccion`,
+      { accion: d.accion, ids: [item.filaId], soloEstaLista: true },
+      "El servidor no pudo dejarlo como está y no dijo por qué.",
+      { url: `/api/proveedores/listas/${id}/seleccion`, cuerpo: { accion: inversa, ids: [item.filaId], soloEstaLista: true } }
+    );
+  };
+
+  /**
+   * La vuelve a incluir sin recargar, para que «Usar precio nuevo» siga con lo
+   * suyo sobre una tarjeta que estaba dejada como está. Devuelve si salió; si
+   * no, deja el error en la tarjeta como cualquier otro pedido.
+   */
+  const incluirDeNuevo = async (item) => {
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: ACCION_DEJAR.INCLUIR, ids: [item.filaId], soloEstaLista: true }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) return true;
+      setErrores((prev) => new Map(prev).set(item.productoBaseId, `${j?.error || "El servidor no pudo volver a incluirlo y no dijo por qué."} No se guardó nada.`));
+    } catch {
+      setErrores((prev) =>
+        new Map(prev).set(item.productoBaseId, "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.")
+      );
+    }
+    return false;
   };
 
   /**
@@ -1144,6 +1191,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                 trabajando={tocando === item.productoBaseId}
                 error={errores.get(item.productoBaseId) ?? ""}
                 onUsar={(it) => usar(it)}
+                onDejar={dejar}
                 onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
                 onCaja={caja}
                 onKilos={kilos}
@@ -1553,6 +1601,7 @@ export default function ResultadoDeListaPage({ paquete = PAQUETE.TUS_PRODUCTOS }
                   trabajando={tocando === item.productoBaseId}
                   error={errores.get(item.productoBaseId) ?? ""}
                   onUsar={(it) => usar(it)}
+                  onDejar={dejar}
                   onCorregir={(it) => setRevisando({ filaId: it.filaId, productoBaseId: it.productoBaseId })}
                   onCaja={caja}
                   onKilos={kilos}

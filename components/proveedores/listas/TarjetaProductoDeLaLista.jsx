@@ -63,7 +63,12 @@ import {
 
 /** El borde ámbar de una tarjeta fuera de rango. Solo el borde: el fondo no cambia. */
 export const CLASE_TARJETA_FUERA_DE_RANGO = "border-1.5 sunmi-border-warning";
-import { ACCION_USAR, ESTADO_TU_PRODUCTO } from "@/lib/proveedores/listas/tusProductos";
+import {
+  ACCION_USAR,
+  ESTADO_TU_PRODUCTO,
+  TEXTO_DEJAR_COMO_ESTA,
+  TEXTO_USAR_PRECIO_NUEVO,
+} from "@/lib/proveedores/listas/tusProductos";
 import { cuentaPorKilo } from "@/lib/proveedores/listas/explicarLectura";
 import { presentacionDelRenglon } from "@/lib/proveedores/listas/presentacion";
 
@@ -81,17 +86,20 @@ export const TEXTO_OTRO = "Otro";
  * del tema. Exportado desde el 2026-10-24 para la hoja "Te quedan precios sin
  * aplicar", que tiene que dibujar el mismo botón y no uno parecido.
  */
-export function BotonUsar({ enUso = false, trabajando = false, onClick }) {
+export function BotonUsar({ enUso = false, trabajando = false, onClick, texto = TEXTO_USAR }) {
+  // `texto` desde el 2026-11-25: la tarjeta fuera de rango dibuja con ESTA
+  // pieza sus dos decisiones —«Usar precio nuevo» y «Dejar como está»—, la
+  // elegida rellena como siempre. Sin `texto` es el «✓ Usar» de siempre.
   return (
     // Sin usar es la acción rápida del kit; en uso, el botón lleno, que dice
     // que ya está elegido.
     enUso ? (
       <SunmiButton color="primary" aria-pressed onClick={onClick} disabled={trabajando} className="shrink-0">
-        {TEXTO_USAR}
+        {texto}
       </SunmiButton>
     ) : (
       <SunmiAccionRapida aria-pressed={false} onClick={onClick} disabled={trabajando}>
-        {TEXTO_USAR}
+        {texto}
       </SunmiAccionRapida>
     )
   );
@@ -123,6 +131,8 @@ export default function TarjetaProductoDeLaLista({
   trabajando = false,
   error = "",
   onUsar,
+  // «Dejar como está», en una tarjeta fuera de rango (`item.dejar`).
+  onDejar,
   onCorregir,
   // «Listo» con cuántas trae la caja.
   onCaja,
@@ -167,7 +177,29 @@ export default function TarjetaProductoDeLaLista({
 
   // ── ARRIBA A LA DERECHA: EL CASO FELIZ ───────────────────────────────────
   let accionArriba = null;
-  if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
+  if (abierta && puedeCambiarCostos && !controlando && item.dejar) {
+    // ── FUERA DE RANGO: LAS DOS DECISIONES, UNA AL LADO DE LA OTRA ────────
+    // (Emanuel, 2026-11-25). La elegida rellena, como «✓ Usar» en uso; se pasa
+    // de una a la otra tocándola. Ver `ACCION_DEJAR`.
+    accionArriba = (
+      <span className="flex flex-wrap gap-2">
+        {item.usar && (
+          <BotonUsar
+            texto={TEXTO_USAR_PRECIO_NUEVO}
+            enUso={cambia}
+            trabajando={trabajando}
+            onClick={() => onUsar?.(item)}
+          />
+        )}
+        <BotonUsar
+          texto={TEXTO_DEJAR_COMO_ESTA}
+          enUso={item.dejar.marcado === true}
+          trabajando={trabajando}
+          onClick={() => onDejar?.(item)}
+        />
+      </span>
+    );
+  } else if (abierta && puedeCambiarCostos && !controlando && item.usar && (revisar || cambia)) {
     accionArriba = <BotonUsar enUso={cambia} trabajando={trabajando} onClick={() => onUsar?.(item)} />;
   }
 

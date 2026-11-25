@@ -33,7 +33,14 @@ import {
 } from "@/components/proveedores/listas/PreguntaQueFalta";
 import { conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
-import { tusProductosDeLaLista } from "@/lib/proveedores/listas/tusProductos";
+import { tusProductosDeLaLista, TEXTO_DEJAR_COMO_ESTA, TEXTO_USAR_PRECIO_NUEVO } from "@/lib/proveedores/listas/tusProductos";
+
+// ── UNA TARJETA FUERA DE RANGO TIENE DOS DECISIONES (2026-11-25) ──────────
+// «Usar precio nuevo» y «Dejar como está» en lugar del «✓ Usar» solo (Emanuel,
+// lista de Arcor). Los tres casos de abajo que están fuera de rango —9 DE ORO
+// −0,5 %, el pimentón y GRANIX contra un 0 a 12— afirman eso ahora; los que
+// están en rango siguen con su «✓ Usar». Ver `dejarComoEsta.test.mjs`.
+const DECISIONES_FUERA_DE_RANGO = [TEXTO_USAR_PRECIO_NUEVO, TEXTO_DEJAR_COMO_ESTA];
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
 import { lecturaElegida, lecturasDeLaFila } from "@/lib/proveedores/listas/lecturasDeLaFila";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
@@ -220,7 +227,7 @@ test("9 DE ORO DIBUJADO: la cuenta con la caja de 20, el −0,5 % en verde y fue
   }).items[0];
   assert.equal(conEspacios(cuentaDe(item)), "$ 955,00 × 20 = $ 19.100,00 · hoy $ 19.200,00");
   const html = dibujar({ item, abierta: true });
-  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+  assert.deepEqual(botones(html).map((x) => x.texto), [...DECISIONES_FUERA_DE_RANGO, TEXTO_CORREGIR]);
   // Una baja va en verde (2026-11-06); que esté fuera del 0 a 12 lo dice la etiqueta aparte.
   assert.match(html, /sunmi-text-success[^>]*>-0,5 %</);
   assert.ok(html.includes(TEXTO_FUERA_DE_RANGO));
@@ -298,7 +305,7 @@ test("CON LA CAJA DE 24 RECORDADA, LA CUENTA SE ARMA Y LA PREGUNTA SE VA", () =>
   assert.equal(conEspacios(cuentaDe(item)), "$ 800,45 × 24 = $ 19.210,80 · hoy $ 19.680,00");
   const html = dibujar({ item, abierta: true });
   assert.ok(!html.includes(TEXTO_PREGUNTA_CAJA));
-  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+  assert.deepEqual(botones(html).map((x) => x.texto), [...DECISIONES_FUERA_DE_RANGO, TEXTO_CORREGIR]);
 });
 
 // ── «¿CUÁNTOS KILOS TRAE LA PIEZA?» (GRANIX BOCADITO 2KG, 2026-10-24) ───
@@ -357,7 +364,7 @@ test("GRANIX CON LA PIEZA DE 2 KG: LA CUENTA EN KILOS CONTRA $ 6.405 EL KILO, Y 
   assert.equal(conEspacios(cuentaDe(item)), "$ 22.105,73 ÷ (2 piezas × 2 kg) = $ 5.526,43 el kilo · hoy $ 6.405,00 el kilo");
   const html = dibujar({ item, abierta: true });
   assert.ok(!html.includes(TEXTO_PREGUNTA_KILOS));
-  assert.deepEqual(botones(html).map((x) => x.texto), [TEXTO_USAR, TEXTO_CORREGIR]);
+  assert.deepEqual(botones(html).map((x) => x.texto), [...DECISIONES_FUERA_DE_RANGO, TEXTO_CORREGIR]);
   // Una baja va en verde (2026-11-06), y fuera del 0 a 12 lo dice la etiqueta aparte.
   assert.match(html, /sunmi-text-success[^>]*>-13,7 %</);
   // La pieza sola, con la cuenta del pedido de Emanuel.
