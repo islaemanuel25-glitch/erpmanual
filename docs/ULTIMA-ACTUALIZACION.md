@@ -1,12 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-11-25 20:31
+**Fecha:** 2026-11-25 21:33
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat: una tarjeta fuera de rango ofrece «Usar precio nuevo» y «Dejar como está» — SIN VERIFICAR en pantalla, fix: Listas nunca queda en pantalla negra: límite de error por tarjeta y del segmento, que ofrece recargar si el sistema se actualizó — SIN VERIFICAR la causa
-- Archivos: 2 nuevos, 3 modificados (5 total)
+- perf: tocar una tarjeta trae esa tarjeta y no la lista entera — SIN VERIFICAR en pantalla, perf: aplicar una lista escribe en lote, con la misma auditoría y el mismo Libro de Costos, feat: una tarjeta fuera de rango ofrece «Usar precio nuevo» y «Dejar como está» — SIN VERIFICAR en pantalla
+- Archivos: 2 nuevos, 5 modificados (7 total)
+
+### auditoria
+- perf: aplicar una lista escribe en lote, con la misma auditoría y el mismo Libro de Costos
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización

@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-11-25 20:31
+**Última actualización:** 2026-11-25 21:33
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,9 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-11-25: perf: tocar una tarjeta trae esa tarjeta y no la lista entera — SIN VERIFICAR en pantalla
+- 2026-11-25: perf: aplicar una lista escribe en lote, con la misma auditoría y el mismo Libro de Costos
+- 2026-11-25: perf: abrir una lista ya no pasa por el motor los renglones que no puede atar por nombre
 - 2026-11-25: feat: una tarjeta fuera de rango ofrece «Usar precio nuevo» y «Dejar como está» — SIN VERIFICAR en pantalla
 - 2026-11-25: fix: una lista leída con el lector propio del proveedor, sin decisión de columna, ya no tira la pantalla de la lista — SIN VERIFICAR en pantalla
 - 2026-11-25: fix: Listas nunca queda en pantalla negra: límite de error por tarjeta y del segmento, que ofrece recargar si el sistema se actualizó — SIN VERIFICAR la causa
