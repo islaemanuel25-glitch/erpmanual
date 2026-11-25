@@ -181,8 +181,15 @@ export default function TarjetaProductoDeLaLista({
     // ── FUERA DE RANGO: LAS DOS DECISIONES, UNA AL LADO DE LA OTRA ────────
     // (Emanuel, 2026-11-25). La elegida rellena, como «✓ Usar» en uso; se pasa
     // de una a la otra tocándola. Ver `ACCION_DEJAR`.
+    //
+    // `whitespace-nowrap` (2026-11-25): dejada como está, la ruta manda
+    // `usar: null` y queda UN botón. El reparto de la fila calculaba el mínimo
+    // de este grupo como si el texto del botón pudiera partirse ("Dejar / como
+    // / está"), le daba ese ancho, y el botón —que no se encoge— se salía de la
+    // tarjeta por la derecha: 23 px a 360 de ancho. Sin partir el texto, el
+    // mínimo del grupo es el ancho real del botón.
     accionArriba = (
-      <span className="flex flex-wrap gap-2">
+      <span className="flex flex-wrap gap-2 whitespace-nowrap">
         {item.usar && (
           <BotonUsar
             texto={TEXTO_USAR_PRECIO_NUEVO}

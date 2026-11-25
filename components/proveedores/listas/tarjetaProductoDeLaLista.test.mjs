@@ -33,7 +33,12 @@ import {
 } from "@/components/proveedores/listas/PreguntaQueFalta";
 import { conLoRecordado } from "@/lib/proveedores/listas/cajaRecordada";
 import { CLASE_ACCION_RAPIDA } from "@/components/revision/PiezasDeRevision";
-import { tusProductosDeLaLista, TEXTO_DEJAR_COMO_ESTA, TEXTO_USAR_PRECIO_NUEVO } from "@/lib/proveedores/listas/tusProductos";
+import {
+  ESTADO_TU_PRODUCTO,
+  tusProductosDeLaLista,
+  TEXTO_DEJAR_COMO_ESTA,
+  TEXTO_USAR_PRECIO_NUEVO,
+} from "@/lib/proveedores/listas/tusProductos";
 
 // ── UNA TARJETA FUERA DE RANGO TIENE DOS DECISIONES (2026-11-25) ──────────
 // «Usar precio nuevo» y «Dejar como está» en lugar del «✓ Usar» solo (Emanuel,
@@ -418,6 +423,53 @@ test("NINGUNA PIEZA DE LA REVISIÓN DE UNA LISTA CORTA UN NOMBRE", () => {
   // El renglón de la hoja de vincular, entero y partiendo línea.
   const hoja = sinComentarios("components/proveedores/listas/HojaVincularConLaLista.jsx");
   assert.match(hoja, /break-words">\s*\{c\.codigo\} · \{c\.descripcion\}/);
+});
+
+// ── «DEJAR COMO ESTÁ» ELEGIDO NO SE SALE DE LA TARJETA (2026-11-25) ─────────
+//
+// En producción (ALFAJOR FULBITO, ALGABO JABON LIQ COCONUT 300), después de
+// tocarlo el botón relleno se salía por la derecha. Medido en Chromium con esta
+// misma tarjeta y el CSS del build: 35 px a 320 de ancho, 23 a 360, 13 a 390 y
+// 6 a 412; con el arreglo, 0 en los cuatro, y antes del toque nada se movió.
+//
+// El porqué: dejada, la ruta manda `usar: null` y queda UN botón en el grupo
+// de arriba a la derecha. El grupo es un elemento flexible de la fila del
+// nombre, y su mínimo se calculaba como si el texto del botón se pudiera
+// partir; el botón no se encoge (`shrink-0`) y desbordaba el grupo. Con
+// `whitespace-nowrap` en el grupo, su mínimo es el ancho real del botón.
+//
+// La suite no levanta un navegador, así que el candado fija LA CAUSA en lo que
+// la tarjeta dibuja: el botón elegido va en un grupo que no parte el texto, y
+// el botón no se encoge. El fixture es la tarjeta tal como la manda
+// `resultado` después del toque —sacada de `scripts/pruebas-db/listasRendimiento.mjs`,
+// con `usar: null`—, no una armada a mano.
+const DEJADA_COMO_LA_MANDA_LA_RUTA = {
+  productoBaseId: 1, filaId: 1, nombre: "ALGABO JABON LIQ COCONUT 300", estado: ESTADO_TU_PRODUCTO.NO_LO_CAMBIO,
+  costoHoy: 1600, costoNuevo: null, variacionPct: 31, enRango: false, multiplicador: null, porKilo: false,
+  divisorKg: null, kilosPorPieza: null, piezas: null, precioBase: null, usar: null,
+  dejar: { accion: "INCLUIR", marcado: true }, codigos: ["30180"],
+  renglon: { codigo: "30180", descripcion: "ARCOR PRODUCTO 180", precio: 1996.19, cantidad: 1, contenidoMl: null },
+  motivo: null, motivoTexto: null, renglones: 1, sugerencia: null, preguntarCaja: false, preguntarKilos: false,
+  cajaDelCatalogo: null, respuestaSugerida: null, sumadoA: null,
+};
+
+test("«DEJAR COMO ESTÁ» ELEGIDO QUEDA ADENTRO DE LA TARJETA: su grupo no parte el texto y el botón no se encoge", () => {
+  for (const item of [
+    DEJADA_COMO_LA_MANDA_LA_RUTA,
+    // Y con «Usar precio nuevo» al lado, que también puede llegar.
+    { ...DEJADA_COMO_LA_MANDA_LA_RUTA, usar: { accion: "CONFIRMAR", clave: "MISMA_PRESENTACION", desdeDejada: true } },
+  ]) {
+    const html = dibujar({ item, abierta: true, puedeCambiarCostos: true });
+    // El grupo que contiene al botón elegido, desde su `<span` hasta el botón.
+    const elegido = html.indexOf(`>${TEXTO_DEJAR_COMO_ESTA}</button>`);
+    assert.ok(elegido > 0, "no dibujó «Dejar como está»");
+    const abreGrupo = html.lastIndexOf("<span", html.lastIndexOf("<button", elegido));
+    const grupo = html.slice(abreGrupo, html.indexOf(">", abreGrupo));
+    assert.match(grupo, /\bwhitespace-nowrap\b/, `el grupo del botón elegido parte el texto: ${grupo}`);
+    const boton = html.slice(html.lastIndexOf("<button", elegido), elegido);
+    assert.match(boton, /aria-pressed="true"/, "el elegido tiene que ir relleno");
+    assert.match(boton, /\bshrink-0\b/);
+  }
 });
 
 test("EL RECHAZO DEL SERVIDOR SE DIBUJA EN LA TARJETA DONDE SE TOCÓ", () => {
