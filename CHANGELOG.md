@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-26] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: feat: Pedidos pendientes en el celular, copia de Recibir mercadería — SIN VERIFICAR EN PANTALLA
+
+
 ## [2026-11-25] - Actualización: compras-proveedor, proveedores
 
 ### Modificado
