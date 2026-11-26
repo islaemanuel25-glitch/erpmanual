@@ -24,17 +24,24 @@
 // copias sueltas de ese helper en el módulo y una tercera sería peor.
 import { formatearMoneda } from "@/lib/moneda";
 
+// Los textos llegan por props con el default de Recibir mercadería: Pedidos
+// pendientes usa esta misma tarjeta y solo cambia las palabras. Recibir no pasa
+// ninguna y se dibuja como antes.
 export default function TarjetaPorEntrar({
   total = 0,
   rotuloDelPeriodo = "",
   pedidos = 0,
   diasDelMasViejo = null,
+  titulo = "Por entrar",
+  aclaracion = "estimado al pedir",
+  estadoSingular = "pedido esperando",
+  estadoPlural = "pedidos esperando",
 }) {
   const hayPedidos = pedidos > 0;
 
   return (
     <div className="min-h-tarjetaPorEntrar rounded-xl border-2 sunmi-border-accent sunmi-bg-card px-4 py-filtro flex flex-col gap-dato">
-      <span className="text-sm3 sunmi-text-muted">Por entrar</span>
+      <span className="text-sm3 sunmi-text-muted">{titulo}</span>
 
       <span className="text-xl3 font-bold sunmi-text-strong tabular-nums">
         {formatearMoneda(total)}
@@ -45,14 +52,14 @@ export default function TarjetaPorEntrar({
       <span className="text-sm3 sunmi-text-muted">
         {rotuloDelPeriodo}
         {/* La palabra que evita la discusión con la factura. */}
-        {" · estimado al pedir"}
+        {` · ${aclaracion}`}
       </span>
 
       <div className="border-t sunmi-divider pt-dato mt-dato">
         <span className="text-sm3 font-medium sunmi-text-accent">
           {hayPedidos
-            ? `${pedidos} ${pedidos === 1 ? "pedido esperando" : "pedidos esperando"}`
-            : "Sin pedidos esperando"}
+            ? `${pedidos} ${pedidos === 1 ? estadoSingular : estadoPlural}`
+            : `Sin ${estadoPlural}`}
           {hayPedidos && diasDelMasViejo != null
             ? ` · el más viejo hace ${diasDelMasViejo} ${
                 diasDelMasViejo === 1 ? "día" : "días"

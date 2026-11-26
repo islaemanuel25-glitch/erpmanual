@@ -27,7 +27,19 @@ import DiaConBanda from "@/components/periodo/DiaConBanda";
 import { formatearMoneda } from "@/lib/moneda";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
 
-export default function DiaDePedidos({ dia, onRecibir }) {
+// ── LO QUE CAMBIA DE PANTALLA A PANTALLA: EL ESTADO Y LA ACCIÓN ───────────
+//
+// Pedidos pendientes usa esta misma tarjeta (copia de Recibir mercadería). Lo
+// único que difiere es qué dice la línea del estado y qué botones lleva cada
+// pedido. Los dos llegan por props con el default de Recibir, así que Recibir
+// no pasa nada y se dibuja exactamente como antes.
+const ESTADO_DE_RECIBIR = () => "Esperando mercadería";
+
+// La medida del botón de la fila. Se le pasa a `renderAccion` para que los
+// botones de otra pantalla salgan con la misma, sin escribirla de nuevo.
+const CLASE_BOTON_DE_FILA = "min-h-botonRecibir rounded-control px-4 text-sm3";
+
+export default function DiaDePedidos({ dia, onRecibir, estadoDe = ESTADO_DE_RECIBIR, renderAccion }) {
   const pedidos = dia?.pedidos || [];
 
   // La caja y la banda son `DiaConBanda`, la misma de Transferencias, Pagos a
@@ -71,7 +83,7 @@ export default function DiaDePedidos({ dia, onRecibir }) {
               {horaAR(p.fechaEnviado || p.createdAt)} · {p.cantItems}{" "}
               {p.cantItems === 1 ? "producto" : "productos"}
             </div>
-            <div className="text-sm3 sunmi-text-accent truncate">Esperando mercadería</div>
+            <div className="text-sm3 sunmi-text-accent truncate">{estadoDe(p)}</div>
           </div>
 
           <div className="shrink-0 flex flex-col items-end gap-dato">
@@ -87,14 +99,18 @@ export default function DiaDePedidos({ dia, onRecibir }) {
             <span className="text-sm2 sunmi-text-muted">
               {p.totalFacturado != null ? "te facturó" : "estimado al pedir"}
             </span>
-            <SunmiButton
-              type="button"
-              color="primary"
-              onClick={() => onRecibir?.(p)}
-              className="min-h-botonRecibir rounded-control px-4 text-sm3"
-            >
-              Recibir
-            </SunmiButton>
+            {renderAccion ? (
+              renderAccion(p, CLASE_BOTON_DE_FILA)
+            ) : (
+              <SunmiButton
+                type="button"
+                color="primary"
+                onClick={() => onRecibir?.(p)}
+                className={CLASE_BOTON_DE_FILA}
+              >
+                Recibir
+              </SunmiButton>
+            )}
           </div>
         </div>
       ))}
