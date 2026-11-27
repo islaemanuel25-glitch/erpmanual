@@ -4,6 +4,7 @@
 
 ### Modificado
 - **compras-proveedor**: fix: una factura de hojas sin total ya no «no cierra» contra el subtotal de una hoja (Mauro #759)
+- **compras-proveedor**: fix: al recibir se puede subir y bajar el costo, y viene marcado el más alto (Hellmanns 250G) — SIN VERIFICAR con los datos del caso
 
 ## [2026-11-26] - Actualización: compras-proveedor
 
