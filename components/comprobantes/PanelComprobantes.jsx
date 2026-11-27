@@ -558,7 +558,10 @@ export default function PanelComprobantes({
           texto: d.posibleLecturaCorrida
             ? d.avisoLecturaCorrida
             : sinTotal
-            ? textoDelPapelSinTotal({ leidos: d.lineas, vistos: d.lineasEnElPapel, hojaImpresa: d.hojaImpresa })
+            ? // Si esta foto se juntó con la anterior, ya es la hoja siguiente:
+              // no se vuelve a pedir otra (Mauro #759). La factura juntada
+              // tampoco la pide —la fusión deja `hojaImpresa` vacío—.
+              textoDelPapelSinTotal({ leidos: d.lineas, vistos: d.lineasEnElPapel, hojaImpresa: juntadas ? null : d.hojaImpresa })
             : d.cierra
             ? `Leído y verificado: ${d.lineas} ${d.lineas === 1 ? "producto" : "productos"}.`
             : "Leído, pero la cuenta no cierra. Está señalado abajo, con la foto al lado.",
