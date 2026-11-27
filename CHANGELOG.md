@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-11-27] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: fix: una factura de hojas sin total ya no «no cierra» contra el subtotal de una hoja (Mauro #759)
+
 ## [2026-11-26] - Actualización: compras-proveedor
 
 ### Modificado
