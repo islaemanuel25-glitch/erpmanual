@@ -93,7 +93,7 @@ import {
   SITUACION,
   VARIACION_POR_DEFECTO,
 } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
-import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
+import { esBajaGrande } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { ORIGEN_VINCULO, textoParaBuscarAMano } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
   faltaLaLineaDelPedido,
@@ -117,7 +117,6 @@ import {
   piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
   saltoDePrecioAceptable,
-  saltoSinBultoConOpciones,
   subeMasQueLoPlausible,
   TEXTO_ELEGI_EL_PRECIO,
   textoSiAceptaElSalto,
@@ -230,13 +229,21 @@ function Bloque({ titulo, accion = null, children }) {
  * QUÉ OPCIÓN DE PRECIO VIENE MARCADA AL ABRIR: `true` aceptar, `false` dejar,
  * `null` ninguna.
  *
- * Lo ya decidido manda, y lo que la regla bloquea es dejar. Si no, el más alto
- * de los dos precios (Emanuel, 2026-10-29): en el salto de precio, los de UNA
- * unidad —los mismos que dicen las dos opciones—; si no, los de la regla del
- * proveedor, que deja `null` solo cuando la diferencia es el factor del bulto.
+ * Lo ya decidido manda. Si no, el más alto de los dos precios (Emanuel,
+ * 2026-10-29): en el salto de precio, los de UNA unidad —los mismos que dicen
+ * las dos opciones—; si no, los de la regla del proveedor, que deja `null` solo
+ * cuando la diferencia es el factor del bulto.
+ *
+ * ── NINGUNA REGLA FUERZA "DEJAR" (Emanuel, 2026-11-27, Hellmanns 250G) ───
+ *
+ * Arrancaba con "si aceptar está bloqueado, dejar": una baja de más del 15 %
+ * contra el CATÁLOGO marcaba "Dejar el que tenía" y escondía "Aceptar", aunque
+ * contra el costo que la hoja muestra el papel fuera MÁS CARO —$1.516,29
+ * contra $1.290,94—. Quien tocaba "Revisado" guardaba "Dejás tu precio" sin
+ * haberlo elegido, y no había forma de subirlo. Una diferencia grande es una
+ * alerta, no un bloqueo: viene marcado el más alto y las dos se pueden tomar.
  */
 export function opcionAlAbrir({ fila, sugerida, saltoAceptable, deUnaUnidad }) {
-  if (aceptarEstaBloqueado(fila?.precio?.decision)) return false;
   const decidida = decisionVigente(fila);
   if (decidida) return decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA;
   // Una suba de más del 35 % no viene marcada: Emanuel tiene que tocar una
@@ -580,24 +587,22 @@ export default function HojaCorregirLinea({
   const deUnaUnidad = precioDeUnaUnidad(fila);
   // En qué unidad van los dos precios cuando se muestran juntos: dicho al lado.
   const unidadDelPrecio = unidadDeComparacion(fila);
-  // Y lo que ya está decidido por regla tampoco se ofrece: una baja no se
-  // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
-  // es dejar el propio, que es la única que corresponde.
-  //
-  // Salvo un salto de un producto sin bulto, aunque sea una baja grande: hay
-  // una sola lectura y la baja se ofrece con su número (Emanuel, 2026-11-05,
-  // maní de Prod Nat). La ruta de aceptar pregunta lo mismo.
-  const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision) && !saltoSinBultoConOpciones(fila);
   // ── UN SALTO DE PRECIO GRANDE SE PUEDE ACEPTAR (Emanuel, 2026-10-29) ───
   //
   // PICNIC 38g: $375,35 contra $246,00, y el aumento era real. Antes la hoja
   // decía "tu costo no se toca" y no había forma de tomarlo. Ahora se ofrecen
-  // las mismas dos opciones que en el caso normal, con el aviso arriba. Lo ya
-  // decidido bajo el freno sigue diciéndose como decidido, y una baja que la
-  // regla frena sigue sin ofrecerse, igual que en el caso normal.
-  const saltoAceptable = saltoDePrecioAceptable(fila) && !yaDecidioElFreno && !noSePuedeAceptar;
-  // Un salto de precio, se pueda aceptar o no —una baja la frena la regla—:
-  // se muestran los dos precios de una unidad con el porcentaje, no la frase.
+  // las mismas dos opciones que en el caso normal, con el aviso arriba.
+  //
+  // ── Y NADA LAS SACA (Emanuel, 2026-11-27, Hellmanns 250G) ─────────────
+  //
+  // Ni una baja grande contra el catálogo (la "sospecha de mala lectura") ni un
+  // "dejo mi precio" guardado antes sobre otros números: las dos cosas
+  // escondían las opciones sin dejar un «Cambiar», y el costo no se podía
+  // subir ni bajar desde la recepción. Subir o bajar al recibir nunca queda
+  // bloqueado; la diferencia grande se avisa con el tono y el porcentaje.
+  const saltoAceptable = saltoDePrecioAceptable(fila);
+  // Un salto de precio: se muestran los dos precios de una unidad con el
+  // porcentaje, no la frase.
   const esSaltoDePrecio = saltoDePrecioAceptable(fila) && deUnaUnidad !== null;
 
   // ── LA REGLA DEL PROVEEDOR, SOBRE LOS DOS PRECIOS DE ESTE RENGLÓN ─────
@@ -1128,7 +1133,7 @@ export default function HojaCorregirLinea({
     ? pctDeLaTarjeta ?? ((deUnaUnidad.papel - deUnaUnidad.erp) / deUnaUnidad.erp) * 100
     : null;
   const pctDelCambio = pctDeLaTarjeta ?? porcentaje;
-  const tituloDelPrecio = yaDecidioElFreno
+  const tituloDelPrecio = yaDecidioElFreno && !saltoAceptable
     ? "Ya decidiste este precio"
     : pctDelSalto !== null && Number.isFinite(pctDelSalto)
     ? `El precio ${pctDelSalto < 0 ? "bajó" : "subió"} ${Math.abs(pctDelSalto).toFixed(1).replace(".", ",")} %`
@@ -1604,7 +1609,7 @@ export default function HojaCorregirLinea({
               // Sin uno de los dos precios no hay decisión posible: se dice cuál
               // falta y qué pasa igual. Nada que elegir.
               <>
-                {yaDecidioElFreno && deUnaUnidad && (
+                {yaDecidioElFreno && !saltoAceptable && deUnaUnidad && (
                   <span className="text-sm3 sunmi-text-muted break-words">
                     {textoDeDecision(DECISION_DE_PRECIO.DEJA_EL_MIO)} · {formatearMoneda(deUnaUnidad.erp)} la unidad
                   </span>
@@ -1679,11 +1684,9 @@ export default function HojaCorregirLinea({
                     pregunta de nuevo, sin texto extra; una decisión que sigue
                     valiendo se dice como "Ya decidiste este precio". */}
 
-                {/* Lo que ya está decidido por regla no se ofrece: el servidor
-                    rechaza una baja y un salto brusco, así que el botón sería
-                    un error seguro. Se dice el porqué con el texto que esa
-                    regla ya tiene escrito. */}
-                {noSePuedeAceptar && fila?.precio?.decision?.detalle && (
+                {/* Una baja grande contra el catálogo se avisa con su texto,
+                    y las dos opciones siguen ahí (Hellmanns, 2026-11-27). */}
+                {esBajaGrande(fila?.precio?.decision) && fila?.precio?.decision?.detalle && (
                   <span className="text-sm3 sunmi-text-muted break-words">
                     {fila.precio.decision.detalle}
                   </span>
@@ -1699,14 +1702,12 @@ export default function HojaCorregirLinea({
                 )}
 
                 <div className="flex flex-col gap-0.5">
-                  {!noSePuedeAceptar && (
-                    <OpcionDePrecio
-                      elegida={aceptaPrecio}
-                      titulo="Aceptar el precio nuevo"
-                      detalle={textoDelCostoQueQueda(fila)}
-                      onElegir={() => setAceptaPrecio(true)}
-                    />
-                  )}
+                  <OpcionDePrecio
+                    elegida={aceptaPrecio}
+                    titulo="Aceptar el precio nuevo"
+                    detalle={textoDelCostoQueQueda(fila)}
+                    onElegir={() => setAceptaPrecio(true)}
+                  />
                   <OpcionDePrecio
                     elegida={!aceptaPrecio}
                     titulo="Dejar el que tenía"

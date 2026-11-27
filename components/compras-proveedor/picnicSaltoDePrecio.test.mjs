@@ -100,7 +100,9 @@ test("los textos dicen qué queda en cada caso, con el formato de moneda de la p
 test("al guardar con «aceptar» elegido, va por la misma ruta que el caso normal", () => {
   const hoja = codigoDe("components/compras-proveedor/HojaCorregirLinea.jsx");
   assert.match(hoja, /if \(cambio \|\| \(saltoAceptable && aceptaPrecio !== null\)\) \{\s*const r = aceptaPrecio \? await onAceptarPrecio\?\.\(fila\) : await onDejarMiPrecio\?\.\(fila\);/);
-  assert.match(hoja, /const saltoAceptable = saltoDePrecioAceptable\(fila\) && !yaDecidioElFreno && !noSePuedeAceptar;/);
+  // Desde Hellmanns 250G (2026-11-27) nada saca las opciones: ni una baja
+  // grande ni un "dejo mi precio" de otros números.
+  assert.match(hoja, /const saltoAceptable = saltoDePrecioAceptable\(fila\);/);
 });
 
 test("el servidor deja pasar el salto, preguntando lo mismo sobre la fila de la hoja", () => {
@@ -108,12 +110,12 @@ test("el servidor deja pasar el salto, preguntando lo mismo sobre la fila de la 
   assert.match(ruta, /if \(motivoQueFrena && !dejaElMioBajoFreno && !aceptaUnSalto\) \{/);
   // Y lo que frena se pregunta sobre la fila de la hoja si está (2026-11-06).
   assert.match(ruta, /const motivoQueFrena = filaComoLaVeLaHoja != null \? motivoSinComparacion\(filaComoLaVeLaHoja\) : sinComparacion;/);
-  // La fila de la hoja, con lo que la ruta de la pantalla le agrega, y las dos
-  // preguntas sobre ella (la segunda desde el maní de Prod Nat, 2026-11-05).
+  // La fila de la hoja, con lo que la ruta de la pantalla le agrega, y la
+  // pregunta sobre ella. El "freno levantado" del maní de Prod Nat se borró el
+  // 2026-11-27: una baja grande ya no frena en ningún producto.
   assert.match(ruta, /const filaComoLaVeLaHoja =\s*filaDeLaHoja != null\s*\?\s*\{\s*\.\.\.filaDeLaHoja,/);
   assert.match(ruta, /const aceptaUnSalto = filaComoLaVeLaHoja != null && saltoDePrecioAceptable\(filaComoLaVeLaHoja\);/);
-  assert.match(ruta, /const frenoLevantado = filaComoLaVeLaHoja != null && saltoSinBultoConOpciones\(filaComoLaVeLaHoja\);/);
-  assert.match(ruta, /unidad: analisis\.unidad,\s*frenoLevantado,\s*\}\);/);
+  assert.doesNotMatch(ruta, /frenoLevantado/);
 });
 
 test("lo que no es un precio sigue sin poder aceptarse: un papel corrido, una escala", () => {

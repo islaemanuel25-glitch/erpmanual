@@ -33,16 +33,14 @@ import HojaCorregirLinea from "./HojaCorregirLinea.jsx";
 import TarjetaLineaFactura from "./TarjetaLineaFactura.jsx";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
-import { ACCION_PRECIO, MOTIVO_NO_ACEPTAR, puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
+import { ACCION_PRECIO, puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { formatearMoneda } from "@/lib/moneda";
 // El cartel que frenaba, borrado el 2026-11-07. Se sigue afirmando que no aparece.
 const AVISO_ESCALA = "No se puede saber en qué viene: revisá la cantidad.";
 import {
   TEXTO_ELEGI_EN_QUE_VIENE,
   loQueNoCuadra,
-  productoSinBulto,
   saltoDePrecioAceptable,
-  saltoSinBultoConOpciones,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 
 const aLaVista = (el) => renderToStaticMarkup(el).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
@@ -90,13 +88,12 @@ const tarjeta = (fila) => renderToStaticMarkup(React.createElement(TarjetaLineaF
 
 test("MANÍ DE PROD NAT: sin pack, 8 × $2.312,50 contra $5.000 es una baja de PRECIO, no una escala", () => {
   const f = mani();
-  assert.equal(productoSinBulto(f), true);
   assert.equal(f.costoFactura, 2312.5);
   assert.equal(loQueNoCuadra(f).que, "PRECIO", "antes: ESCALA, por el 2,16 cerca de 2");
   assert.match(loQueNoCuadra(f).texto, /\(54 % menos\)\.$/);
   assert.equal(saltoDePrecioAceptable(f), true);
-  assert.equal(saltoSinBultoConOpciones(f), true);
-  // La regla de bajas lo clasifica para frenar; sin bulto se ofrece igual.
+  // La regla de bajas la clasifica como baja grande: se avisa y se ofrece igual
+  // (desde Hellmanns 250G, 2026-11-27, en cualquier producto, no solo sin bulto).
   assert.equal(f.precio.decision.accion, ACCION_PRECIO.FRENA);
 });
 
@@ -124,11 +121,10 @@ test("LA TARJETA: sin el cartel de escala, con la diferencia en el renglón del 
   assert.match(html, /sunmi-state-warning/);
 });
 
-test("EL SERVIDOR acepta el precio del papel con el freno levantado, y sin levantarlo sigue rechazando", () => {
+test("EL SERVIDOR acepta el precio del papel: la baja grande ya no frena (Hellmanns 250G, 2026-11-27)", () => {
   const f = mani();
   const base = { linea: {}, productoBaseId: 601, lineaDePedidoId: 9101, comprobante: { estado: "CARGADO" }, decision: f.precio.decision, unidad: f.unidad };
-  assert.deepEqual(puedeAceptarse({ ...base, frenoLevantado: saltoSinBultoConOpciones(f) }), { ok: true });
-  assert.deepEqual(puedeAceptarse(base), { ok: false, motivo: MOTIVO_NO_ACEPTAR.SALTO_BRUSCO });
+  assert.deepEqual(puedeAceptarse(base), { ok: true });
 });
 
 test("CONTRAPRUEBA: un pack de 12 donde ninguna lectura gana clara se pregunta, sin freno y sin opciones de precio", () => {
@@ -138,10 +134,8 @@ test("CONTRAPRUEBA: un pack de 12 donde ninguna lectura gana clara se pregunta, 
   // frenaba con "No se puede saber en qué viene: revisá la cantidad.".
   const f = pack();
   assert.equal(f.unidad.requiereDecision, true);
-  assert.equal(productoSinBulto(f), false);
   assert.equal(loQueNoCuadra(f).que, "ELEGIR");
   assert.equal(saltoDePrecioAceptable(f), false);
-  assert.equal(saltoSinBultoConOpciones(f), false);
   assert.match(aLaVistaHtml(tarjeta(f)), new RegExp(literal(TEXTO_ELEGI_EN_QUE_VIENE)));
   assert.doesNotMatch(aLaVistaHtml(tarjeta(f)), /No se puede saber en qué viene/);
   assert.doesNotMatch(aLaVista(React.createElement(HojaCorregirLinea, { fila: f, abierta: true, onCerrar() {} })), /Aceptar el precio nuevo/);

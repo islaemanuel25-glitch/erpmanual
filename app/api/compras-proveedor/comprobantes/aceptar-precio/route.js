@@ -67,7 +67,6 @@ import {
   escalaSinDeducir,
   motivoSinComparacion,
   saltoDePrecioAceptable,
-  saltoSinBultoConOpciones,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
@@ -385,9 +384,6 @@ export async function POST(req) {
           }
         : null;
     const aceptaUnSalto = filaComoLaVeLaHoja != null && saltoDePrecioAceptable(filaComoLaVeLaHoja);
-    // Y si es un producto sin bulto, la baja grande también se acepta: la hoja
-    // la ofrece con su número (Emanuel, 2026-11-05, maní de Prod Nat).
-    const frenoLevantado = filaComoLaVeLaHoja != null && saltoSinBultoConOpciones(filaComoLaVeLaHoja);
     // ── CON LA FILA DE LA HOJA, SE PREGUNTA SOBRE ELLA (2026-11-06) ───────
     //
     // `comparacion` no trae cantidad ni importe, y sin ellos `loQueNoCuadra`
@@ -478,9 +474,7 @@ export async function POST(req) {
       lineaDePedidoId: delPedido.detalle?.id ?? null,
       // Con el veredicto de hoy, no el guardado (`papelDeHoy`, arriba).
       comprobante: { ...linea.comprobante, estado: papelDeHoy?.estado ?? linea.comprobante.estado },
-      decision: analisis.decision,
       unidad: analisis.unidad,
-      frenoLevantado,
     });
     if (!puede.ok) {
       return NextResponse.json(
